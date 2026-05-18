@@ -946,7 +946,7 @@ const StudentManagement = () => {
       {/* Students Table */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 mt-5 overflow-hidden">
         {/* Desktop Table - Scrollable Container */}
-<div className="hidden md:block w-full overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+<div className="hidden md:block w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
   <table className="w-full min-w-[1220px] table-fixed border-collapse">
     <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       <tr>

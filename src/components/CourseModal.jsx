@@ -495,81 +495,10 @@ const CourseModal = ({
     return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
-  const handleAddSection = () => {
-    setFormData((prev) => {
-      const nextSections = [...(prev.sections || [])];
-      nextSections.push(createEmptySection(nextSections.length));
-      return { ...prev, sections: nextSections };
-    });
-  };
 
-  const handleRemoveSection = (sectionIndex) => {
-    setFormData((prev) => {
-      const remaining = (prev.sections || []).filter((_, idx) => idx !== sectionIndex);
-      const reSorted = remaining.map((section, idx) => ({
-        ...section,
-        sortOrder: idx,
-        title: section.title || `Section ${idx + 1}`
-      }));
-      return { ...prev, sections: reSorted.length > 0 ? reSorted : [createEmptySection(0)] };
-    });
-  };
 
-  const handleSectionFieldChange = (sectionIndex, field, value) => {
-    setFormData((prev) => {
-      const nextSections = [...(prev.sections || [])];
-      const current = nextSections[sectionIndex] || createEmptySection(sectionIndex);
-      nextSections[sectionIndex] = { ...current, [field]: value };
-      return { ...prev, sections: nextSections };
-    });
-  };
 
-  const handleSectionLectureSelect = (sectionIndex, lecture) => {
-    const mappingId = lecture.lmscourseMappingId || lecture.id;
-    setFormData((prev) => {
-      const nextSections = [...(prev.sections || [])];
-      const current = nextSections[sectionIndex] || createEmptySection(sectionIndex);
-      const lectures = [...(current.lectures || [])];
 
-      const alreadySelected = lectures.some((l) => (l.lmscourseMappingId || l.id) === mappingId);
-      if (alreadySelected) return prev;
-
-      lectures.push(createLectureData(lecture, lectures.length));
-      nextSections[sectionIndex] = { ...current, lectures };
-      return { ...prev, sections: nextSections };
-    });
-  };
-
-  const handleSectionLectureRemove = (sectionIndex, lectureId) => {
-    setFormData((prev) => {
-      const nextSections = [...(prev.sections || [])];
-      const current = nextSections[sectionIndex];
-      if (!current) return prev;
-
-      const remaining = (current.lectures || []).filter((l) => (l.lmscourseMappingId || l.id) !== lectureId);
-      const reSorted = remaining.map((l, idx) => ({ ...l, sortOrder: idx }));
-
-      nextSections[sectionIndex] = { ...current, lectures: reSorted };
-      return { ...prev, sections: nextSections };
-    });
-  };
-
-  const handleSectionLectureReorder = (sectionIndex, dragIndex, dropIndex) => {
-    setFormData((prev) => {
-      const nextSections = [...(prev.sections || [])];
-      const current = nextSections[sectionIndex];
-      if (!current) return prev;
-
-      const next = [...(current.lectures || [])];
-      const dragged = next[dragIndex];
-      next.splice(dragIndex, 1);
-      next.splice(dropIndex, 0, dragged);
-      const reSorted = next.map((l, idx) => ({ ...l, sortOrder: idx }));
-
-      nextSections[sectionIndex] = { ...current, lectures: reSorted };
-      return { ...prev, sections: nextSections };
-    });
-  };
 
   const handleInputChange = e => {
     const { name, value, type, checked } = e.target;
