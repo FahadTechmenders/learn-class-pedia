@@ -195,7 +195,6 @@ export class Notebook implements OnInit, OnChanges {
     
     
     this.isDownloadingPdf.set(true);
-    this.toastr.info('Generating your PDF...', 'Please wait');
     
     this.courseService.downloadNotebookPdf(
       p.shortCourseId, 
@@ -216,12 +215,11 @@ export class Notebook implements OnInit, OnChanges {
         window.URL.revokeObjectURL(url);
         
         this.isDownloadingPdf.set(false);
-        this.toastr.success('PDF downloaded successfully!', 'Success');
       },
       error: (err: any) => {
         console.error('Download PDF Error:', err);
         this.isDownloadingPdf.set(false);
-        this.toastr.error('Failed to download PDF. Please try again.', 'Download Error');
+        console.error('Failed to download PDF. Please try again.');
       }
     });
   }

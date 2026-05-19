@@ -17,7 +17,7 @@ import { StartAssessment } from '../assessment/start-assessment/start-assessment
 import { FinalAssessment } from '../assessment/final-assessment/final-assessment';
 import { FailedAssessment } from '../assessment/failed-assessment/failed-assessment';
 import { ClearedAssessment } from '../assessment/cleared-assessment/cleared-assessment';
-import { EnrolledCourses } from '../course/enrolled-courses/enrolled-courses';
+import { EnrolledCourses } from '../classroom/enrolled-courses/enrolled-courses';
 import { VideoPlayerComponent } from './video-player/video-player';
 import { Chat } from './chat/chat';
 import { ToastrService } from 'ngx-toastr';

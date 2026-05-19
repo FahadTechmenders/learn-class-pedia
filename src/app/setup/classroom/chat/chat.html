@@ -14,14 +14,51 @@
        M15 9l4-4M19 5v5M19 5h-5" />
       </svg>
     </button>
-    <button
-      class="absolute bg-white top-4 right-4 text-gray-600 transition-colors p-2 rounded-full">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-        <circle cx="12" cy="5" r="2" />
-        <circle cx="12" cy="12" r="2" />
-        <circle cx="12" cy="19" r="2" />
-      </svg>
-    </button>
+    <!-- Three-dot menu -->
+    <div class="absolute top-4 right-4">
+      <button (click)="toggleChatMenu($event)"
+        class="bg-white text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="2" />
+          <circle cx="12" cy="12" r="2" />
+          <circle cx="12" cy="19" r="2" />
+        </svg>
+      </button>
+      @if (isChatMenuOpen()) {
+      <div class="absolute top-full right-0 mt-1 bg-white rounded-xl shadow-lg z-[60] py-1 min-w-[150px] border border-gray-100"
+        (click)="$event.stopPropagation()">
+        <button (click)="clearChat()" [disabled]="chatMessages().length < 1"
+          class="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-xl disabled:opacity-60 disabled:cursor-not-allowed">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Clear Chat
+        </button>
+        <button (click)="downloadChat()" [disabled]="isDownloadingChat() || chatMessages().length < 1"
+          class="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+          @if (isDownloadingChat()) {
+          <svg class="h-3.5 w-3.5 text-gray-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          Downloading...
+          } @else {
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download Chat
+          }
+        </button>
+        <button (click)="closeChat()"
+          class="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-b-xl">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Close Chat
+        </button>
+      </div>
+      }
+    </div>
 
     <!-- Robot Icon - Blue rounded square -->
     <div class="w-auto h-12 mb-1 rounded-2xl flex items-center justify-start">

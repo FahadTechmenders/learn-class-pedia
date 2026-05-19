@@ -6,6 +6,7 @@ import { CourseService } from '../../../services/course.service';
 import { ToastrService } from 'ngx-toastr';
 import { Subject, takeUntil } from 'rxjs';
 import { SpeechService } from '../../../services/speech.service';
+import jsPDF from 'jspdf';
 
 // Declare global window interface for chattrik API
 declare global {
@@ -70,6 +71,9 @@ export class Chat implements OnInit {
   isLiveChatActive = signal<boolean>(false);
   isLiveChatLoading = signal<boolean>(false);
 
+  isChatMenuOpen = signal<boolean>(false);
+  isDownloadingChat = signal<boolean>(false);
+  private menuCloseHandler: (() => void) | null = null;
   chatInput = signal<string>('');
   chatThreadId = signal<string>('');
   isChatSending = signal<boolean>(false);
@@ -115,13 +119,11 @@ export class Chat implements OnInit {
     }, 100);
   }
 
-  ngOnInit(): void {
-    // Add welcome message only on browser (skip SSR to prevent duplicate on hydration)
-    if (isPlatformBrowser(this.platformId) && this.chatMessages().length === 0) {
-      this.chatMessages.set([{
-        id: this.WELCOME_MESSAGE_ID,
-        role: 'bot',
-        text: this.sanitizer.bypassSecurityTrustHtml(`
+  private buildWelcomeMessage() {
+    return {
+      id: this.WELCOME_MESSAGE_ID,
+      role: 'bot' as const,
+      text: this.sanitizer.bypassSecurityTrustHtml(`
           Hi! 👋<br>
           I'm Lumi, your AI learning assistant. How can I help you with this lecture?
           <div style="margin: 12px 0; display: flex; flex-direction: column; gap: 4px;">
@@ -137,8 +139,120 @@ export class Chat implements OnInit {
             </button>
           </div>
         `)
-      }]);
+    };
+  }
+
+  ngOnInit(): void {
+    // Add welcome message only on browser (skip SSR to prevent duplicate on hydration)
+    if (isPlatformBrowser(this.platformId) && this.chatMessages().length === 0) {
+      this.chatMessages.set([this.buildWelcomeMessage()]);
     }
+  }
+
+  toggleChatMenu(event: Event) {
+    event.stopPropagation();
+    const newState = !this.isChatMenuOpen();
+    this.isChatMenuOpen.set(newState);
+    if (newState && isPlatformBrowser(this.platformId)) {
+      const handler = () => {
+        this.isChatMenuOpen.set(false);
+        document.removeEventListener('click', handler);
+        this.menuCloseHandler = null;
+      };
+      this.menuCloseHandler = handler;
+      document.addEventListener('click', handler);
+    } else {
+      this.closeMenuListener();
+    }
+  }
+
+  private closeMenuListener() {
+    if (this.menuCloseHandler && isPlatformBrowser(this.platformId)) {
+      document.removeEventListener('click', this.menuCloseHandler);
+      this.menuCloseHandler = null;
+    }
+  }
+
+  clearChat() {
+    this.isChatMenuOpen.set(false);
+    this.closeMenuListener();
+    this.chatMessages.set([this.buildWelcomeMessage()]);
+    this.chatThreadId.set('');
+    this.expandedMessages.set(new Set());
+    this.truncatedMessages.set(new Set());
+    this.msgIdCounter = 0;
+  }
+
+  downloadChat() {
+    const messages = this.chatMessages();
+    const nonWelcome = messages.filter(m => m.id !== this.WELCOME_MESSAGE_ID);
+    if (nonWelcome.length === 0) return;
+    this.isDownloadingChat.set(true);
+    setTimeout(() => {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('Chat Transcript', 10, 15);
+      doc.setFontSize(10);
+      doc.text(`Date: ${new Date().toLocaleString()}`, 10, 22);
+      doc.setLineWidth(0.5);
+      doc.line(10, 25, 200, 25);
+      
+      let yPosition = 35;
+      const pageHeight = 280;
+      const margin = 10;
+      
+      nonWelcome.forEach(msg => {
+        const role = msg.role === 'bot' ? 'Lumi AI' : 'You';
+        const raw = typeof msg.text === 'string'
+          ? msg.text
+          : (msg.text as any)?.changingThisBreaksApplicationSecurity || '';
+        const cleanText = raw.replace(/<[^>]*>/g, '').trim();
+        
+        if (cleanText) {
+          if (yPosition > pageHeight) {
+            doc.addPage();
+            yPosition = 15;
+          }
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${role}:`, margin, yPosition);
+          yPosition += 6;
+          
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          const lines = doc.splitTextToSize(cleanText, 180);
+          lines.forEach((line: string) => {
+            if (yPosition > pageHeight) {
+              doc.addPage();
+              yPosition = 15;
+            }
+            doc.text(line, margin + 5, yPosition);
+            yPosition += 5;
+          });
+          yPosition += 5;
+        }
+      });
+      
+      const blob = doc.output('blob');
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Chat_Transcript_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      this.isDownloadingChat.set(false);
+      this.isChatMenuOpen.set(false);
+      this.closeMenuListener();
+    }, 800);
+  }
+
+  closeChat() {
+    this.isChatMenuOpen.set(false);
+    this.closeMenuListener();
+    this.courseService.toggleChat();
   }
 
   // Toggle voice recording
@@ -679,6 +793,7 @@ export class Chat implements OnInit {
   }
 
   ngOnDestroy() {
+    this.closeMenuListener();
     this.clearSilenceTimer();
     this.clearTtsCheck();
     if (this.recognition) {

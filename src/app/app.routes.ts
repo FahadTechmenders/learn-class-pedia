@@ -12,15 +12,15 @@ export const routes: Routes = [
   },
   {
     path: 'course',
-    loadComponent: () => import('./setup/course/classroom').then(m => m.ClassroomComponent)
+    loadComponent: () => import('./setup/classroom/classroom').then(m => m.ClassroomComponent)
   },
   {
     path: 'course/classroom',
-    loadComponent: () => import('./setup/course/classroom').then(m => m.ClassroomComponent)
+    loadComponent: () => import('./setup/classroom/classroom').then(m => m.ClassroomComponent)
   },
   {
     path: 'classroom',
-    loadComponent: () => import('./setup/course/classroom').then(m => m.ClassroomComponent)
+    loadComponent: () => import('./setup/classroom/classroom').then(m => m.ClassroomComponent)
   },
 
   {

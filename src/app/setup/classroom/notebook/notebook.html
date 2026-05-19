@@ -194,9 +194,17 @@
           Get your notes for this course which includes description, chapters, and timestamps
         </p>
         <button (click)="exportNotesPdf()"
-                 [disabled]="savedNotes().length === 0"
-          class="px-6 py-2 border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+          [disabled]="savedNotes().length === 0 || isDownloadingPdf()"
+          class="px-6 py-2 border border-gray-300 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+          @if (isDownloadingPdf()) {
+          <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          Downloading...
+          } @else {
           Download
+          }
         </button>
       </div>
     </div>
