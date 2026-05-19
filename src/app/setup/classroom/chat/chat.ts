@@ -66,7 +66,7 @@ export class Chat implements OnInit {
 
   @Input() assessmentStep: 'none' | 'start' | 'final' | 'failed' | 'cleared' | 'maxattempts' = 'none';
   @Input() courseTree: any = null;
-  @Input() courseTypeName:string = ''
+  @Input() courseTypeName: string = ''
   @Input() courseDetailId: number | null = null;
   isLiveChatActive = signal<boolean>(false);
   isLiveChatLoading = signal<boolean>(false);
@@ -186,7 +186,10 @@ export class Chat implements OnInit {
   downloadChat() {
     const messages = this.chatMessages();
     const nonWelcome = messages.filter(m => m.id !== this.WELCOME_MESSAGE_ID);
-    if (nonWelcome.length === 0) return;
+    if (nonWelcome.length === 0) {
+      this.isChatMenuOpen.set(false);
+      return
+    };
     this.isDownloadingChat.set(true);
     setTimeout(() => {
       const doc = new jsPDF();
@@ -196,18 +199,18 @@ export class Chat implements OnInit {
       doc.text(`Date: ${new Date().toLocaleString()}`, 10, 22);
       doc.setLineWidth(0.5);
       doc.line(10, 25, 200, 25);
-      
+
       let yPosition = 35;
       const pageHeight = 280;
       const margin = 10;
-      
+
       nonWelcome.forEach(msg => {
         const role = msg.role === 'bot' ? 'Lumi AI' : 'You';
         const raw = typeof msg.text === 'string'
           ? msg.text
           : (msg.text as any)?.changingThisBreaksApplicationSecurity || '';
         const cleanText = raw.replace(/<[^>]*>/g, '').trim();
-        
+
         if (cleanText) {
           if (yPosition > pageHeight) {
             doc.addPage();
@@ -217,7 +220,7 @@ export class Chat implements OnInit {
           doc.setFont('helvetica', 'bold');
           doc.text(`${role}:`, margin, yPosition);
           yPosition += 6;
-          
+
           doc.setFontSize(10);
           doc.setFont('helvetica', 'normal');
           const lines = doc.splitTextToSize(cleanText, 180);
@@ -232,7 +235,7 @@ export class Chat implements OnInit {
           yPosition += 5;
         }
       });
-      
+
       const blob = doc.output('blob');
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -242,7 +245,7 @@ export class Chat implements OnInit {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       this.isDownloadingChat.set(false);
       this.isChatMenuOpen.set(false);
       this.closeMenuListener();
@@ -508,7 +511,7 @@ export class Chat implements OnInit {
     }
     this.isChatSending.set(true);
     this.chatInput.set('');
-    
+
     this.courseService.askCourseQuestion(payload).pipe(takeUntil(this.destroy$)).subscribe({
       next: (res: any) => {
         const threadId = res?.data?.threadId ?? res?.threadId;
