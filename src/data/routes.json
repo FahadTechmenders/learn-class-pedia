@@ -137,6 +137,15 @@
     },
   
     {
+      "id": "email",
+      "path": "/admin/email",
+      "component": "Email",
+      "label": "Email",
+      "icon": "Mail",
+      "category": "main",
+      "order": 3
+    },
+    {
       "id": "contact-us",
       "path": "/admin/contact-us",
       "component": "ContactUs",

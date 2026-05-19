@@ -25,6 +25,7 @@ import PaymentProviders from '../pages/PaymentProviders/PaymentProviders';
 import PaymentProviderAccounts from '../pages/PaymentProviderAccounts/PaymentProviderAccounts';
 import ContactUs from '../pages/ContactUs/ContactUs';
 import CourseContent from '../pages/CourseContent/CourseContent';
+import Email from '../pages/Email/Email';
 
 // Component mapping
 const componentMap = {
@@ -51,6 +52,7 @@ const componentMap = {
   PaymentProviderAccounts,
   ContactUs,
   CourseContent,
+  Email,
 };
 
 // Protected Route Component
@@ -191,6 +193,21 @@ const DynamicRoutes = () => {
       <Route path="templates" element={
         <ProtectedRoute>
           <TemplateManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="email" element={
+        <ProtectedRoute>
+          <Email />
+        </ProtectedRoute>
+      } />
+      <Route path="email/:folder" element={
+        <ProtectedRoute>
+          <Email />
+        </ProtectedRoute>
+      } />
+      <Route path="email/:folder/:id" element={
+        <ProtectedRoute>
+          <Email />
         </ProtectedRoute>
       } />
       

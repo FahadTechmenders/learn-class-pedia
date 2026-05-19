@@ -176,6 +176,19 @@ export const ENDPOINTS = {
   // Contact Information endpoints
   CONTACT_INFORMATION: '/contact-information',
   INQUIRY_OPTIONS: '/inquiry-options',
+
+  // Email endpoints
+  EMAIL_LIST: '/Email',
+  EMAIL_BY_ID: (id) => `/Email/${id}`,
+  EMAIL_MARK_AS_READ: (id) => `/Email/${id}/mark-as-read`,
+  EMAIL_MARK_READ: '/Email/mark-read',
+  EMAIL_MARK_UNREAD: '/Email/mark-unread',
+  EMAIL_TOGGLE_STAR: '/Email/toggle-star',
+  EMAIL_DELETE: '/Email/delete',
+  EMAIL_ARCHIVE: '/Email/archive',
+  EMAIL_MOVE_TO_SPAM: '/Email/move-to-spam',
+  EMAIL_SEND: '/Email/send',
+  EMAIL_SAVE_DRAFT: '/Email/save-draft',
 };
 
 // HTTP Status Codes
