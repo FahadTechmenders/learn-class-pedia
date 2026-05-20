@@ -10,10 +10,29 @@ class EmailService {
       [EMAIL_FOLDERS.DRAFTS]: 3,
       [EMAIL_FOLDERS.TRASH]: 4
     };
+    this.dynamicFolderMap = {}; // Will be populated from API
     // Use local URL in development, production URL otherwise
     this.baseUrl = appSettings.environment === 'development' 
       ? API_CONFIG.BASE_URL_Local 
       : API_CONFIG.BASE_URL;
+  }
+
+  // Update folder map from API
+  updateFolderMap(folders) {
+    const slugMap = {
+      'Inbox': 'inbox',
+      'Sent': 'sent',
+      'Drafts': 'drafts',
+      'Trash': 'trash',
+      'Spam': 'spam',
+      'All Mail': 'all',
+      'Outbound': 'Outbound'
+    };
+    
+    folders.forEach(folder => {
+      const slug = slugMap[folder.name] || folder.name.toLowerCase();
+      this.dynamicFolderMap[slug] = folder.id;
+    });
   }
 
   transformApiEmail(apiEmail) {
@@ -67,8 +86,11 @@ class EmailService {
 
       // Only add EmailFolderId if it's not ALL or STARRED or IMPORTANT
       if (folder !== EMAIL_FOLDERS.ALL && folder !== EMAIL_FOLDERS.STARRED && folder !== EMAIL_FOLDERS.IMPORTANT) {
-        const folderId = this.folderIdMap[folder];
-        if (folderId) {
+        // Try dynamic folder map first, then fall back to static map
+        const folderId = this.dynamicFolderMap[folder] || this.folderIdMap[folder];
+        console.log('Folder:', folder, 'FolderId:', folderId, 'DynamicMap:', this.dynamicFolderMap);
+        // Don't add EmailFolderId if it's 5 (special folder like All Mail)
+        if (folderId && folderId !== 5) {
           params.append('EmailFolderId', folderId);
         }
       }
@@ -111,6 +133,7 @@ class EmailService {
       return {
         emails,
         total: result.data.totalCount,
+        unreadCount: result.data.unreadCount || 0,
         page: result.data.page,
         pageSize: result.data.pageSize
       };
@@ -163,10 +186,10 @@ class EmailService {
     }
   }
 
-  async markAsReadById(id) {
+  async markAsReadById(id, isRead = true) {
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_MARK_AS_READ(id)}`, {
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_MARK_AS_READ(id)}?IsRead=${isRead}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -213,6 +236,12 @@ class EmailService {
       starred: apiEmail.isStarred,
       important: false,
       labels: apiEmail.labelTypeId ? [apiEmail.labelTypeId] : [],
+      labelDetails: apiEmail.labelTypeId ? {
+        id: apiEmail.labelTypeId,
+        name: apiEmail.labelName,
+        color: apiEmail.labelColor,
+        bgColor: apiEmail.labelBgColor
+      } : null,
       folder: this.getFolderNameById(apiEmail.emailFolderId),
       priority: 'normal',
       hasAttachments: apiEmail.hasAttachments,
@@ -223,27 +252,103 @@ class EmailService {
     };
   }
 
-  async getEmailThread(threadId) {
-    // TODO: Implement API call for email threads
-    return [];
+  async toggleStar(emailId, isStarred) {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_TOGGLE_STAR(emailId)}?IsStarred=${isStarred}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to toggle star');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to toggle star');
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error toggling email star:', error);
+      return { success: false, error };
+    }
   }
 
   async markAsRead(emailIds) {
-    // TODO: Implement API call
-    console.log('Mark as read:', emailIds);
-    return { success: true };
+    try {
+      const token = localStorage.getItem('adminToken');
+      const results = await Promise.all(
+        emailIds.map(async (id) => {
+          const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_MARK_AS_READ(id)}?isRead=true`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to mark email ${id} as read`);
+          }
+
+          const result = await response.json();
+          const isSuccess = result.success || result.isSuccess;
+          
+          if (!isSuccess) {
+            throw new Error(result.message || result.errorMessage || `Failed to mark email ${id} as read`);
+          }
+
+          return result;
+        })
+      );
+
+      return { success: true, data: results };
+    } catch (error) {
+      console.error('Error marking emails as read:', error);
+      return { success: false, error };
+    }
   }
 
   async markAsUnread(emailIds) {
-    // TODO: Implement API call
-    console.log('Mark as unread:', emailIds);
-    return { success: true };
-  }
+    try {
+      const token = localStorage.getItem('adminToken');
+      const results = await Promise.all(
+        emailIds.map(async (id) => {
+          const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_MARK_AS_READ(id)}?isRead=false`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
 
-  async toggleStar(emailIds) {
-    // TODO: Implement API call
-    console.log('Toggle star:', emailIds);
-    return { success: true };
+          if (!response.ok) {
+            throw new Error(`Failed to mark email ${id} as unread`);
+          }
+
+          const result = await response.json();
+          const isSuccess = result.success || result.isSuccess;
+          
+          if (!isSuccess) {
+            throw new Error(result.message || result.errorMessage || `Failed to mark email ${id} as unread`);
+          }
+
+          return result;
+        })
+      );
+
+      return { success: true, data: results };
+    } catch (error) {
+      console.error('Error marking emails as unread:', error);
+      return { success: false, error };
+    }
   }
 
   async toggleImportant(emailIds) {
@@ -362,6 +467,205 @@ class EmailService {
         [EMAIL_FOLDERS.ALL]: 0,
         unread: 0
       };
+    }
+  }
+
+  // Label Management
+  async getLabels() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_LABELS}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch labels');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to fetch labels');
+      }
+
+      // Handle different response formats
+      const data = result.data;
+      
+      // If data is already an array, return it
+      if (Array.isArray(data)) {
+        return data;
+      }
+      
+      // If data is a single object (as per your API response), wrap it in an array
+      if (data && typeof data === 'object' && data.id) {
+        return [data];
+      }
+      
+      // Try to extract array from nested properties
+      if (data && typeof data === 'object') {
+        return data.items || data.labels || [];
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching labels:', error);
+      return [];
+    }
+  }
+
+  async createLabel(labelData) {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_LABELS}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(labelData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create label');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to create label');
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error creating label:', error);
+      return { success: false, error };
+    }
+  }
+
+  async updateLabel(labelId, labelData) {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_LABELS}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ id: labelId, ...labelData })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update label');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to update label');
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error updating label:', error);
+      return { success: false, error };
+    }
+  }
+
+  async deleteLabel(labelId) {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_LABEL_BY_ID(labelId)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete label');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to delete label');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting label:', error);
+      return { success: false, error };
+    }
+  }
+
+  async assignLabel(emailId, labelTypeId) {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_ASSIGN_LABEL(emailId)}?labelTypeId=${labelTypeId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to assign label');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to assign label');
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error assigning label:', error);
+      return { success: false, error };
+    }
+  }
+
+  async getFolders() {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_FOLDERS}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch folders');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to fetch folders');
+      }
+
+      const folders = result.data || [];
+      // Update the dynamic folder map
+      this.updateFolderMap(folders);
+      
+      return folders;
+    } catch (error) {
+      console.error('Error fetching folders:', error);
+      return [];
     }
   }
 }

@@ -13,8 +13,15 @@ import {
   Bold,
   Italic,
   Underline,
+  Strikethrough,
   List,
+  ListOrdered,
+  IndentIncrease,
+  IndentDecrease,
   Link as LinkIcon,
+  Type,
+  Highlighter,
+  AlignLeft,
   GripVertical
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
@@ -126,34 +133,57 @@ const ComposeEmailDrawer = ({
     const end = textarea.selectionEnd;
     const selectedText = formData.body.substring(start, end);
     
-    if (!selectedText) return;
+    if (!selectedText && format !== 'indent' && format !== 'outdent') return;
 
     let formattedText = '';
     let newCursorPos = end;
 
     switch (format) {
       case 'bold':
-        formattedText = `**${selectedText}**`;
-        newCursorPos = end + 4;
+        formattedText = `<b>${selectedText}</b>`;
+        newCursorPos = end + 7;
         break;
       case 'italic':
-        formattedText = `*${selectedText}*`;
-        newCursorPos = end + 2;
+        formattedText = `<i>${selectedText}</i>`;
+        newCursorPos = end + 7;
         break;
       case 'underline':
-        formattedText = `__${selectedText}__`;
-        newCursorPos = end + 4;
+        formattedText = `<u>${selectedText}</u>`;
+        newCursorPos = end + 7;
         break;
-      case 'list':
-        const lines = selectedText.split('\n');
-        formattedText = lines.map(line => `• ${line}`).join('\n');
-        newCursorPos = end + (lines.length * 2);
+      case 'strikethrough':
+        formattedText = `<s>${selectedText}</s>`;
+        newCursorPos = end + 7;
+        break;
+      case 'highlight':
+        formattedText = `<mark>${selectedText}</mark>`;
+        newCursorPos = end + 13;
+        break;
+      case 'bulletList':
+        const bulletLines = selectedText.split('\n');
+        formattedText = bulletLines.map(line => `• ${line}`).join('\n');
+        newCursorPos = end + (bulletLines.length * 2);
+        break;
+      case 'numberedList':
+        const numberedLines = selectedText.split('\n');
+        formattedText = numberedLines.map((line, i) => `${i + 1}. ${line}`).join('\n');
+        newCursorPos = end + numberedLines.reduce((acc, _, i) => acc + `${i + 1}. `.length, 0);
+        break;
+      case 'indent':
+        const indentLines = selectedText.split('\n');
+        formattedText = indentLines.map(line => `    ${line}`).join('\n');
+        newCursorPos = end + (indentLines.length * 4);
+        break;
+      case 'outdent':
+        const outdentLines = selectedText.split('\n');
+        formattedText = outdentLines.map(line => line.replace(/^    /, '')).join('\n');
+        newCursorPos = start + formattedText.length;
         break;
       case 'link':
         const url = prompt('Enter URL:');
         if (url) {
-          formattedText = `[${selectedText}](${url})`;
-          newCursorPos = end + url.length + 4;
+          formattedText = `<a href="${url}">${selectedText}</a>`;
+          newCursorPos = end + url.length + 15;
         } else {
           return;
         }
@@ -410,47 +440,133 @@ const ComposeEmailDrawer = ({
               </div>
 
               <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
-                <div className="flex items-center gap-1 px-2 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <div className="flex items-center gap-0.5 px-2 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
+                  {/* Text Formatting */}
                   <button 
                     onClick={() => applyFormatting('bold')}
-                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                    title="Bold (Ctrl+B)"
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Bold"
                   >
                     <Bold className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => applyFormatting('italic')}
-                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                    title="Italic (Ctrl+I)"
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Italic"
                   >
                     <Italic className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => applyFormatting('underline')}
-                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                    title="Underline (Ctrl+U)"
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Underline"
                   >
                     <Underline className="w-4 h-4" />
                   </button>
-                  <div className="w-px h-6 bg-gray-300 dark:bg-gray-700 mx-1" />
                   <button 
-                    onClick={() => applyFormatting('list')}
-                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    onClick={() => applyFormatting('strikethrough')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Strikethrough"
+                  >
+                    <Strikethrough className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+                  {/* Lists */}
+                  <button 
+                    onClick={() => applyFormatting('bulletList')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                     title="Bullet List"
                   >
                     <List className="w-4 h-4" />
                   </button>
                   <button 
+                    onClick={() => applyFormatting('numberedList')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Numbered List"
+                  >
+                    <ListOrdered className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+                  {/* Indent */}
+                  <button 
+                    onClick={() => applyFormatting('outdent')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Decrease Indent"
+                  >
+                    <IndentDecrease className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => applyFormatting('indent')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Increase Indent"
+                  >
+                    <IndentIncrease className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+                  {/* Text Style Dropdown */}
+                  <select 
+                    className="px-2 py-1.5 text-sm border-0 bg-transparent text-gray-700 dark:text-gray-300 focus:outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    title="Text Style"
+                  >
+                    <option>Normal</option>
+                    <option>Heading 1</option>
+                    <option>Heading 2</option>
+                    <option>Heading 3</option>
+                  </select>
+
+                  <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+                  {/* Font Color & Highlight */}
+                  <button 
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Text Color"
+                  >
+                    <Type className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => applyFormatting('highlight')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Highlight"
+                  >
+                    <Highlighter className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+                  {/* More Options */}
+                  <button 
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="More Options"
+                  >
+                    <AlignLeft className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex-1" />
+
+                  {/* Link & Image */}
+                  <button 
                     onClick={() => applyFormatting('link')}
-                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                     title="Insert Link"
                   >
                     <LinkIcon className="w-4 h-4" />
                   </button>
-                  <div className="w-px h-6 bg-gray-300 dark:bg-gray-700 mx-1" />
+                  <button 
+                    onClick={handleAttachment}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Insert Image"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                  </button>
                   <button 
                     onClick={insertEmoji}
-                    className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                     title="Insert Emoji"
                   >
                     <Smile className="w-4 h-4" />

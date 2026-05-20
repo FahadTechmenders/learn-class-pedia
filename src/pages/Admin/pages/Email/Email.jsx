@@ -38,7 +38,7 @@ const Email = () => {
     setSelectedEmail
   } = useEmail();
 
-  const [currentFolder, setCurrentFolder] = useState(EMAIL_FOLDERS.INBOX);
+  const [currentFolder, setCurrentFolder] = useState(null);
   const [currentLabel, setCurrentLabel] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -49,6 +49,7 @@ const Email = () => {
   const [showEmailDetails, setShowEmailDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalEmails, setTotalEmails] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [pageSize] = useState(50);
 
   useEffect(() => {
@@ -58,14 +59,14 @@ const Email = () => {
     if (folder && Object.values(EMAIL_FOLDERS).includes(folder)) {
       setCurrentFolder(folder);
     } else if (location.pathname === '/admin/email') {
-      setCurrentFolder(EMAIL_FOLDERS.INBOX);
+      setCurrentFolder(null);
     }
   }, [location.pathname]);
 
   useEffect(() => {
     setCurrentPage(1);
     loadEmails();
-    loadFolderCounts();
+    // Removed loadFolderCounts() - not needed since we don't display counts in sidebar
   }, [currentFolder, currentLabel, searchTerm]);
 
   useEffect(() => {
@@ -84,6 +85,13 @@ const Email = () => {
 
   const loadEmails = async () => {
     try {
+      // Don't load emails if no folder is selected
+      if (!currentFolder) {
+        setTotalEmails(0);
+        setUnreadCount(0);
+        return;
+      }
+
       const filters = {
         page: currentPage,
         pageSize: pageSize
@@ -99,6 +107,7 @@ const Email = () => {
 
       const result = await fetchEmails(currentFolder, filters);
       setTotalEmails(result?.total || 0);
+      setUnreadCount(result?.unreadCount || 0);
     } catch (error) {
       console.error('Failed to load emails:', error);
     }
@@ -106,11 +115,20 @@ const Email = () => {
 
   const loadEmailById = async (emailId) => {
     try {
+      // Check if email is already read before fetching
+      const currentEmail = emails.find(e => e.id === emailId);
+      const wasUnread = currentEmail && !currentEmail.read;
+      
       await fetchEmailById(emailId);
       
-      // Reload the email list to show updated read status
-      // This ensures the list reflects the email was marked as read
-      loadEmails();
+      // Only reload list and counts if email was previously unread
+      // This avoids unnecessary API calls when viewing already-read emails
+      if (wasUnread) {
+        setTimeout(() => {
+          loadEmails();
+          loadFolderCounts();
+        }, 300);
+      }
     } catch (error) {
       console.error('Failed to load email:', error);
     }
@@ -238,7 +256,7 @@ const Email = () => {
 
   const handleStarToggle = async (emailId) => {
     try {
-      await toggleStar([emailId]);
+      await toggleStar(emailId);
       await loadEmails();
       await loadFolderCounts();
     } catch (error) {
@@ -271,6 +289,7 @@ const Email = () => {
             folderCounts={folderCounts}
             currentLabel={currentLabel}
             onLabelChange={handleLabelChange}
+            unreadCount={unreadCount}
           />
         </div>
 
@@ -287,7 +306,7 @@ const Email = () => {
             </h1>
           </div>
 
-          <div className=" flex overflow-hidden">
+          <div className=" flex overflow-hidden h-screen">
             <div className={`
               
               w-[456px] bg-white dark:bg-gray-900 flex-shrink-0
@@ -296,7 +315,7 @@ const Email = () => {
                 emails={emails}
                 loading={loading}
                 selectedEmails={selectedEmails}
-                activeEmailId={id}
+                activeEmailId={id ? parseInt(id) : null}
                 onEmailSelect={toggleEmailSelection}
                 onEmailClick={handleEmailClick}
                 onStarToggle={handleStarToggle}
@@ -316,6 +335,7 @@ const Email = () => {
                 onAddLabel={() => console.log('Add label')}
                 currentPage={currentPage}
                 totalEmails={totalEmails}
+                unreadCount={unreadCount}
                 pageSize={pageSize}
                 onPageChange={setCurrentPage}
               />
@@ -342,8 +362,22 @@ const Email = () => {
                   await loadEmails();
                 }}
                 onStar={async () => {
-                  await toggleStar([selectedEmail.id]);
+                  // toggleStar already updates local state in useEmail hook
+                  await toggleStar(selectedEmail.id);
+                  // No need to reload entire list or refresh details
+                }}
+                onMarkRead={async (emailId, isRead) => {
+                  // markAsRead already updates local state in useEmail hook
+                  await markAsRead([emailId], isRead);
+                  // Note: Folder counts will be updated on next email list refresh
+                  // Removed loadFolderCounts() to avoid triggering unnecessary reloads
+                }}
+                onMoveToFolder={async (folderId) => {
+                  // TODO: Implement move to folder API call
+                  console.log('Move email to folder:', folderId);
+                  handleCloseDetails();
                   await loadEmails();
+                  await loadFolderCounts();
                 }}
               />
             </div>

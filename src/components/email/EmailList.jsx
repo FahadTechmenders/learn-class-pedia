@@ -6,9 +6,6 @@ import {
   RefreshCw, 
   Archive, 
   Trash2, 
-  Mail, 
-  MailOpen,
-  Tag,
   AlertCircle,
   ChevronLeft,
   ChevronRight
@@ -31,15 +28,13 @@ const EmailList = ({
   onRefresh,
   onSelectAll,
   onClearSelection,
-  onMarkRead,
-  onMarkUnread,
   onArchive,
   onDelete,
   onMoveToSpam,
-  onAddLabel,
   currentPage = 1,
   totalEmails = 0,
-  pageSize = 50,
+  unreadCount = 0,
+  pageSize = 25,
   onPageChange
 }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -95,14 +90,19 @@ const EmailList = ({
             className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 cursor-pointer"
           />
 
+          {!hasSelection && unreadCount > 0 && (
+            <div className="flex items-center gap-2 mr-2">
+              <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                {unreadCount} unread
+              </span>
+            </div>
+          )}
+
           {hasSelection && (
             <div className="flex items-center gap-1 mr-2">
               <ActionButton icon={Archive} label="Archive" onClick={onArchive} />
               <ActionButton icon={Trash2} label="Delete" onClick={onDelete} danger />
-              <ActionButton icon={MailOpen} label="Mark as read" onClick={onMarkRead} />
-              <ActionButton icon={Mail} label="Mark as unread" onClick={onMarkUnread} />
               <ActionButton icon={AlertCircle} label="Report spam" onClick={onMoveToSpam} danger />
-              <ActionButton icon={Tag} label="Add label" onClick={onAddLabel} />
               <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
                 {selectedEmails.length} selected
               </span>

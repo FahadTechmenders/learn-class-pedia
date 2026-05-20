@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Inbox, 
   Send, 
@@ -6,130 +6,141 @@ import {
   Star, 
   AlertCircle, 
   Trash2, 
-  Archive,
   Mail,
   Tag,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Plus,
+  Edit2,
+  Trash
 } from 'lucide-react';
+import emailService from '../../services/emailService';
 import { EMAIL_FOLDERS, EMAIL_LABELS } from '../../constants/emailConstants';
-import { useTheme } from '../../context/ThemeContext';
 
 const EmailSidebar = ({
   currentFolder,
   onFolderChange,
   folderCounts = {},
   isCollapsed = false,
-  onToggleCollapse,
   currentLabel = null,
-  onLabelChange
+  onLabelChange,
+  unreadCount = 0
 }) => {
-  const { theme } = useTheme();
-  const [showLabels, setShowLabels] = React.useState(true);
+  const [showLabels, setShowLabels] = useState(true);
+  const [labels, setLabels] = useState([]);
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [editingLabel, setEditingLabel] = useState(null);
+  const [folders, setFolders] = useState([]);
 
-  const folders = [
-    {
-      id: EMAIL_FOLDERS.INBOX,
-      label: 'Inbox',
-      icon: Inbox,
-      count: folderCounts[EMAIL_FOLDERS.INBOX] || 0,
-      unreadCount: folderCounts.unread || 0,
-      color: 'text-blue-600 dark:text-blue-400'
-    },
-    {
-      id: EMAIL_FOLDERS.STARRED,
-      label: 'Starred',
-      icon: Star,
-      count: folderCounts[EMAIL_FOLDERS.STARRED] || 0,
-      color: 'text-yellow-600 dark:text-yellow-400'
-    },
-    {
-      id: EMAIL_FOLDERS.IMPORTANT,
-      label: 'Important',
-      icon: AlertCircle,
-      count: folderCounts[EMAIL_FOLDERS.IMPORTANT] || 0,
-      color: 'text-red-600 dark:text-red-400'
-    },
-    {
-      id: EMAIL_FOLDERS.SENT,
-      label: 'Sent',
-      icon: Send,
-      count: folderCounts[EMAIL_FOLDERS.SENT] || 0,
-      color: 'text-green-600 dark:text-green-400'
-    },
-    {
-      id: EMAIL_FOLDERS.DRAFTS,
-      label: 'Drafts',
-      icon: FileText,
-      count: folderCounts[EMAIL_FOLDERS.DRAFTS] || 0,
-      color: 'text-gray-600 dark:text-gray-400'
-    },
-    {
-      id: EMAIL_FOLDERS.SPAM,
-      label: 'Spam',
-      icon: AlertCircle,
-      count: folderCounts[EMAIL_FOLDERS.SPAM] || 0,
-      color: 'text-orange-600 dark:text-orange-400'
-    },
-    {
-      id: EMAIL_FOLDERS.TRASH,
-      label: 'Trash',
-      icon: Trash2,
-      count: folderCounts[EMAIL_FOLDERS.TRASH] || 0,
-      color: 'text-gray-600 dark:text-gray-400'
-    },
-    {
-      id: EMAIL_FOLDERS.ALL,
-      label: 'All Mail',
-      icon: Mail,
-      count: folderCounts[EMAIL_FOLDERS.ALL] || 0,
-      color: 'text-purple-600 dark:text-purple-400'
+  // Icon mapping for folder icons from API
+  const iconMap = {
+    'fas fa-inbox': Inbox,
+    'fas fa-paper-plane': Send,
+    'fas fa-file-alt': FileText,
+    'fas fa-trash-alt': Trash2,
+    'fas fa-exclamation-circle': AlertCircle
+  };
+
+  // Color mapping for folders
+  const colorMap = {
+    'Inbox': 'text-blue-600 dark:text-blue-400',
+    'Sent': 'text-green-600 dark:text-green-400',
+    'Drafts': 'text-gray-600 dark:text-gray-400',
+    'Trash': 'text-gray-600 dark:text-gray-400',
+    'Spam': 'text-orange-600 dark:text-orange-400',
+    'Starred': 'text-yellow-600 dark:text-yellow-400',
+    'All Mail': 'text-purple-600 dark:text-purple-400'
+  };
+
+  useEffect(() => {
+    loadLabels();
+    loadFolders();
+  }, []);
+
+  const loadLabels = async () => {
+    const fetchedLabels = await emailService.getLabels();
+    // Ensure we always set an array
+    setLabels(Array.isArray(fetchedLabels) ? fetchedLabels : []);
+  };
+
+  const loadFolders = async () => {
+    const apiFolders = await emailService.getFolders();
+    // Map API folders to include Lucide icons, colors, and slugs
+    const slugMap = {
+      'Inbox': 'inbox',
+      'Sent': 'sent',
+      'Drafts': 'drafts',
+      'Trash': 'trash',
+      'Spam': 'spam',
+      'All Mail': 'all',
+      'Outbound': 'Outbound'
+    };
+    
+    const mappedFolders = apiFolders.map(folder => ({
+      id: folder.id,
+      label: folder.name,
+      slug: slugMap[folder.name] || folder.name.toLowerCase().replace(/\s+/g, '-'),
+      icon: iconMap[folder.icon] || Inbox,
+      color: colorMap[folder.name] || 'text-gray-600 dark:text-gray-400'
+    }));
+    setFolders(mappedFolders);
+  };
+
+  const handleCreateLabel = () => {
+    setEditingLabel(null);
+    setShowLabelModal(true);
+  };
+
+  const handleEditLabel = (label) => {
+    setEditingLabel(label);
+    setShowLabelModal(true);
+  };
+
+  const handleDeleteLabel = async (labelId) => {
+    if (window.confirm('Are you sure you want to delete this label?')) {
+      const result = await emailService.deleteLabel(labelId);
+      if (result.success) {
+        loadLabels();
+      }
     }
-  ];
+  };
 
-  const labels = Object.values(EMAIL_LABELS);
+
+  // Removed: const labels = Object.values(EMAIL_LABELS); - now using API labels from state
 
   const FolderItem = ({ folder }) => {
-    const isActive = currentFolder === folder.id;
+    const isActive = currentFolder === folder.slug;
     const Icon = folder.icon;
-    const showUnread = folder.id === EMAIL_FOLDERS.INBOX && folder.unreadCount > 0;
 
     return (
       <button
-        onClick={() => onFolderChange(folder.id)}
+        onClick={() => onFolderChange(folder.slug)}
         className={`
-          w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 relative group
+          w-full flex items-center gap-3.5 px-3 py-2.5 rounded-lg transition-all duration-200 relative group
           ${isActive
-            ? 'text-blue-600 dark:text-blue-400 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 font-semibold shadow-sm'
-            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
+            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium shadow-sm'
+            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50'
           }
           ${isCollapsed ? 'justify-center' : ''}
         `}
         title={isCollapsed ? folder.label : undefined}
       >
         {isActive && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-10 bg-gradient-to-b from-blue-600 via-blue-500 to-purple-600 rounded-r-full shadow-lg shadow-blue-500/50 animate-pulse" />
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-600 dark:bg-blue-400 rounded-r-md" />
         )}
-        <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${isActive ? 'text-blue-600 dark:text-blue-400 scale-110' : folder.color + ' group-hover:scale-105'}`} />
+        <div className={`
+          flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200
+          ${isActive 
+            ? 'bg-blue-100 dark:bg-blue-800/30' 
+            : 'bg-gray-100 dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700'
+          }
+        `}>
+          <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${isActive ? 'text-blue-600 dark:text-blue-400' : folder.color}`} />
+        </div>
         {!isCollapsed && (
-          <>
-            <span className={`flex-1 text-left text-sm transition-all duration-300 ${isActive ? 'tracking-wide' : ''}`}>{folder.label}</span>
-            {showUnread ? (
-              <span className="px-2.5 py-1 text-xs font-bold bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full shadow-md shadow-red-500/30 animate-pulse">
-                {folder.unreadCount}
-              </span>
-            ) : folder.count > 0 ? (
-              <span className={`
-                px-2 py-0.5 text-xs font-semibold rounded-full transition-all duration-300
-                ${isActive 
-                  ? 'bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300' 
-                  : 'text-gray-500 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-700'
-                }
-              `}>
-                {folder.count}
-              </span>
-            ) : null}
-          </>
+          <span className={`flex-1 text-left text-sm transition-all duration-200 ${isActive ? 'font-medium' : 'font-normal'}`}>
+            {folder.label}
+          </span>
         )}
       </button>
     );
@@ -137,34 +148,62 @@ const EmailSidebar = ({
 
   const LabelItem = ({ label }) => {
     const isActive = currentLabel === label.id;
-    const labelColorClasses = {
-      blue: 'bg-blue-500',
-      green: 'bg-green-500',
-      red: 'bg-red-500',
-      yellow: 'bg-yellow-500',
-      purple: 'bg-purple-500',
-      gray: 'bg-gray-500'
-    };
+    const [showActions, setShowActions] = useState(false);
 
     return (
-      <button
-        className={`
-          w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 relative group
-          ${isActive
-            ? 'text-blue-600 dark:text-blue-400 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 font-semibold shadow-sm'
-            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
-          }
-        `}
-        onClick={() => onLabelChange?.(label.id)}
+      <div
+        className="relative group"
+        onMouseEnter={() => setShowActions(true)}
+        onMouseLeave={() => setShowActions(false)}
       >
-        {isActive && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-10 bg-gradient-to-b from-blue-600 via-blue-500 to-purple-600 rounded-r-full shadow-lg shadow-blue-500/50 animate-pulse" />
-        )}
-        <div className={`w-3 h-3 rounded-full ${labelColorClasses[label.color]} ${isActive ? 'scale-110' : 'group-hover:scale-105'} transition-all duration-300`} />
-        {!isCollapsed && (
-          <span className={`flex-1 text-left text-sm transition-all duration-300 ${isActive ? 'tracking-wide' : ''}`}>{label.name}</span>
-        )}
-      </button>
+        <button
+          className={`
+            w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 relative
+            ${isActive
+              ? 'text-blue-600 dark:text-blue-400 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 font-semibold shadow-sm'
+              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:translate-x-1'
+            }
+          `}
+          onClick={() => onLabelChange?.(label.id)}
+        >
+          {isActive && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-10 bg-gradient-to-b from-blue-600 via-blue-500 to-purple-600 rounded-r-full shadow-lg shadow-blue-500/50 animate-pulse" />
+          )}
+          <div 
+            className={`w-3 h-3 rounded-full ${isActive ? 'scale-110' : 'group-hover:scale-105'} transition-all duration-300`}
+            style={{ backgroundColor: label.bgColor || label.color }}
+          />
+          {!isCollapsed && (
+            <>
+              <span className={`flex-1 text-left text-sm transition-all duration-300 ${isActive ? 'tracking-wide' : ''}`}>{label.name}</span>
+              {showActions && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditLabel(label);
+                    }}
+                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                    title="Edit label"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteLabel(label.id);
+                    }}
+                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded"
+                    title="Delete label"
+                  >
+                    <Trash className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </button>
+      </div>
     );
   };
 
@@ -179,24 +218,39 @@ const EmailSidebar = ({
 
         {!isCollapsed && (
           <div className="space-y-1">
-            <button
-              onClick={() => setShowLabels(!showLabels)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
-            >
-              {showLabels ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-              <Tag className="w-4 h-4" />
-              <span className="flex-1 text-left text-sm font-medium">Labels</span>
-            </button>
+            <div className="flex items-center gap-2 px-3 py-2">
+              <button
+                onClick={() => setShowLabels(!showLabels)}
+                className="flex-1 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200 px-2 py-1"
+              >
+                {showLabels ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+                <Tag className="w-4 h-4" />
+                <span className="flex-1 text-left text-sm font-medium">Labels</span>
+              </button>
+              <button
+                onClick={handleCreateLabel}
+                className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+                title="Create new label"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
             
             {showLabels && (
               <div className="space-y-1 pl-2">
-                {labels.map(label => (
-                  <LabelItem key={label.id} label={label} />
-                ))}
+                {labels?.length === 0 ? (
+                  <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
+                    No labels yet. Click + to create one.
+                  </div>
+                ) : (
+                  labels?.map(label => (
+                    <LabelItem key={label.id} label={label} />
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -216,6 +270,110 @@ const EmailSidebar = ({
           </div>
         </div>
       )}
+
+      {showLabelModal && (
+        <LabelModal
+          label={editingLabel}
+          onClose={() => setShowLabelModal(false)}
+          onSave={async (labelData) => {
+            if (editingLabel) {
+              await emailService.updateLabel(editingLabel.id, labelData);
+            } else {
+              await emailService.createLabel(labelData);
+            }
+            loadLabels();
+            setShowLabelModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const LabelModal = ({ label, onClose, onSave }) => {
+  const [formData, setFormData] = useState({
+    name: label?.name || '',
+    color: label?.color || '#3B82F6',
+    bgColor: label?.bgColor || '#3B82F6'
+  });
+
+  const predefinedColors = [
+    { name: 'Blue', value: '#3B82F6' },
+    { name: 'Green', value: '#10B981' },
+    { name: 'Red', value: '#EF4444' },
+    { name: 'Yellow', value: '#F59E0B' },
+    { name: 'Purple', value: '#8B5CF6' },
+    { name: 'Pink', value: '#EC4899' },
+    { name: 'Indigo', value: '#6366F1' },
+    { name: 'Gray', value: '#6B7280' }
+  ];
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          {label ? 'Edit Label' : 'Create New Label'}
+        </h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Label Name
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Enter label name"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Color
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {predefinedColors.map((color) => (
+                <button
+                  key={color.value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, color: color.value, bgColor: color.value })}
+                  className={`w-full h-10 rounded-lg transition-all ${
+                    formData.color === color.value
+                      ? 'ring-2 ring-offset-2 ring-blue-500 scale-110'
+                      : 'hover:scale-105'
+                  }`}
+                  style={{ backgroundColor: color.value }}
+                  title={color.name}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              {label ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

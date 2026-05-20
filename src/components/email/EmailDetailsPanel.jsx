@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Reply,
@@ -12,13 +12,21 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
-  Paperclip
+  Paperclip,
+  FolderOpen,
+  Inbox,
+  Send,
+  FileText,
+  AlertCircle,
+  Mail,
+  MailOpen
 } from 'lucide-react';
 import UserAvatar from './UserAvatar';
 import EmailBadge from './EmailBadge';
 import AttachmentPreview from './AttachmentPreview';
 import { formatFullDate, formatRecipients } from '../../utils/emailUtils';
 import { useTheme } from '../../context/ThemeContext';
+import emailService from '../../services/emailService';
 
 const EmailDetailsPanel = ({
   email,
@@ -28,10 +36,42 @@ const EmailDetailsPanel = ({
   onForward,
   onArchive,
   onDelete,
-  onStar
+  onStar,
+  onMoveToFolder,
+  onMarkRead
 }) => {
   const { theme } = useTheme();
   const [showDetails, setShowDetails] = useState(false);
+  const [showFolderDropdown, setShowFolderDropdown] = useState(false);
+  const [folders, setFolders] = useState([]);
+
+  // Icon mapping for folder icons
+  const iconMap = {
+    'fas fa-inbox': Inbox,
+    'fas fa-paper-plane': Send,
+    'fas fa-file-alt': FileText,
+    'fas fa-trash-alt': Trash2,
+    'fas fa-exclamation-circle': AlertCircle
+  };
+
+  useEffect(() => {
+    loadFolders();
+  }, []);
+
+  const loadFolders = async () => {
+    const apiFolders = await emailService.getFolders();
+    // Map API folders to include Lucide icons
+    const mappedFolders = apiFolders.map(folder => ({
+      ...folder,
+      icon: iconMap[folder.icon] || Inbox
+    }));
+    setFolders(mappedFolders);
+  };
+
+  const handleMoveToFolder = async (folderId) => {
+    setShowFolderDropdown(false);
+    onMoveToFolder?.(folderId);
+  };
 
   if (!email) {
     return (
@@ -65,10 +105,62 @@ const EmailDetailsPanel = ({
             <ActionButton icon={Archive} label="Archive" onClick={() => onArchive?.(email.id)} />
             <ActionButton icon={Trash2} label="Delete" onClick={() => onDelete?.(email.id)} danger />
             <ActionButton
-              icon={Star}
-              label={email.starred ? 'Unstar' : 'Star'}
-              onClick={() => onStar?.(email.id)}
+              icon={email.read ? Mail : MailOpen}
+              label={email.read ? 'Mark as Unread' : 'Mark as Read'}
+              onClick={() => onMarkRead?.(email.id, !email.read)}
             />
+            <button
+              onClick={() => onStar?.(email.id)}
+              className={`
+                p-2 rounded-lg transition-all duration-200 group relative
+                ${email.starred 
+                  ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-500' 
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }
+                hover:bg-gray-100 dark:hover:bg-gray-800
+              `}
+              title={email.starred ? 'Unstar' : 'Star'}
+            >
+              <Star 
+                className={`w-5 h-5 transition-all ${email.starred ? 'fill-current' : ''}`}
+              />
+              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                {email.starred ? 'Unstar' : 'Star'}
+              </span>
+            </button>
+            <div className="relative">
+              <ActionButton 
+                icon={FolderOpen} 
+                label="Move to Folder" 
+                onClick={() => setShowFolderDropdown(!showFolderDropdown)} 
+              />
+              
+              {showFolderDropdown && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setShowFolderDropdown(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20">
+                    {folders.map((folder) => {
+                      const FolderIcon = folder.icon;
+                      return (
+                        <button
+                          key={folder.id}
+                          onClick={() => handleMoveToFolder(folder.id)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                        >
+                          <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                          <span className="text-sm text-gray-900 dark:text-white">
+                            {folder.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
             <div className="w-px h-6 bg-gray-300 dark:bg-gray-700 mx-1" />
             <ActionButton icon={Printer} label="Print" onClick={() => window.print()} />
             <ActionButton icon={Download} label="Download" onClick={() => {}} />
@@ -86,11 +178,15 @@ const EmailDetailsPanel = ({
           {email.subject}
         </h1>
 
-        {email.labels && email.labels.length > 0 && (
+        {email.labelDetails && (
           <div className="flex flex-wrap gap-2 mb-4">
-            {email.labels.map(labelId => (
-              <EmailBadge key={labelId} labelId={labelId} />
-            ))}
+            <span 
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium text-white"
+              style={{ backgroundColor: email.labelDetails.bgColor || email.labelDetails.color }}
+            >
+              <span className="w-2 h-2 rounded-full bg-white/30" />
+              {email.labelDetails.name}
+            </span>
           </div>
         )}
       </div>

@@ -25,13 +25,13 @@ export const useEmail = () => {
     }
   }, []);
 
-  const fetchEmailById = useCallback(async (id) => {
+  const fetchEmailById = useCallback(async (id, markAsRead = true) => {
     try {
       setLoading(true);
       setError(null);
-      const email = await emailService.getEmailById(id);
+      const email = await emailService.getEmailById(id, markAsRead);
       setSelectedEmail(email);
-      await emailService.markAsRead([id]);
+      // Note: markAsRead is handled in getEmailById based on parameter
       return email;
     } catch (err) {
       setError(err.message);
@@ -55,14 +55,18 @@ export const useEmail = () => {
     }
   }, []);
 
-  const markAsRead = useCallback(async (emailIds) => {
+  const markAsRead = useCallback(async (emailIds, isRead = true) => {
     try {
-      await emailService.markAsRead(emailIds);
+      if (isRead) {
+        await emailService.markAsRead(emailIds);
+      } else {
+        await emailService.markAsUnread(emailIds);
+      }
       setEmails(prev => prev.map(email =>
-        emailIds.includes(email.id) ? { ...email, read: true } : email
+        emailIds.includes(email.id) ? { ...email, read: isRead } : email
       ));
       if (selectedEmail && emailIds.includes(selectedEmail.id)) {
-        setSelectedEmail(prev => ({ ...prev, read: true }));
+        setSelectedEmail(prev => ({ ...prev, read: isRead }));
       }
     } catch (err) {
       setError(err.message);
@@ -85,20 +89,24 @@ export const useEmail = () => {
     }
   }, [selectedEmail]);
 
-  const toggleStar = useCallback(async (emailIds) => {
+  const toggleStar = useCallback(async (emailId) => {
     try {
-      await emailService.toggleStar(emailIds);
+      // Find the email to get current starred status
+      const email = emails.find(e => e.id === emailId) || selectedEmail;
+      const newStarredStatus = !email?.starred;
+      
+      await emailService.toggleStar(emailId, newStarredStatus);
       setEmails(prev => prev.map(email =>
-        emailIds.includes(email.id) ? { ...email, starred: !email.starred } : email
+        email.id === emailId ? { ...email, starred: newStarredStatus } : email
       ));
-      if (selectedEmail && emailIds.includes(selectedEmail.id)) {
-        setSelectedEmail(prev => ({ ...prev, starred: !prev.starred }));
+      if (selectedEmail && selectedEmail.id === emailId) {
+        setSelectedEmail(prev => ({ ...prev, starred: newStarredStatus }));
       }
     } catch (err) {
       setError(err.message);
       throw err;
     }
-  }, [selectedEmail]);
+  }, [emails, selectedEmail]);
 
   const toggleImportant = useCallback(async (emailIds) => {
     try {
