@@ -57,7 +57,8 @@ export const useStudentManagement = () => {
         ...(filters.isCart && { IsCart: filters.isCart.toString() }),
         ...(filters.completionPercentage !== '' && filters.completionPercentage !== undefined && { CompletionPercentage: filters.completionPercentage }),
         ...(filters.isEnrolled && { IsEnrolled: filters.isEnrolled.toString() }),
-        ...(filters.isTestimonial && { IsTestimonial: filters.isTestimonial.toString() })
+        ...(filters.isTestimonial && { IsTestimonial: filters.isTestimonial.toString() }),
+        ...(filters.testimonialStatusId && { TestimonialStatusId: filters.testimonialStatusId })
       });
 
       if (filters.geoLocationCountry) {
