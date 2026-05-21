@@ -73,6 +73,26 @@ const EmailDetailsPanel = ({
     onMoveToFolder?.(folderId);
   };
 
+  const getCurrentFolderId = () => {
+    return email.emailFolderId || null;
+  };
+
+  const getCurrentFolderName = () => {
+    return email.folderName || null;
+  };
+
+  const isStarredFolder = (folder) => {
+    return folder.name === 'Starred' && email.starred;
+  };
+
+  const isCurrentFolder = (folder) => {
+    const currentFolderId = getCurrentFolderId();
+    const currentFolderName = getCurrentFolderName();
+    
+    // Check by ID first, then by name as fallback
+    return folder.id === currentFolderId || folder.name === currentFolderName;
+  };
+
   if (!email) {
     return (
       <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900">
@@ -144,16 +164,29 @@ const EmailDetailsPanel = ({
                   <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20">
                     {folders.map((folder) => {
                       const FolderIcon = folder.icon;
+                      const isCurrent = isCurrentFolder(folder);
+                      const isStarred = isStarredFolder(folder);
+                      const isSelected = isCurrent || isStarred;
                       return (
                         <button
                           key={folder.id}
                           onClick={() => handleMoveToFolder(folder.id)}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                          disabled={isSelected}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left ${
+                            isSelected
+                              ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer'
+                          }`}
                         >
                           <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                          <span className="text-sm text-gray-900 dark:text-white">
+                          <span className="text-sm text-gray-900 dark:text-white flex-1">
                             {folder.name}
                           </span>
+                          {isSelected && (
+                            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                              ✓
+                            </span>
+                          )}
                         </button>
                       );
                     })}

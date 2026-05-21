@@ -1,4 +1,4 @@
-import { EMAIL_FOLDERS, EMAIL_STATUS } from '../constants/emailConstants';
+import { EMAIL_FOLDERS } from '../constants/emailConstants';
 import { API_CONFIG, ENDPOINTS } from '../config/api';
 import appSettings from '../config/appSettings';
 
@@ -7,10 +7,13 @@ class EmailService {
     this.folderIdMap = {
       [EMAIL_FOLDERS.INBOX]: 1,
       [EMAIL_FOLDERS.SENT]: 2,
-      [EMAIL_FOLDERS.DRAFTS]: 3,
-      [EMAIL_FOLDERS.TRASH]: 4
+      [EMAIL_FOLDERS.DRAFTS]: 4,
+      [EMAIL_FOLDERS.TRASH]: 7,
+      [EMAIL_FOLDERS.STARRED]: 3,
+      [EMAIL_FOLDERS.OUTGOING]: 5,
+      [EMAIL_FOLDERS.ALL]: 6,
     };
-    this.dynamicFolderMap = {}; // Will be populated from API
+    this.dynamicFolderMap = {}; // Will be populated from API - takes precedence over static map
     // Use local URL in development, production URL otherwise
     this.baseUrl = appSettings.environment === 'development' 
       ? API_CONFIG.BASE_URL_Local 
@@ -30,15 +33,13 @@ class EmailService {
       'Starred': 'starred'
     };
     
-    console.log('📁 updateFolderMap - Folders from API:', folders);
     
     folders.forEach(folder => {
       const slug = slugMap[folder.name] || folder.name.toLowerCase().replace(/\s+/g, '-');
       this.dynamicFolderMap[slug] = folder.id;
-      console.log(`   ✅ Mapped: "${folder.name}" (ID: ${folder.id}) → slug: "${slug}"`);
+            
     });
     
-    console.log('📁 Final dynamicFolderMap:', this.dynamicFolderMap);
   }
 
   transformApiEmail(apiEmail) {
@@ -97,10 +98,13 @@ class EmailService {
 
       // Get folder ID from dynamic or static map
       const folderId = this.dynamicFolderMap[folder] || this.folderIdMap[folder];
-      console.log('🔍 getEmails - Folder:', folder, '| FolderId:', folderId, '| LabelTypeId:', filters.labelTypeId, '| DynamicMap:', this.dynamicFolderMap);
+      console.log('🔍 getEmails - Folder:', folder, '| FolderId:', folderId, '| LabelTypeId:', filters.labelTypeId, '| DynamicMap:', this.dynamicFolderMap, '| StaticMap:', this.folderIdMap);
       
+      // Always send EmailFolderId if available
       if (folderId) {
         params.append('EmailFolderId', folderId);
+      } else {
+        console.warn('⚠️ No folderId found for folder:', folder, '- EmailFolderId will not be sent');
       }
 
       const token = localStorage.getItem('adminToken');
@@ -365,10 +369,34 @@ class EmailService {
     return { success: true };
   }
 
-  async deleteEmails(emailIds) {
-    // TODO: Implement API call
-    console.log('Delete emails:', emailIds);
-    return { success: true };
+  async deleteEmails(emailId) {
+    try {
+      // Move to trash folder (folderId 7)
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_MOVE_TO_FOLDER(emailId)}?folderId=7`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete email');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to delete email');
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error deleting email:', error);
+      return { success: false, error };
+    }
   }
 
   async archiveEmails(emailIds) {
@@ -383,10 +411,33 @@ class EmailService {
     return { success: true };
   }
 
-  async moveToFolder(emailIds, folder) {
-    // TODO: Implement API call
-    console.log('Move to folder:', emailIds, folder);
-    return { success: true };
+  async moveToFolder(emailId, folderId) {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_MOVE_TO_FOLDER(emailId)}?folderId=${folderId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to move email to folder');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to move email to folder');
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error moving email to folder:', error);
+      return { success: false, error };
+    }
   }
 
   async addLabel(emailIds, label) {
@@ -402,15 +453,113 @@ class EmailService {
   }
 
   async sendEmail(emailData) {
-    // TODO: Implement API call
-    console.log('Send email:', emailData);
-    return { success: true, email: emailData };
+    try {
+      const token = localStorage.getItem('adminToken');
+      
+      const formData = new FormData();
+      formData.append('ToEmail', emailData.to);
+      formData.append('CcEmail', emailData.cc || '');
+      formData.append('BccEmail', emailData.bcc || '');
+      formData.append('Subject', emailData.subject);
+      formData.append('TextBody', emailData.body);
+      formData.append('EmailTypeId', emailData.emailTypeId || 1);
+      if (emailData.labelTypeId) {
+        formData.append('LabelTypeId', emailData.labelTypeId);
+      }
+      formData.append('EmailFolderId', emailData.emailFolderId || 2); // Default to Sent folder
+      if (emailData.replyMode) {
+        formData.append('ReplyMode', emailData.replyMode);
+      }
+      
+      // Handle attachments
+      if (emailData.attachments && emailData.attachments.length > 0) {
+        emailData.attachments.forEach((file, index) => {
+          if (file instanceof File) {
+            formData.append(`Attachments[${index}]`, file);
+          }
+        });
+      }
+
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_SEND}`, {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send email');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to send email');
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error sending email:', error);
+      return { success: false, error };
+    }
   }
 
   async saveDraft(emailData) {
-    // TODO: Implement API call
-    console.log('Save draft:', emailData);
-    return { success: true, email: emailData };
+    try {
+      const token = localStorage.getItem('adminToken');
+      
+      const formData = new FormData();
+      formData.append('ToEmail', emailData.to || '');
+      formData.append('CcEmail', emailData.cc || '');
+      formData.append('BccEmail', emailData.bcc || '');
+      formData.append('Subject', emailData.subject || '');
+      formData.append('TextBody', emailData.body || '');
+      formData.append('EmailTypeId', emailData.emailTypeId || 3); // Draft type
+      if (emailData.labelTypeId) {
+        formData.append('LabelTypeId', emailData.labelTypeId);
+      }
+      formData.append('EmailFolderId', 4); // Drafts folder
+      if (emailData.replyMode) {
+        formData.append('ReplyMode', emailData.replyMode);
+      }
+      
+      // Handle attachments
+      if (emailData.attachments && emailData.attachments.length > 0) {
+        emailData.attachments.forEach((file, index) => {
+          if (file instanceof File) {
+            formData.append(`Attachments[${index}]`, file);
+          }
+        });
+      }
+
+      const response = await fetch(`${this.baseUrl}${ENDPOINTS.EMAIL_SEND}`, {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save draft');
+      }
+
+      const result = await response.json();
+      const isSuccess = result.success || result.isSuccess;
+      
+      if (!isSuccess) {
+        throw new Error(result.message || result.errorMessage || 'Failed to save draft');
+      }
+
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      return { success: false, error };
+    }
   }
 
   async getFolderCounts() {
@@ -501,28 +650,11 @@ class EmailService {
         throw new Error(result.message || result.errorMessage || 'Failed to fetch labels');
       }
 
-      // Handle different response formats
-      const data = result.data;
-      
-      // If data is already an array, return it
-      if (Array.isArray(data)) {
-        return data;
-      }
-      
-      // If data is a single object (as per your API response), wrap it in an array
-      if (data && typeof data === 'object' && data.id) {
-        return [data];
-      }
-      
-      // Try to extract array from nested properties
-      if (data && typeof data === 'object') {
-        return data.items || data.labels || [];
-      }
-      
-      return [];
+      // Return the data with success flag
+      return { success: true, data: result.data || [] };
     } catch (error) {
       console.error('Error fetching labels:', error);
-      return [];
+      return { success: false, data: [] };
     }
   }
 

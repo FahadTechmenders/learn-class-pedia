@@ -22,9 +22,11 @@ import {
   Type,
   Highlighter,
   AlignLeft,
-  GripVertical
+  GripVertical,
+  Tag
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import emailService from '../../services/emailService';
 
 const ComposeEmailDrawer = ({
   isOpen = false,
@@ -48,6 +50,11 @@ const ComposeEmailDrawer = ({
   const [showBcc, setShowBcc] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [isSending, setIsSending] = useState(false);
+  const [labels, setLabels] = useState([]);
+  const [selectedLabel, setSelectedLabel] = useState(null);
+  const [showLabelDropdown, setShowLabelDropdown] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [statusType, setStatusType] = useState('success'); // 'success' or 'error'
   
   // Drag state
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -70,6 +77,24 @@ const ComposeEmailDrawer = ({
     }
   }, [initialData]);
 
+  useEffect(() => {
+    const fetchLabels = async () => {
+      try {
+        const result = await emailService.getLabels();
+        const isSuccess = result.success || result.isSuccess;
+        if (isSuccess) {
+          setLabels(result.data || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch labels:', error);
+      }
+    };
+
+    if (isOpen) {
+      fetchLabels();
+    }
+  }, [isOpen]);
+
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -84,11 +109,18 @@ const ComposeEmailDrawer = ({
     try {
       await onSend?.({
         ...formData,
-        attachments
+        attachments,
+        labelTypeId: selectedLabel?.id
       });
-      handleClose();
+      setStatusMessage('Email sent successfully!');
+      setStatusType('success');
+      setTimeout(() => {
+        handleClose();
+      }, 1500);
     } catch (error) {
       console.error('Failed to send email:', error);
+      setStatusMessage('Failed to send email. Please try again.');
+      setStatusType('error');
     } finally {
       setIsSending(false);
     }
@@ -98,10 +130,18 @@ const ComposeEmailDrawer = ({
     try {
       await onSaveDraft?.({
         ...formData,
-        attachments
+        attachments,
+        labelTypeId: selectedLabel?.id
       });
+      setStatusMessage('Draft saved successfully!');
+      setStatusType('success');
+      setTimeout(() => {
+        setStatusMessage(null);
+      }, 2000);
     } catch (error) {
       console.error('Failed to save draft:', error);
+      setStatusMessage('Failed to save draft. Please try again.');
+      setStatusType('error');
     }
   };
 
@@ -118,6 +158,9 @@ const ComposeEmailDrawer = ({
     setShowBcc(false);
     setIsMinimized(false);
     setIsFullscreen(false);
+    setSelectedLabel(null);
+    setShowLabelDropdown(false);
+    setStatusMessage(null);
     onClose?.();
   };
 
@@ -349,6 +392,26 @@ const ComposeEmailDrawer = ({
 
         {!isMinimized && (
           <>
+            {/* Status Message */}
+            {statusMessage && (
+              <div className={`mx-4 mt-4 p-3 rounded-lg flex items-center gap-2 ${
+                statusType === 'success'
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
+              }`}>
+                {statusType === 'success' ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                <span className="text-sm font-medium">{statusMessage}</span>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -437,6 +500,62 @@ const ComposeEmailDrawer = ({
                   placeholder="Subject"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
                 />
+
+                {/* Label Selector */}
+                <div className="relative flex items-center gap-2">
+                  <button
+                    onClick={() => setShowLabelDropdown(!showLabelDropdown)}
+                    className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
+                  >
+                    <Tag className="w-4 h-4" />
+                    <span>
+                      {selectedLabel ? selectedLabel.name : 'Add Label'}
+                    </span>
+                  </button>
+
+                  {selectedLabel && (
+                    <button
+                      onClick={() => setSelectedLabel(null)}
+                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    >
+                      <X className="w-4 h-4 text-gray-400" />
+                    </button>
+                  )}
+
+                  {showLabelDropdown && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-[100]" 
+                        onClick={() => setShowLabelDropdown(false)}
+                      />
+                      <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[101]">
+                        {labels.length === 0 && (
+                          <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                            No labels available
+                          </div>
+                        )}
+                        {labels.map((label) => (
+                          <button
+                            key={label.id}
+                            onClick={() => {
+                              setSelectedLabel(label);
+                              setShowLabelDropdown(false);
+                            }}
+                            className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left first:rounded-t-lg last:rounded-b-lg"
+                          >
+                            <span
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: label.color || '#3B82F6' }}
+                            />
+                            <span className="text-sm text-gray-900 dark:text-white">
+                              {label.name}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">

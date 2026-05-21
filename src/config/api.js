@@ -193,6 +193,7 @@ export const ENDPOINTS = {
   EMAIL_LABEL_BY_ID: (id) => `/Email/labels/${id}`,
   EMAIL_ASSIGN_LABEL: (id) => `/Email/${id}/assign-label`,
   EMAIL_FOLDERS: '/Email/Folders',
+  EMAIL_MOVE_TO_FOLDER: (id) => `/Email/${id}/move-to-folder`,
 };
 
 // HTTP Status Codes

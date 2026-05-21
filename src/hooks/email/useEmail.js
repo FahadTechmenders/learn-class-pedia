@@ -126,14 +126,13 @@ export const useEmail = () => {
     }
   }, [selectedEmail]);
 
-  const deleteEmails = useCallback(async (emailIds) => {
+  const deleteEmails = useCallback(async (emailId) => {
     try {
-      await emailService.deleteEmails(emailIds);
-      setEmails(prev => prev.filter(email => !emailIds.includes(email.id)));
-      if (selectedEmail && emailIds.includes(selectedEmail.id)) {
+      await emailService.deleteEmails(emailId);
+      setEmails(prev => prev.filter(email => email.id !== emailId));
+      if (selectedEmail && selectedEmail.id === emailId) {
         setSelectedEmail(null);
       }
-      setSelectedEmails([]);
     } catch (err) {
       setError(err.message);
       throw err;
@@ -168,16 +167,18 @@ export const useEmail = () => {
     }
   }, [selectedEmail]);
 
-  const moveToFolder = useCallback(async (emailIds, folder) => {
+  const moveToFolder = useCallback(async (emailId, folderId) => {
     try {
-      await emailService.moveToFolder(emailIds, folder);
-      setEmails(prev => prev.filter(email => !emailIds.includes(email.id)));
-      setSelectedEmails([]);
+      await emailService.moveToFolder(emailId, folderId);
+      setEmails(prev => prev.filter(email => email.id !== emailId));
+      if (selectedEmail && selectedEmail.id === emailId) {
+        setSelectedEmail(null);
+      }
     } catch (err) {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [selectedEmail]);
 
   const addLabel = useCallback(async (emailIds, label) => {
     try {

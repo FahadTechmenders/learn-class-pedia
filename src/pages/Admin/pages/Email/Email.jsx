@@ -30,6 +30,7 @@ const Email = () => {
     deleteEmails,
     archiveEmails,
     moveToSpam,
+    moveToFolder,
     sendEmail,
     saveDraft,
     fetchFolderCounts,
@@ -254,7 +255,7 @@ const Email = () => {
           await archiveEmails(selectedEmails);
           break;
         case 'delete':
-          await deleteEmails(selectedEmails);
+          await Promise.all(selectedEmails.map(id => deleteEmails(id)));
           break;
         case 'spam':
           await moveToSpam(selectedEmails);
@@ -374,7 +375,7 @@ const Email = () => {
                   await loadEmails();
                 }}
                 onDelete={async () => {
-                  await deleteEmails([selectedEmail.id]);
+                  await deleteEmails(selectedEmail.id);
                   handleCloseDetails();
                   await loadEmails();
                 }}
@@ -390,8 +391,7 @@ const Email = () => {
                   // Removed loadFolderCounts() to avoid triggering unnecessary reloads
                 }}
                 onMoveToFolder={async (folderId) => {
-                  // TODO: Implement move to folder API call
-                  console.log('Move email to folder:', folderId);
+                  await moveToFolder(selectedEmail.id, folderId);
                   handleCloseDetails();
                   await loadEmails();
                   await loadFolderCounts();

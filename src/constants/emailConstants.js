@@ -5,7 +5,7 @@ export const EMAIL_FOLDERS = {
   SPAM: 'spam',
   TRASH: 'trash',
   STARRED: 'starred',
-  IMPORTANT: 'important',
+  OUTGOING: 'outgoing',
   ALL: 'all'
 };
 
