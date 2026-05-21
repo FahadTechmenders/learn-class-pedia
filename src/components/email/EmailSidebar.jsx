@@ -47,9 +47,14 @@ const EmailSidebar = ({
   }, []);
 
   const loadLabels = async () => {
-    const fetchedLabels = await emailService.getLabels();
-    // Ensure we always set an array
-    setLabels(Array.isArray(fetchedLabels) ? fetchedLabels : []);
+    const result = await emailService.getLabels();
+    // Handle the new response format
+    const isSuccess = result.success || result.isSuccess;
+    if (isSuccess) {
+      setLabels(result.data || []);
+    } else {
+      setLabels([]);
+    }
   };
 
   const loadFolders = async () => {
