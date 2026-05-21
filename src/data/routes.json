@@ -28,13 +28,31 @@
       "order": 3
     },
     {
+      "id": "career-path",
+      "path": "/admin/career-path",
+      "component": "CareerPath",
+      "label": "Career Path",
+      "icon": "TrendingUp",
+      "category": "management",
+      "order": 4
+    },
+    {
+      "id": "testimonial-management",
+      "path": "/admin/testimonial-management",
+      "component": "TestimonialManagement",
+      "label": "Testimonial Management",
+      "icon": "MessageSquare",
+      "category": "management",
+      "order": 5
+    },
+    {
       "id": "featured",
       "path": "/admin/featured",
       "component": "FeaturedMarking",
       "label": "Featured Marking",
       "icon": "Star",
       "category": "management",
-      "order": 5
+      "order": 6
     },
     {
       "id": "review-management-page",
@@ -43,7 +61,7 @@
       "label": "Course & Career Reviews",
       "icon": "Star",
       "category": "management",
-      "order": 6
+      "order": 7
     },
     {
       "id": "categories",
@@ -89,15 +107,6 @@
       "icon": "Award",
       "category": "management",
       "order": 11
-    },
-    {
-      "id": "career-path",
-      "path": "/admin/career-path",
-      "component": "CareerPath",
-      "label": "Career Path",
-      "icon": "TrendingUp",
-      "category": "management",
-      "order": 4
     },
     {
       "id": "topics",
