@@ -25,6 +25,7 @@ import PaymentProviders from '../pages/PaymentProviders/PaymentProviders';
 import PaymentProviderAccounts from '../pages/PaymentProviderAccounts/PaymentProviderAccounts';
 import ContactUs from '../pages/ContactUs/ContactUs';
 import CourseContent from '../pages/CourseContent/CourseContent';
+import TestimonialManagement from '../pages/TestimonialManagement/TestimonialManagement';
 
 // Component mapping
 const componentMap = {
@@ -51,6 +52,7 @@ const componentMap = {
   PaymentProviderAccounts,
   ContactUs,
   CourseContent,
+  TestimonialManagement,
 };
 
 // Protected Route Component
