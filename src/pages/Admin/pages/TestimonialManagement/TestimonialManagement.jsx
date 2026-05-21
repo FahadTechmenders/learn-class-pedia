@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Star,
   Phone,
+  Video,
 } from 'lucide-react';
 import useStudentManagement from '../../../../hooks/api/useStudentManagement';
 import { useToast } from '../../../../components/ToastProvider';
@@ -38,6 +39,7 @@ const TestimonialManagement = () => {
     email: '',
     signupDateFrom: '',
     signupDateTo: '',
+    testimonialStatusId: '',
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showTestimonialsModal, setShowTestimonialsModal] = useState(false);
@@ -48,16 +50,28 @@ const TestimonialManagement = () => {
   const [selectedTestimonialStatus, setSelectedTestimonialStatus] = useState({});
   const [testimonialComments, setTestimonialComments] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [filterTestimonialStatuses, setFilterTestimonialStatuses] = useState([]);
 
   const emptyFiltersRef = useMemo(() => ({
     fullName: '',
     email: '',
     signupDateFrom: '',
     signupDateTo: '',
+    testimonialStatusId: '',
   }), []);
   useEffect(() => {
     getAllStudents(1, 100, { isTestimonial: true });
+    loadFilterTestimonialStatuses();
   }, [getAllStudents]);
+
+  const loadFilterTestimonialStatuses = async () => {
+    try {
+      const statuses = await getTestimonialStatusesDropdown();
+      setFilterTestimonialStatuses(statuses || []);
+    } catch (err) {
+      console.error('Failed to load testimonial statuses:', err);
+    }
+  };
 
   const loadStudents = useCallback(async (page = 1, pageSize = 100) => {
     try {
@@ -228,6 +242,7 @@ const TestimonialManagement = () => {
       email: 'Email',
       signupDateFrom: 'Date From',
       signupDateTo: 'Date To',
+      testimonialStatusId: 'Status',
     };
 
     const isActive = (k, v) => {
@@ -319,7 +334,7 @@ const TestimonialManagement = () => {
           }`}
         >
           <div className="p-4 space-y-4 bg-gray-50/60 dark:bg-gray-900/20 rounded-b-2xl">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
               <div className="relative">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Customer Name</label>
                 <div className="relative">
@@ -344,6 +359,25 @@ const TestimonialManagement = () => {
                     onChange={(e) => handleFilterChange('email', e.target.value)}
                     className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white transition-all shadow-sm"
                   />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Testimonial Status</label>
+                <div className="relative">
+                  <CheckCircle className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+                  <select
+                    value={filters.testimonialStatusId}
+                    onChange={(e) => handleFilterChange('testimonialStatusId', e.target.value)}
+                    className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white transition-all shadow-sm appearance-none cursor-pointer"
+                  >
+                    <option value="">All Statuses</option>
+                    {filterTestimonialStatuses.map((status) => (
+                      <option key={status.id} value={status.id}>
+                        {status.statusName}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
               <div>
@@ -453,10 +487,23 @@ const TestimonialManagement = () => {
                       <button
                         onClick={() => handleViewTestimonials(student.id)}
                         disabled={loadingTestimonials}
-                        className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg shadow-sm hover:shadow transition-all"
+                        title={`View ${student.testimonialCount || 0} testimonial${(student.testimonialCount || 0) !== 1 ? 's' : ''}`}
+                        className="group flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-sm"
                       >
-                        <MessageSquare className="w-4 h-4" />
-                        View Testimonials
+                        {loadingTestimonials ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Loading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <MessageSquare className="w-4 h-4 group-hover:animate-pulse" />
+                            <span>View</span>
+                            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold bg-white/20 rounded-full">
+                              {student.testimonialCount || 0}
+                            </span>
+                          </>
+                        )}
                       </button>
                     </td>
                   </tr>
@@ -538,10 +585,8 @@ const TestimonialManagement = () => {
                           {testimonial.testimonialVideoUrl ? (
                             <div>
                               <div className="flex items-center gap-2 mb-3">
-                                <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                                  <video className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                </div>
-                                <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Video Testimonial</label>
+                                
+           
                               </div>
                               <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-black">
                                 <video
