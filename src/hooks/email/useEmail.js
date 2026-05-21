@@ -62,12 +62,15 @@ export const useEmail = () => {
       } else {
         await emailService.markAsUnread(emailIds);
       }
+      // Update emails list state to reflect read/unread status
       setEmails(prev => prev.map(email =>
         emailIds.includes(email.id) ? { ...email, read: isRead } : email
       ));
+      // Update selected email state if it's the one being marked
       if (selectedEmail && emailIds.includes(selectedEmail.id)) {
         setSelectedEmail(prev => ({ ...prev, read: isRead }));
       }
+      console.log('✅ markAsRead - EmailIds:', emailIds, 'isRead:', isRead, 'Updated emails state');
     } catch (err) {
       setError(err.message);
       throw err;

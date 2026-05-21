@@ -26,13 +26,19 @@ class EmailService {
       'Trash': 'trash',
       'Spam': 'spam',
       'All Mail': 'all',
-      'Outbound': 'Outbound'
+      'Outgoing': 'outgoing',
+      'Starred': 'starred'
     };
     
+    console.log('📁 updateFolderMap - Folders from API:', folders);
+    
     folders.forEach(folder => {
-      const slug = slugMap[folder.name] || folder.name.toLowerCase();
+      const slug = slugMap[folder.name] || folder.name.toLowerCase().replace(/\s+/g, '-');
       this.dynamicFolderMap[slug] = folder.id;
+      console.log(`   ✅ Mapped: "${folder.name}" (ID: ${folder.id}) → slug: "${slug}"`);
     });
+    
+    console.log('📁 Final dynamicFolderMap:', this.dynamicFolderMap);
   }
 
   transformApiEmail(apiEmail) {
@@ -84,15 +90,17 @@ class EmailService {
         params.append('SearchEmail', filters.search);
       }
 
-      // Only add EmailFolderId if it's not ALL or STARRED or IMPORTANT
-      if (folder !== EMAIL_FOLDERS.ALL && folder !== EMAIL_FOLDERS.STARRED && folder !== EMAIL_FOLDERS.IMPORTANT) {
-        // Try dynamic folder map first, then fall back to static map
-        const folderId = this.dynamicFolderMap[folder] || this.folderIdMap[folder];
-        console.log('Folder:', folder, 'FolderId:', folderId, 'DynamicMap:', this.dynamicFolderMap);
-        // Don't add EmailFolderId if it's 5 (special folder like All Mail)
-        if (folderId && folderId !== 5) {
-          params.append('EmailFolderId', folderId);
-        }
+      // Add labelTypeId if provided
+      if (filters.labelTypeId) {
+        params.append('LabelTypeId', filters.labelTypeId);
+      }
+
+      // Get folder ID from dynamic or static map
+      const folderId = this.dynamicFolderMap[folder] || this.folderIdMap[folder];
+      console.log('🔍 getEmails - Folder:', folder, '| FolderId:', folderId, '| LabelTypeId:', filters.labelTypeId, '| DynamicMap:', this.dynamicFolderMap);
+      
+      if (folderId) {
+        params.append('EmailFolderId', folderId);
       }
 
       const token = localStorage.getItem('adminToken');

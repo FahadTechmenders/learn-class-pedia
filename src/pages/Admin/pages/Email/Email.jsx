@@ -8,6 +8,7 @@ import EmailList from '../../../../components/email/EmailList';
 import EmailDetailsPanel from '../../../../components/email/EmailDetailsPanel';
 import ComposeEmailDrawer from '../../../../components/email/ComposeEmailDrawer';
 import { useTheme } from '../../../../context/ThemeContext';
+import emailService from '../../../../services/emailService';
 
 const Email = () => {
   const navigate = useNavigate();
@@ -51,6 +52,16 @@ const Email = () => {
   const [totalEmails, setTotalEmails] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [pageSize] = useState(50);
+  const [foldersLoaded, setFoldersLoaded] = useState(false);
+
+  // Load folders on mount
+  useEffect(() => {
+    const initFolders = async () => {
+      await emailService.getFolders();
+      setFoldersLoaded(true);
+    };
+    initFolders();
+  }, []);
 
   useEffect(() => {
     const pathParts = location.pathname.split('/');
@@ -64,10 +75,13 @@ const Email = () => {
   }, [location.pathname]);
 
   useEffect(() => {
+    // Only load emails if folders have been loaded
+    if (!foldersLoaded) return;
+    
     setCurrentPage(1);
     loadEmails();
     // Removed loadFolderCounts() - not needed since we don't display counts in sidebar
-  }, [currentFolder, currentLabel, searchTerm]);
+  }, [currentFolder, currentLabel, searchTerm, foldersLoaded]);
 
   useEffect(() => {
     loadEmails();
@@ -85,8 +99,8 @@ const Email = () => {
 
   const loadEmails = async () => {
     try {
-      // Don't load emails if no folder is selected
-      if (!currentFolder) {
+      // Don't load emails if no folder is selected and no label is selected
+      if (!currentFolder && !currentLabel) {
         setTotalEmails(0);
         setUnreadCount(0);
         return;
@@ -102,10 +116,13 @@ const Email = () => {
       }
 
       if (currentLabel) {
-        filters.labels = [currentLabel];
+        filters.labelTypeId = currentLabel;
       }
 
-      const result = await fetchEmails(currentFolder, filters);
+      // When label is selected, don't pass folder parameter
+      const folder = currentLabel ? null : currentFolder;
+
+      const result = await fetchEmails(folder, filters);
       setTotalEmails(result?.total || 0);
       setUnreadCount(result?.unreadCount || 0);
     } catch (error) {

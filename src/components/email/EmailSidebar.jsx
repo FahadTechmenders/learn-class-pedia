@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Inbox, 
-  Send, 
-  FileText, 
-  Star, 
-  AlertCircle, 
-  Trash2, 
+  Inbox,
+  Send,
+  Star,
+  FileText,
+  AlertCircle,
   Mail,
+  Trash2,
   Tag,
   ChevronDown,
   ChevronRight,
@@ -15,16 +15,13 @@ import {
   Trash
 } from 'lucide-react';
 import emailService from '../../services/emailService';
-import { EMAIL_FOLDERS, EMAIL_LABELS } from '../../constants/emailConstants';
 
 const EmailSidebar = ({
   currentFolder,
   onFolderChange,
-  folderCounts = {},
   isCollapsed = false,
   currentLabel = null,
-  onLabelChange,
-  unreadCount = 0
+  onLabelChange
 }) => {
   const [showLabels, setShowLabels] = useState(true);
   const [labels, setLabels] = useState([]);
@@ -32,24 +29,16 @@ const EmailSidebar = ({
   const [editingLabel, setEditingLabel] = useState(null);
   const [folders, setFolders] = useState([]);
 
-  // Icon mapping for folder icons from API
-  const iconMap = {
-    'fas fa-inbox': Inbox,
-    'fas fa-paper-plane': Send,
-    'fas fa-file-alt': FileText,
-    'fas fa-trash-alt': Trash2,
-    'fas fa-exclamation-circle': AlertCircle
-  };
-
   // Color mapping for folders
   const colorMap = {
     'Inbox': 'text-blue-600 dark:text-blue-400',
     'Sent': 'text-green-600 dark:text-green-400',
     'Drafts': 'text-gray-600 dark:text-gray-400',
-    'Trash': 'text-gray-600 dark:text-gray-400',
+    'Trash': 'text-red-600 dark:text-red-400',
     'Spam': 'text-orange-600 dark:text-orange-400',
     'Starred': 'text-yellow-600 dark:text-yellow-400',
-    'All Mail': 'text-purple-600 dark:text-purple-400'
+    'All Mail': 'text-purple-600 dark:text-purple-400',
+    'Outgoing': 'text-teal-600 dark:text-teal-400'
   };
 
   useEffect(() => {
@@ -65,7 +54,19 @@ const EmailSidebar = ({
 
   const loadFolders = async () => {
     const apiFolders = await emailService.getFolders();
-    // Map API folders to include Lucide icons, colors, and slugs
+    
+    // Map icon names from API to Lucide React components
+    const iconComponentMap = {
+      'Inbox': Inbox,
+      'Send': Send,
+      'Star': Star,
+      'FileText': FileText,
+      'AlertCircle': AlertCircle,
+      'Mail': Mail,
+      'Trash2': Trash2
+    };
+    
+    // Map API folders to include colors and slugs
     const slugMap = {
       'Inbox': 'inbox',
       'Sent': 'sent',
@@ -73,14 +74,15 @@ const EmailSidebar = ({
       'Trash': 'trash',
       'Spam': 'spam',
       'All Mail': 'all',
-      'Outbound': 'Outbound'
+      'Outgoing': 'outgoing',
+      'Starred': 'starred'
     };
     
     const mappedFolders = apiFolders.map(folder => ({
       id: folder.id,
       label: folder.name,
       slug: slugMap[folder.name] || folder.name.toLowerCase().replace(/\s+/g, '-'),
-      icon: iconMap[folder.icon] || Inbox,
+      icon: iconComponentMap[folder.icon] || Inbox, // Map icon name to Lucide component
       color: colorMap[folder.name] || 'text-gray-600 dark:text-gray-400'
     }));
     setFolders(mappedFolders);
@@ -110,7 +112,7 @@ const EmailSidebar = ({
 
   const FolderItem = ({ folder }) => {
     const isActive = currentFolder === folder.slug;
-    const Icon = folder.icon;
+    const IconComponent = folder.icon;
 
     return (
       <button
@@ -135,7 +137,7 @@ const EmailSidebar = ({
             : 'bg-gray-100 dark:bg-gray-800 group-hover:bg-gray-200 dark:group-hover:bg-gray-700'
           }
         `}>
-          <Icon className={`w-5 h-5 flex-shrink-0 transition-all duration-200 ${isActive ? 'text-blue-600 dark:text-blue-400' : folder.color}`} />
+          <IconComponent className={`w-5 h-5 transition-all duration-200 ${isActive ? 'text-blue-600 dark:text-blue-400' : folder.color}`} />
         </div>
         {!isCollapsed && (
           <span className={`flex-1 text-left text-sm transition-all duration-200 ${isActive ? 'font-medium' : 'font-normal'}`}>

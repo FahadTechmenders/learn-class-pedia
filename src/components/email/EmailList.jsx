@@ -14,7 +14,6 @@ import EmailRow from './EmailRow';
 import EmptyState from './EmptyState';
 const EmailList = ({
   emails = [],
-  loading = false,
   selectedEmails = [],
   activeEmailId = null,
   onEmailSelect,
