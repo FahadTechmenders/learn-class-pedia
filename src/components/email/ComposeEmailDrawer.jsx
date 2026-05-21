@@ -325,6 +325,8 @@ const ComposeEmailDrawer = ({
         return 'Reply All';
       case 'forward':
         return 'Forward';
+      case 'editDraft':
+        return 'Edit Draft';
       default:
         return 'New Message';
     }

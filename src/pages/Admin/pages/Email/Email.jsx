@@ -175,8 +175,27 @@ const Email = () => {
     setShowMobileSidebar(false);
   };
 
-  const handleEmailClick = (email) => {
-    navigate(`/admin/email/${currentFolder}/${email.id}`);
+  const handleEmailClick = async (email) => {
+    // If in drafts folder, fetch full email data then open compose drawer to edit the draft
+    if (currentFolder === 'drafts') {
+      try {
+        const fullEmailData = await fetchEmailById(email.id);
+        setComposeMode('editDraft');
+        setComposeInitialData({
+          to: fullEmailData.to?.map(r => r.email).join(', ') || '',
+          cc: fullEmailData.cc?.map(r => r.email).join(', ') || '',
+          bcc: fullEmailData.bcc?.map(r => r.email).join(', ') || '',
+          subject: fullEmailData.subject || '',
+          body: fullEmailData.body || '',
+          emailId: email.id // Pass email ID for updating the draft
+        });
+        setShowCompose(true);
+      } catch (error) {
+        console.error('Failed to fetch draft email:', error);
+      }
+    } else {
+      navigate(`/admin/email/${currentFolder}/${email.id}`);
+    }
   };
 
   const handleCloseDetails = () => {
@@ -222,7 +241,12 @@ const Email = () => {
 
   const handleSendEmail = async (emailData) => {
     try {
-      await sendEmail(emailData);
+      // If sending from a draft (has emailId), set emailFolderId to 4 (Sent folder)
+      const emailPayload = emailData.emailId
+        ? { ...emailData, emailFolderId: 4 }
+        : emailData;
+
+      await sendEmail(emailPayload);
       await loadEmails();
       await loadFolderCounts();
     } catch (error) {
@@ -233,7 +257,16 @@ const Email = () => {
 
   const handleSaveDraft = async (emailData) => {
     try {
-      await saveDraft(emailData);
+      // If emailId is present, it's an existing draft being edited
+      if (emailData.emailId) {
+        // Update existing draft - you'll need to implement an updateDraft function in useEmail hook
+        // For now, we'll use saveDraft which should handle both cases
+        await saveDraft({ ...emailData, id: emailData.emailId });
+      } else {
+        // Create new draft
+        await saveDraft(emailData);
+      }
+      await loadEmails();
       await loadFolderCounts();
     } catch (error) {
       console.error('Failed to save draft:', error);
@@ -360,7 +393,7 @@ const Email = () => {
             </div>
 
             <div className={`
-              ${showEmailDetails ? 'flex-1' : 'hidden'}
+              ${showEmailDetails && currentFolder !== 'drafts' ? 'flex-1' : 'hidden'}
               lg:block lg:flex-1 border-l border-gray-200 dark:border-gray-800 overflow-hidden
             `}>
               <EmailDetailsPanel
@@ -411,7 +444,11 @@ const Email = () => {
 
       <ComposeEmailDrawer
         isOpen={showCompose}
-        onClose={() => setShowCompose(false)}
+        onClose={() => {
+          setShowCompose(false);
+          setSelectedEmail(null);
+          setShowEmailDetails(false);
+        }}
         onSend={handleSendEmail}
         onSaveDraft={handleSaveDraft}
         initialData={composeInitialData}
