@@ -177,6 +177,10 @@ export const ENDPOINTS = {
   CONTACT_INFORMATION: '/contact-information',
   INQUIRY_OPTIONS: '/inquiry-options',
 
+  // Testimonial Management endpoints
+  TESTIMONIAL_ALL: '/Testimonial',
+  TESTIMONIAL_BY_ID: (id) => `/Testimonial/${id}`,
+
   // Email endpoints
   EMAIL_LIST: '/Email',
   EMAIL_BY_ID: (id) => `/Email/${id}`,
@@ -194,9 +198,6 @@ export const ENDPOINTS = {
   EMAIL_ASSIGN_LABEL: (id) => `/Email/${id}/assign-label`,
   EMAIL_FOLDERS: '/Email/Folders',
   EMAIL_MOVE_TO_FOLDER: (id) => `/Email/${id}/move-to-folder`,
-  // Testimonial Management endpoints
-  TESTIMONIAL_ALL: '/Testimonial',
-  TESTIMONIAL_BY_ID: (id) => `/Testimonial/${id}`,
 };
 
 // HTTP Status Codes
