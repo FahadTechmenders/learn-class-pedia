@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import  { useState, useEffect, useRef } from 'react';
 import {
   X,
   Minimize2,
@@ -7,7 +7,6 @@ import {
   Paperclip,
   Image as ImageIcon,
   Smile,
-  AtSign,
   Save,
   Trash2,
   Bold,
@@ -22,10 +21,12 @@ import {
   Type,
   Highlighter,
   AlignLeft,
+  AlignCenter,
+  AlignRight,
   GripVertical,
-  Tag
+  Tag,
+  Eraser
 } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
 import emailService from '../../services/emailService';
 
 const ComposeEmailDrawer = ({
@@ -36,10 +37,10 @@ const ComposeEmailDrawer = ({
   initialData = null,
   mode = 'compose'
 }) => {
-  const { theme } = useTheme();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [formData, setFormData] = useState({
+    from: 'noreply@classpedia.ai',
     to: '',
     cc: '',
     bcc: '',
@@ -66,6 +67,7 @@ const ComposeEmailDrawer = ({
   useEffect(() => {
     if (initialData) {
       setFormData({
+        from: initialData.from || 'noreply@classpedia.ai',
         to: initialData.to || '',
         cc: initialData.cc || '',
         bcc: initialData.bcc || '',
@@ -76,6 +78,13 @@ const ComposeEmailDrawer = ({
       if (initialData.bcc) setShowBcc(true);
     }
   }, [initialData]);
+
+  // Sync initial body to contenteditable when drawer opens or initialData changes
+  useEffect(() => {
+    if (bodyRef.current && initialData) {
+      bodyRef.current.innerHTML = initialData.body || '';
+    }
+  }, [initialData, isOpen]);
 
   useEffect(() => {
     const fetchLabels = async () => {
@@ -147,6 +156,7 @@ const ComposeEmailDrawer = ({
 
   const handleClose = () => {
     setFormData({
+      from: 'noreply@classpedia.ai',
       to: '',
       cc: '',
       bcc: '',
@@ -169,103 +179,132 @@ const ComposeEmailDrawer = ({
   };
 
   const applyFormatting = (format) => {
-    const textarea = bodyRef.current;
-    if (!textarea) return;
+    const editor = bodyRef.current;
+    if (!editor) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = formData.body.substring(start, end);
-    
-    if (!selectedText && format !== 'indent' && format !== 'outdent') return;
+    editor.focus();
 
-    let formattedText = '';
-    let newCursorPos = end;
+    // Check if there's a selection
+    const selection = window.getSelection();
+    const hasSelection = selection.rangeCount > 0 && !selection.isCollapsed;
 
     switch (format) {
       case 'bold':
-        formattedText = `<b>${selectedText}</b>`;
-        newCursorPos = end + 7;
+        document.execCommand('bold', false, null);
         break;
       case 'italic':
-        formattedText = `<i>${selectedText}</i>`;
-        newCursorPos = end + 7;
+        document.execCommand('italic', false, null);
         break;
       case 'underline':
-        formattedText = `<u>${selectedText}</u>`;
-        newCursorPos = end + 7;
+        document.execCommand('underline', false, null);
         break;
       case 'strikethrough':
-        formattedText = `<s>${selectedText}</s>`;
-        newCursorPos = end + 7;
+        document.execCommand('strikeThrough', false, null);
         break;
       case 'highlight':
-        formattedText = `<mark>${selectedText}</mark>`;
-        newCursorPos = end + 13;
+        document.execCommand('backColor', false, 'yellow');
         break;
       case 'bulletList':
-        const bulletLines = selectedText.split('\n');
-        formattedText = bulletLines.map(line => `• ${line}`).join('\n');
-        newCursorPos = end + (bulletLines.length * 2);
+        document.execCommand('insertUnorderedList', false, null);
         break;
       case 'numberedList':
-        const numberedLines = selectedText.split('\n');
-        formattedText = numberedLines.map((line, i) => `${i + 1}. ${line}`).join('\n');
-        newCursorPos = end + numberedLines.reduce((acc, _, i) => acc + `${i + 1}. `.length, 0);
+        document.execCommand('insertOrderedList', false, null);
         break;
       case 'indent':
-        const indentLines = selectedText.split('\n');
-        formattedText = indentLines.map(line => `    ${line}`).join('\n');
-        newCursorPos = end + (indentLines.length * 4);
+        document.execCommand('indent', false, null);
         break;
       case 'outdent':
-        const outdentLines = selectedText.split('\n');
-        formattedText = outdentLines.map(line => line.replace(/^    /, '')).join('\n');
-        newCursorPos = start + formattedText.length;
+        document.execCommand('outdent', false, null);
         break;
       case 'link':
         const url = prompt('Enter URL:');
         if (url) {
-          formattedText = `<a href="${url}">${selectedText}</a>`;
-          newCursorPos = end + url.length + 15;
-        } else {
-          return;
+          document.execCommand('createLink', false, url);
         }
+        break;
+      case 'alignLeft':
+        document.execCommand('justifyLeft', false, null);
+        break;
+      case 'alignCenter':
+        document.execCommand('justifyCenter', false, null);
+        break;
+      case 'alignRight':
+        document.execCommand('justifyRight', false, null);
+        break;
+      case 'clearFormatting':
+        document.execCommand('removeFormat', false, null);
         break;
       default:
         return;
     }
 
-    const newBody = 
-      formData.body.substring(0, start) + 
-      formattedText + 
-      formData.body.substring(end);
+    // If no selection was made, ensure cursor is inside the formatted element
+    if (!hasSelection) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
 
-    handleChange('body', newBody);
+    // Update formData.body after formatting
+    handleChange('body', editor.innerHTML);
+  };
 
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
+  const handleTextStyle = (e) => {
+    const editor = bodyRef.current;
+    if (!editor) return;
+
+    editor.focus();
+    const style = e.target.value;
+
+    switch (style) {
+      case 'Normal':
+        document.execCommand('formatBlock', false, 'p');
+        break;
+      case 'Heading 1':
+        document.execCommand('formatBlock', false, 'h1');
+        break;
+      case 'Heading 2':
+        document.execCommand('formatBlock', false, 'h2');
+        break;
+      case 'Heading 3':
+        document.execCommand('formatBlock', false, 'h3');
+        break;
+      default:
+        break;
+    }
+
+    // Reset select to Normal after applying
+    e.target.value = 'Normal';
+    handleChange('body', editor.innerHTML);
+  };
+
+  const handleFontColor = () => {
+    const editor = bodyRef.current;
+    if (!editor) return;
+
+    editor.focus();
+    const color = prompt('Enter color (e.g., red, #ff0000):');
+    if (color) {
+      document.execCommand('foreColor', false, color);
+      handleChange('body', editor.innerHTML);
+    }
+  };
+
+  const handleBodyInput = (e) => {
+    handleChange('body', e.target.innerHTML);
   };
 
   const insertEmoji = () => {
     const emojis = ['😊', '👍', '❤️', '🎉', '✨', '🔥', '💯', '👏', '🙏', '💪'];
     const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-    const textarea = bodyRef.current;
-    if (!textarea) return;
+    const editor = bodyRef.current;
+    if (!editor) return;
 
-    const start = textarea.selectionStart;
-    const newBody = 
-      formData.body.substring(0, start) + 
-      emoji + 
-      formData.body.substring(start);
-
-    handleChange('body', newBody);
-
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + emoji.length, start + emoji.length);
-    }, 0);
+    editor.focus();
+    document.execCommand('insertText', false, emoji);
+    handleChange('body', editor.innerHTML);
   };
 
   const handleMouseDown = (e) => {
@@ -306,7 +345,7 @@ const ComposeEmailDrawer = ({
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart, position]);
+  }, [isDragging, dragStart, position, handleMouseMove]);
 
   // Reset position when fullscreen or minimized changes
   useEffect(() => {
@@ -416,6 +455,18 @@ const ComposeEmailDrawer = ({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-12">
+                    From
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.from}
+                    onChange={(e) => handleChange('from', e.target.value)}
+                    placeholder="From"
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                  />
+                </div>
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-12">
                     To
@@ -631,7 +682,8 @@ const ComposeEmailDrawer = ({
                   <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
                   {/* Text Style Dropdown */}
-                  <select 
+                  <select
+                    onChange={handleTextStyle}
                     className="px-2 py-1.5 text-sm border-0 bg-transparent text-gray-700 dark:text-gray-300 focus:outline-none cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                     title="Text Style"
                   >
@@ -644,7 +696,8 @@ const ComposeEmailDrawer = ({
                   <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
                   {/* Font Color & Highlight */}
-                  <button 
+                  <button
+                    onClick={handleFontColor}
                     className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                     title="Text Color"
                   >
@@ -660,12 +713,38 @@ const ComposeEmailDrawer = ({
 
                   <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
-                  {/* More Options */}
-                  <button 
+                  {/* Alignment */}
+                  <button
+                    onClick={() => applyFormatting('alignLeft')}
                     className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-                    title="More Options"
+                    title="Align Left"
                   >
                     <AlignLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => applyFormatting('alignCenter')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Align Center"
+                  >
+                    <AlignCenter className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => applyFormatting('alignRight')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Align Right"
+                  >
+                    <AlignRight className="w-4 h-4" />
+                  </button>
+
+                  <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+                  {/* Clear Formatting */}
+                  <button
+                    onClick={() => applyFormatting('clearFormatting')}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    title="Clear Formatting"
+                  >
+                    <Eraser className="w-4 h-4" />
                   </button>
 
                   <div className="flex-1" />
@@ -693,12 +772,13 @@ const ComposeEmailDrawer = ({
                     <Smile className="w-4 h-4" />
                   </button>
                 </div>
-                <textarea
+                <div
                   ref={bodyRef}
-                  value={formData.body}
-                  onChange={(e) => handleChange('body', e.target.value)}
+                  contentEditable
+                  onInput={handleBodyInput}
                   placeholder="Write your message..."
-                  className="w-full h-64 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none resize-none text-sm"
+                  className="w-full h-64 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none overflow-y-auto text-sm"
+                  style={{ minHeight: '256px', direction: 'ltr' }}
                 />
               </div>
 

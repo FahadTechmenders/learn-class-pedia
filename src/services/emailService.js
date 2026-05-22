@@ -98,10 +98,8 @@ class EmailService {
 
       // Get folder ID from dynamic or static map
       const folderId = this.dynamicFolderMap[folder] || this.folderIdMap[folder];
-      console.log('🔍 getEmails - Folder:', folder, '| FolderId:', folderId, '| LabelTypeId:', filters.labelTypeId, '| DynamicMap:', this.dynamicFolderMap, '| StaticMap:', this.folderIdMap);
-      
-      // Always send EmailFolderId if available
-      if (folderId) {
+     
+      if (folderId && folderId!=6) {
         params.append('EmailFolderId', folderId);
       } else {
         console.warn('⚠️ No folderId found for folder:', folder, '- EmailFolderId will not be sent');
