@@ -176,6 +176,10 @@ export const ENDPOINTS = {
   // Contact Information endpoints
   CONTACT_INFORMATION: '/contact-information',
   INQUIRY_OPTIONS: '/inquiry-options',
+
+  // Testimonial Management endpoints
+  TESTIMONIAL_ALL: '/Testimonial',
+  TESTIMONIAL_BY_ID: (id) => `/Testimonial/${id}`,
 };
 
 // HTTP Status Codes
