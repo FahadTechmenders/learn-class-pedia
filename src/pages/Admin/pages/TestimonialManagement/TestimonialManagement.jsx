@@ -391,155 +391,118 @@ const TestimonialManagement = () => {
       </div>
 
       {/* Testimonials Table */}
-     <div className="mt-4 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden ring-1 ring-gray-200/50 dark:ring-gray-700/50">
+     <div className="mt-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
  <table className="w-full table-fixed border-collapse">
 
-  <thead className="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+  <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600">
     <tr>
 
-      <th className="w-[22%] px-8 py-4 text-center align-middle text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+      <th className="w-[22%] px-4 py-3 text-left align-middle text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
         Student
       </th>
 
-      <th className="w-[25%] px-8 py-4 text-center align-middle text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+      <th className="w-[25%] px-4 py-3 text-left align-middle text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
         Email
       </th>
 
-      <th className="w-[18%] px-8 py-4 text-center align-middle text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+      <th className="w-[18%] px-4 py-3 text-left align-middle text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
         Phone
       </th>
 
-      <th className="w-[14%] px-8 py-4 text-center align-middle text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+      <th className="w-[14%] px-4 py-3 text-left align-middle text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
         Date
       </th>
 
-      <th className="w-[13%] px-8 py-4 text-center align-middle text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+      <th className="w-[13%] px-4 py-3 text-left align-middle text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
         Status
       </th>
 
-      <th className="w-[8%] px-8 py-4 text-center align-middle text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+      <th className="w-[8%] px-4 py-3 text-left align-middle text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
         Actions
       </th>
 
     </tr>
   </thead>
 
-  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
 
     {testimonials.map((testimonial) => (
       <tr
         key={testimonial.id}
-        className="hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors duration-200"
+        className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors duration-150"
       >
 
         {/* Student */}
-        <td className="px-8 py-5 align-middle">
-          <div className="flex items-center gap-4 min-w-0">
-
-            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white font-semibold shadow-md">
-              {getInitials(testimonial.studentName)}
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                {testimonial.studentName}
-              </p>
-            </div>
-
-          </div>
+        <td className="px-4 py-4 align-middle">
+          <p className="text-sm font-normal text-gray-900 dark:text-white truncate">
+            {testimonial.studentName}
+          </p>
         </td>
 
         {/* Email */}
-        <td className="px-8 py-5 align-middle">
-          <div className="flex items-center gap-3 min-w-0">
-
-            <div className="flex-shrink-0 p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-              <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            </div>
-
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
+        <td className="px-4 py-4 align-middle">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
               {testimonial.studentEmail}
             </p>
-
           </div>
         </td>
 
         {/* Phone */}
-        <td className="px-8 py-5 align-middle">
-          <div className="flex items-center gap-3">
-
-            <div className="flex-shrink-0 p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-              <Phone className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            </div>
-
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+        <td className="px-4 py-4 align-middle">
+          <div className="flex items-center gap-1.5">
+            <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
               {testimonial.studentPhoneNumber || "-"}
             </p>
-
           </div>
         </td>
 
         {/* Date */}
-        <td className="px-8 py-5 align-middle">
-          <div className="flex items-center gap-3">
-
-            <div className="flex-shrink-0 p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-              <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-            </div>
-
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+        <td className="px-4 py-4 align-middle">
+          <div className="flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
               {formatDate(testimonial.testimonialDate)}
             </p>
-
           </div>
         </td>
 
         {/* Status */}
-        <td className="px-8 py-5 align-middle">
-          <div className="flex justify-center">
-
-            <span
-              className={`inline-flex items-center justify-center gap-1.5 min-w-[120px] px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide ${
-                testimonial.isApproved
-                  ? "bg-green-500 text-white"
-                  : testimonial.testimonialStatusName === "Rejected"
-                  ? "bg-red-500 text-white"
-                  : "bg-amber-500 text-white"
-              }`}
-            >
-
-              {testimonial.isApproved && (
-                <CheckCircle className="w-3.5 h-3.5" />
-              )}
-
-              {testimonial.testimonialStatusName === "Rejected" && (
-                <X className="w-3.5 h-3.5" />
-              )}
-
-              {!testimonial.isApproved &&
-                testimonial.testimonialStatusName !== "Rejected" && (
-                  <Clock className="w-3.5 h-3.5" />
-              )}
-
-              {testimonial.testimonialStatusName}
-
-            </span>
-
-          </div>
+        <td className="px-4 py-4 align-middle">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
+              testimonial.isApproved
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : testimonial.testimonialStatusName === "Rejected"
+                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+            }`}
+          >
+            {testimonial.isApproved && (
+              <CheckCircle className="w-3.5 h-3.5" />
+            )}
+            {testimonial.testimonialStatusName === "Rejected" && (
+              <X className="w-3.5 h-3.5" />
+            )}
+            {!testimonial.isApproved &&
+              testimonial.testimonialStatusName !== "Rejected" && (
+                <Clock className="w-3.5 h-3.5" />
+            )}
+            {testimonial.testimonialStatusName}
+          </span>
         </td>
 
         {/* Actions */}
-        <td className="px-8 py-5 align-middle">
-          <div className="flex justify-center">
-
-            <button
-              onClick={() => handleViewTestimonial(testimonial.id)}
-              className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md hover:scale-105 transition-transform duration-200"
-            >
-              <SquarePen className="w-4 h-4" />
-            </button>
-
-          </div>
+        <td className="px-4 py-4 align-middle">
+          <button
+            onClick={() => handleViewTestimonial(testimonial.id)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors duration-150"
+          >
+            <SquarePen className="w-4 h-4" />
+            
+          </button>
         </td>
 
       </tr>
