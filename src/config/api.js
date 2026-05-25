@@ -180,6 +180,17 @@ export const ENDPOINTS = {
   // Testimonial Management endpoints
   TESTIMONIAL_ALL: '/Testimonial',
   TESTIMONIAL_BY_ID: (id) => `/Testimonial/${id}`,
+
+  // Publisher Management endpoints
+  PUBLISHER_ALL: '/Publisher',
+  PUBLISHER_BY_ID: (id) => `/Publisher/${id}`,
+
+  // Publisher Category Management endpoints
+  PUBLISHER_CATEGORY_ALL: '/PublisherCategory',
+  PUBLISHER_CATEGORY_BY_ID: (id) => `/PublisherCategory/${id}`,
+  PUBLISHER_CATEGORY_CREATE: '/PublisherCategory',
+  PUBLISHER_CATEGORY_UPDATE: (id) => `/PublisherCategory/${id}`,
+  PUBLISHER_CATEGORY_DELETE: (id) => `/PublisherCategory/${id}`,
 };
 
 // HTTP Status Codes
