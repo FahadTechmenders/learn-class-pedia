@@ -14,7 +14,8 @@ import {
   FileText,
   DollarSign,
   SquarePen ,
-  User
+  User,
+  Search
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
@@ -211,84 +212,142 @@ const BookManagement = () => {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <SlidersHorizontal className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            <span className="font-semibold text-gray-900 dark:text-white">Filters</span>
+     <div className="mb-6 bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-all">
+  {/* Filter Header */}
+  <button
+    onClick={() => setShowFilters(!showFilters)}
+    className={`w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-all duration-200 ${showFilters ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}
+    aria-expanded={showFilters}
+  >
+    <div className="flex items-center gap-2.5">
+      <SlidersHorizontal className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+      <span className="font-semibold text-gray-900 dark:text-white">Filters</span>
+      {/* Active filter indicator */}
+      {(filters.publisherName || filters.bookStatusId) && (
+        <span className="ml-1.5 px-2 py-0.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-full">
+          {[filters.publisherName, filters.bookStatusId].filter(Boolean).length}
+        </span>
+      )}
+    </div>
+    <ChevronDown
+      className={`w-4.5 h-4.5 text-gray-500 transition-transform duration-300 ${
+        showFilters ? 'rotate-180' : ''
+      }`}
+    />
+  </button>
+
+  {/* Filter Panel */}
+  <div
+    className={`transition-all duration-300 ease-out ${
+      showFilters ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+    }`}
+  >
+    <div className="p-5 bg-gray-50/80 dark:bg-gray-800/50 space-y-4">
+      {/* Main filter inputs */}
+      <div className="flex flex-col md:flex-row md:items-end gap-4">
+        {/* Publisher Name with search icon */}
+        <div className="flex-1 min-w-0">
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            Publisher Name
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+            <input
+              type="text"
+              value={filters.publisherName}
+              onChange={(e) => setFilters({ ...filters, publisherName: e.target.value })}
+              placeholder="e.g., Penguin Random House"
+              className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+            />
+            {filters.publisherName && (
+              <button
+                onClick={() => setFilters({ ...filters, publisherName: '' })}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
+                <X className="w-3.5 h-3.5 text-gray-500" />
+              </button>
+            )}
           </div>
-          <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-        </button>
+        </div>
 
-        {showFilters && (
-          <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Publisher Name
-                </label>
-                <input
-                  type="text"
-                  value={filters.publisherName}
-                  onChange={(e) => setFilters({ ...filters, publisherName: e.target.value })}
-                  placeholder="Search by publisher name..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white transition-all"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  Status
-                </label>
-                <div className="relative">
-                  <select
-                    value={filters.bookStatusId}
-                    onChange={(e) => setFilters({ ...filters, bookStatusId: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white appearance-none transition-all"
-                  >
-                    <option value="">All Statuses</option>
-                    {bookStatuses.map((status) => (
-                      <option key={status.id} value={status.id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 opacity-0">
-                  Action
-                </label>
-                <button
-                  onClick={handleFilter}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 hover:shadow-md transition-all duration-200"
-                >
-                  <Filter className="w-3.5 h-3.5" />
-                  Apply
-                </button>
-              </div>
-
-              <div className="md:col-span-1">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 opacity-0">
-                  Action
-                </label>
-                <button
-                  onClick={handleResetFilters}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 hover:shadow-md transition-all duration-200"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  Reset
-                </button>
-              </div>
-            </div>
+        {/* Status Select */}
+        <div className="flex-1 min-w-0">
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+            Status
+          </label>
+          <div className="relative">
+            <select
+              value={filters.bookStatusId}
+              onChange={(e) => setFilters({ ...filters, bookStatusId: e.target.value })}
+              className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer transition-all"
+            >
+              <option value="">All Statuses</option>
+              {bookStatuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
-        )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-row gap-2.5 flex-shrink-0">
+          <button
+            onClick={handleFilter}
+            className="inline-flex items-center justify-center gap-1.5 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl hover:from-indigo-700 hover:to-indigo-600 focus:ring-2 focus:ring-indigo-500/30 shadow-sm transition-all duration-200 active:scale-95"
+          >
+            <Filter className="w-3.5 h-3.5" />
+            Apply
+          </button>
+          <button
+            onClick={handleResetFilters}
+            className="inline-flex items-center justify-center gap-1.5 px-5 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-400 focus:ring-2 focus:ring-gray-400/30 transition-all duration-200 active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset
+          </button>
+        </div>
       </div>
+
+      {/* Active filter chips (only show if filters are active) */}
+      {(filters.publisherName || filters.bookStatusId) && (
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
+          <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Active filters:</span>
+          {filters.publisherName && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
+              <span>Publisher: {filters.publisherName}</span>
+              <button
+                onClick={() => setFilters({ ...filters, publisherName: '' })}
+                className="hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-full p-0.5 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          {filters.bookStatusId && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
+              <span>Status: {bookStatuses.find(s => s.id === filters.bookStatusId)?.name}</span>
+              <button
+                onClick={() => setFilters({ ...filters, bookStatusId: '' })}
+                className="hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-full p-0.5 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          <button
+            onClick={handleResetFilters}
+            className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors ml-1 underline-offset-2 hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
 
       {/* Books Table */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
