@@ -191,6 +191,12 @@ export const ENDPOINTS = {
   PUBLISHER_CATEGORY_CREATE: '/PublisherCategory',
   PUBLISHER_CATEGORY_UPDATE: (id) => `/PublisherCategory/${id}`,
   PUBLISHER_CATEGORY_DELETE: (id) => `/PublisherCategory/${id}`,
+
+  // Book Management endpoints
+  BOOK_ALL: '/Book',
+  BOOK_BY_ID: (id) => `/Book/${id}`,
+  BOOK_STATUS: '/Book/BookStatus',
+  BOOK_UPDATE_STATUS: (id) => `/Book/${id}/status`,
 };
 
 // HTTP Status Codes

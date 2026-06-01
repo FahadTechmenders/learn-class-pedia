@@ -5,7 +5,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Calendar,
   Mail,
   RefreshCw,
   User,
@@ -18,19 +17,19 @@ import {
   Globe,
   FileText,
   Tag,
-  Clock,
-  SquarePen,
+  Eye,
   XCircle,
+  Book
 } from 'lucide-react';
 import usePublisherManagement from '../../../../hooks/api/usePublisherManagement';
 import usePublisherCategoryManagement from '../../../../hooks/api/usePublisherCategoryManagement';
 import { useToast } from '../../../../components/ToastProvider';
 
 const PublisherManagement = () => {
-  const { showSuccess, showError } = useToast();
+  const {  showError } = useToast();
   const {
     loading,
-    loadingDetail,
+    error,
     publishers,
     pagination,
     getAllPublishers,
@@ -65,8 +64,21 @@ const PublisherManagement = () => {
   }), []);
 
   useEffect(() => {
-    getAllPublishers(1, 20);
-    getAllCategories(1, 100);
+    const initializeData = async () => {
+      try {
+        await getAllPublishers(1, 20);
+      } catch (err) {
+        console.error('Failed to load publishers:', err);
+      }
+      
+      try {
+        await getAllCategories(1, 100);
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+      }
+    };
+    
+    initializeData();
   }, [getAllPublishers, getAllCategories]);
 
   const loadPublishers = useCallback(async (page = 1, pageSize = 20) => {
@@ -350,6 +362,7 @@ const PublisherManagement = () => {
                 <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Phone</th>
                 <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Location</th>
                 <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Categories</th>
+                <th className="px-3 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Books</th>
                 <th className="px-3 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Status</th>
                 <th className="px-3 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Actions</th>
               </tr>
@@ -357,7 +370,7 @@ const PublisherManagement = () => {
             <tbody className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="8" className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center gap-3">
                       <div className="relative">
                         <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
@@ -367,9 +380,30 @@ const PublisherManagement = () => {
                     </div>
                   </td>
                 </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan="8" className="px-4 py-16 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/40 dark:to-red-800/40 rounded-full flex items-center justify-center shadow-inner">
+                        <XCircle className="w-10 h-10 text-red-500 dark:text-red-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-red-600 dark:text-red-400 text-lg">Network Error</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{error}</p>
+                        <button
+                          onClick={handleRefresh}
+                          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Retry
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
               ) : publishers.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-16 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="8" className="px-4 py-16 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center gap-4">
                       <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center shadow-inner">
                         <Users className="w-10 h-10 text-gray-400 dark:text-gray-500" />
@@ -387,10 +421,10 @@ const PublisherManagement = () => {
                     <td className="px-3 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 text-white rounded-lg shadow-md flex items-center justify-center font-normal text-sm ring-2 ring-blue-200 dark:ring-blue-800/50 transition-all duration-300">
-                         {publisher.profileImageUrl ? <img src={publisher.profileImageUrl} alt={getInitials(publisher.publisherFullName)} className="w-full h-full object-cover rounded-lg" /> : getInitials(publisher.publisherFullName)}
+                         {publisher.profileImageUrl ? <img src={publisher.profileImageUrl} alt={getInitials(publisher.fullName)} className="w-full h-full object-cover rounded-lg" /> : getInitials(publisher.publisherFullName)}
                         </div>
                         <div>
-                          <div className="font-normal text-gray-900 dark:text-white text-sm">{publisher.publisherFullName}</div>
+                          <div className="font-normal text-gray-900 dark:text-white text-sm">{publisher.fullName}</div>
                         </div>
                       </div>
                     </td>
@@ -399,7 +433,7 @@ const PublisherManagement = () => {
                         <div className="p-1.5 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40 rounded-lg shadow-sm">
                           <Mail className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-300 font-normal">{publisher.publisherEmail}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300 font-normal">{publisher.email}</span>
                       </div>
                     </td>
                     <td className="px-3 py-4">
@@ -407,7 +441,7 @@ const PublisherManagement = () => {
                         <div className="p-1.5 bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/40 dark:to-purple-800/40 rounded-lg shadow-sm">
                           <Phone className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                         </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-300 font-normal">{publisher.publisherPhone || '-'}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300 font-normal">{publisher.phoneNumber || '-'}</span>
                       </div>
                     </td>
                     <td className="px-3 py-4">
@@ -440,6 +474,16 @@ const PublisherManagement = () => {
                       </div>
                     </td>
                     <td className="px-3 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="p-1.5 bg-gradient-to-br from-indigo-100 to-blue-200 dark:from-indigo-900/40 dark:to-blue-800/40 rounded-lg shadow-sm">
+                          <Book className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {publisher.totalBooks || 0}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-4 text-center">
                       <div className="flex flex-col gap-1">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide shadow-md ${
                           publisher.isEmailVerified
@@ -457,12 +501,15 @@ const PublisherManagement = () => {
                         title="View publisher details"
                         className="group relative inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 rounded-lg shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-300"
                       >
-                        <SquarePen className="w-4 h-4" />
+                        <Eye className="w-4 h-4" />
+                       
                       </button>
                     </td>
                   </tr>
                 ))
               )}
+
+            
             </tbody>
           </table>
      
@@ -498,103 +545,134 @@ const PublisherManagement = () => {
 
       {/* Publisher Detail Modal */}
       {showPublisherModal && selectedPublisher && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col border border-gray-200 dark:border-gray-700">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col border-2 border-gray-200 dark:border-gray-700">
             
             {/* Header - Fixed at top */}
-            <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 shadow-lg">
+            <div className="flex-shrink-0 px-8 py-5 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <Users className="w-5 h-5 text-white" />
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm shadow-lg">
+                    <Users className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-white">Publisher Details</h2>
-                    <p className="text-xs text-blue-100 mt-0.5">View publisher information</p>
+                    <h2 className="text-2xl font-bold text-white tracking-tight">Publisher Profile</h2>
+                    <p className="text-sm text-blue-100 mt-1">Complete publisher information and statistics</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowPublisherModal(false)}
-                  className="p-2 hover:bg-white/20 rounded-xl transition-all duration-200 hover:scale-110"
+                  className="p-2.5 hover:bg-white/20 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-90"
                 >
-                  <X className="w-5 h-5 text-white" />
+                  <X className="w-6 h-6 text-white" />
                 </button>
               </div>
             </div>
 
             {/* Content - Scrollable area */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-              <div className="space-y-5">
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+              <div className="space-y-6">
                 {/* Publisher Info */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl p-5 border border-blue-200 dark:border-blue-800 shadow-md">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-xl ring-4 ring-white dark:ring-gray-800">
-                      {getInitials(selectedPublisher.publisherFullName)}
+                <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-purple-900/20 rounded-3xl p-6 border-2 border-blue-200 dark:border-blue-800/50 shadow-xl">
+                  <div className="flex items-start gap-6 mb-6">
+                    <div className="relative group">
+                      {selectedPublisher.profileImageUrl ? (
+                        <img 
+                          src={selectedPublisher.profileImageUrl} 
+                          alt={selectedPublisher.fullName}
+                          className="w-24 h-24 rounded-2xl object-cover shadow-2xl ring-4 ring-white dark:ring-gray-800 group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-24 h-24 bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 text-white rounded-2xl flex items-center justify-center font-bold text-3xl shadow-2xl ring-4 ring-white dark:ring-gray-800 group-hover:scale-105 transition-transform duration-300">
+                          {getInitials(selectedPublisher.fullName)}
+                        </div>
+                      )}
+                      <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-800">
+                        <CheckCircle className="w-5 h-5 text-white" />
+                      </div>
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPublisher.publisherFullName}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-sm ${
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{selectedPublisher.fullName}</h3>
+                      {selectedPublisher.companyName && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
+                          {selectedPublisher.companyName}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide shadow-md ${
                           selectedPublisher.isEmailVerified
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30'
-                            : 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-lg shadow-amber-500/30'
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                            : 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white'
                         }`}>
-                          {selectedPublisher.isEmailVerified && <CheckCircle className="w-3 h-3 inline mr-1" />}
-                          {!selectedPublisher.isEmailVerified && <XCircle className="w-3 h-3 inline mr-1" />}
-                          {selectedPublisher.isEmailVerified ? 'Email Verified' : 'Email Not Verified'}
+                          {selectedPublisher.isEmailVerified ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                          {selectedPublisher.isEmailVerified ? 'Verified' : 'Unverified'}
                         </div>
-                        <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-sm ${
+                        <div className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide shadow-md ${
                           selectedPublisher.isActive
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30'
-                            : 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/30'
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                            : 'bg-gradient-to-r from-red-500 to-rose-500 text-white'
                         }`}>
+                          <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                           {selectedPublisher.isActive ? 'Active' : 'Inactive'}
+                        </div>
+                        <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md">
+                          <Book className="w-3.5 h-3.5" />
+                          {selectedPublisher.totalBooks || 0} Books
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 rounded-xl p-3">
-                      <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-                        <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3 bg-white/70 dark:bg-gray-800/70 rounded-2xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-md">
+                        <Mail className="w-5 h-5 text-white" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{selectedPublisher.publisherEmail}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Email</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate mt-0.5">{selectedPublisher.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 rounded-xl p-3">
-                      <div className="p-2 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
-                        <Phone className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <div className="flex items-center gap-3 bg-white/70 dark:bg-gray-800/70 rounded-2xl p-4 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-md">
+                        <Phone className="w-5 h-5 text-white" />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Phone</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{selectedPublisher.publisherPhone || 'N/A'}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Phone</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate mt-0.5">{selectedPublisher.phoneNumber || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Bio & Website */}
-                {(selectedPublisher.authorBio || selectedPublisher.website) && (
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 flex items-center gap-2">
-                      <div className="p-1.5 bg-purple-500 dark:bg-purple-600 rounded-lg">
-                        <FileText className="w-4 h-4 text-white" />
+                {(selectedPublisher.bio || selectedPublisher.website || selectedPublisher.description) && (
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
+                    <div className="px-5 py-4 bg-gradient-to-r from-purple-500 to-pink-500 flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                        <FileText className="w-5 h-5 text-white" />
                       </div>
-                      <span className="font-bold text-gray-900 dark:text-white text-sm">About</span>
+                      <span className="font-bold text-white text-base">About Publisher</span>
                     </div>
-                    <div className="p-4 space-y-3">
-                      {selectedPublisher.authorBio && (
+                    <div className="p-5 space-y-4">
+                      {selectedPublisher.bio && (
                         <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Bio</p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">{selectedPublisher.authorBio}</p>
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Bio</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{selectedPublisher.bio}</p>
+                        </div>
+                      )}
+                      {selectedPublisher.description && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Description</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{selectedPublisher.description}</p>
                         </div>
                       )}
                       {selectedPublisher.website && (
-                        <div className="flex items-center gap-2">
-                          <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          <a href={selectedPublisher.website} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                        <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                          <div className="p-2 bg-blue-500 rounded-lg">
+                            <Globe className="w-4 h-4 text-white" />
+                          </div>
+                          <a href={`https://${selectedPublisher.website.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
                             {selectedPublisher.website}
                           </a>
                         </div>
@@ -605,14 +683,14 @@ const PublisherManagement = () => {
 
                 {/* Location */}
                 {selectedPublisher.location && (
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 flex items-center gap-2">
-                      <div className="p-1.5 bg-green-500 dark:bg-green-600 rounded-lg">
-                        <MapPin className="w-4 h-4 text-white" />
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
+                    <div className="px-5 py-4 bg-gradient-to-r from-green-500 to-emerald-500 flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                        <MapPin className="w-5 h-5 text-white" />
                       </div>
-                      <span className="font-bold text-gray-900 dark:text-white text-sm">Location</span>
+                      <span className="font-bold text-white text-base">Location Details</span>
                     </div>
-                    <div className="p-4 grid grid-cols-2 gap-3">
+                    <div className="p-5 grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-500 dark:text-gray-400">Name</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
@@ -645,14 +723,14 @@ const PublisherManagement = () => {
 
                 {/* Social Media */}
                 {selectedPublisher.socialMedia && (
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/30 dark:to-rose-900/30 flex items-center gap-2">
-                      <div className="p-1.5 bg-pink-500 dark:bg-pink-600 rounded-lg">
-                        <Globe className="w-4 h-4 text-white" />
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
+                    <div className="px-5 py-4 bg-gradient-to-r from-pink-500 to-rose-500 flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                        <Globe className="w-5 h-5 text-white" />
                       </div>
-                      <span className="font-bold text-gray-900 dark:text-white text-sm">Social Media</span>
+                      <span className="font-bold text-white text-base">Social Media Links</span>
                     </div>
-                    <div className="p-4 grid grid-cols-2 gap-3">
+                    <div className="p-5 grid grid-cols-2 gap-4">
                       {selectedPublisher.socialMedia.twitterHandle && (
                         <div>
                           <p className="text-xs text-gray-500 dark:text-gray-400">Twitter</p>
@@ -689,17 +767,18 @@ const PublisherManagement = () => {
 
                 {/* Categories */}
                 {selectedPublisher.categories && selectedPublisher.categories.length > 0 && (
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
-                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30 flex items-center gap-2">
-                      <div className="p-1.5 bg-orange-500 dark:bg-orange-600 rounded-lg">
-                        <Tag className="w-4 h-4 text-white" />
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
+                    <div className="px-5 py-4 bg-gradient-to-r from-orange-500 to-amber-500 flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                        <Tag className="w-5 h-5 text-white" />
                       </div>
-                      <span className="font-bold text-gray-900 dark:text-white text-sm">Categories</span>
+                      <span className="font-bold text-white text-base">Publishing Categories</span>
                     </div>
-                    <div className="p-4">
-                      <div className="flex flex-wrap gap-2">
+                    <div className="p-5">
+                      <div className="flex flex-wrap gap-3">
                         {selectedPublisher.categories.map((category, index) => (
-                          <span key={index} className="px-3 py-1.5 bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/40 dark:to-amber-900/40 text-orange-700 dark:text-orange-300 rounded-full text-xs font-medium border border-orange-200 dark:border-orange-800">
+                          <span key={index} className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/40 dark:to-amber-900/40 text-orange-700 dark:text-orange-300 rounded-xl text-sm font-semibold border-2 border-orange-200 dark:border-orange-800 shadow-sm hover:shadow-md transition-shadow">
+                            <Tag className="w-3.5 h-3.5" />
                             {category}
                           </span>
                         ))}
@@ -707,30 +786,41 @@ const PublisherManagement = () => {
                     </div>
                   </div>
                 )}
-
-                {/* Timestamps */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md">
-                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-700 dark:to-slate-800 flex items-center gap-2">
-                    <div className="p-1.5 bg-gray-500 dark:bg-gray-600 rounded-lg">
-                      <Clock className="w-4 h-4 text-white" />
+               {/*Total books*/}
+               <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
+                  <div className="px-5 py-4 bg-gradient-to-r from-indigo-500 to-blue-500 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                        <Book className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="font-bold text-white text-base">Published Books</span>
                     </div>
-                    <span className="font-bold text-gray-900 dark:text-white text-sm">Timestamps</span>
+                    <span className="px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-sm font-bold text-white">
+                      {selectedPublisher.totalBooks || 0} Total
+                    </span>
                   </div>
-                  <div className="p-4 grid grid-cols-3 gap-3">
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Created At</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{formatDateTime(selectedPublisher.createdAt)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Updated At</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{formatDateTime(selectedPublisher.updatedAt)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Last Login</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{formatDateTime(selectedPublisher.lastLoginAt)}</p>
-                    </div>
+                  <div className="p-5">
+                    {selectedPublisher.bookTitles && selectedPublisher.bookTitles.length > 0 ? (
+                      <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
+                        {selectedPublisher.bookTitles.map((title, index) => (
+                          <div key={index} className="flex items-start gap-3 p-3 bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 rounded-xl border-2 border-indigo-100 dark:border-indigo-800/50 hover:shadow-md transition-shadow group">
+                            <span className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-blue-500 text-white rounded-lg font-bold text-xs shadow-md">{index + 1}</span>
+                            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 leading-relaxed group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Book className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">No books published yet</p>
+                      </div>
+                    )}
                   </div>
                 </div>
+                {/* Timestamps */}
+         
               </div>
             </div>
           </div>

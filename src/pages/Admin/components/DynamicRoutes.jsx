@@ -28,6 +28,7 @@ import CourseContent from '../pages/CourseContent/CourseContent';
 import TestimonialManagement from '../pages/TestimonialManagement/TestimonialManagement';
 import PublisherManagement from '../pages/PublisherManagement/PublisherManagement';
 import PublisherCategoryManagement from '../pages/PublisherCategoryManagement/PublisherCategoryManagement';
+import BookManagement from '../pages/BookManagement/BookManagement';
 
 // Component mapping
 const componentMap = {
@@ -57,6 +58,7 @@ const componentMap = {
   TestimonialManagement,
   PublisherManagement,
   PublisherCategoryManagement,
+  BookManagement,
 };
 
 // Protected Route Component
@@ -197,6 +199,11 @@ const DynamicRoutes = () => {
       <Route path="templates" element={
         <ProtectedRoute>
           <TemplateManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="book-management" element={
+        <ProtectedRoute>
+          <BookManagement />
         </ProtectedRoute>
       } />
       

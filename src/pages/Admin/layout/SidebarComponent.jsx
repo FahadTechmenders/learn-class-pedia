@@ -1,4 +1,4 @@
-import { X, ChevronLeft, ChevronRight, User, LogOut, Star, ChevronDown, Brain, Percent, Award, Mail, Users, ShoppingCart, CreditCard } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, User, LogOut, Star, ChevronDown, Brain, Percent, Award, Mail, Users, ShoppingCart, CreditCard, Book } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useDynamicRoutes } from '../../../hooks/api/useDynamicRoutes';
@@ -135,12 +135,20 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
         item.id?.includes('course')
       );
       
+      const publisherMgmtIndex = managementItems.findIndex(item => 
+        item.label?.toLowerCase().includes('publisher') || 
+        item.path?.includes('publisher') ||
+        item.id?.includes('publisher')
+      );
+      
+      let items = [...managementItems];
+      
       if (courseMgmtIndex !== -1) {
         // Insert Student Management as parent menu after Course Management
-        const beforeItems = managementItems.slice(0, courseMgmtIndex + 1);
-        const afterItems = managementItems.slice(courseMgmtIndex + 1);
+        const beforeItems = items.slice(0, courseMgmtIndex + 1);
+        const afterItems = items.slice(courseMgmtIndex + 1);
         
-        return [
+        items = [
           ...beforeItems,
           {
             id: 'student-management-parent',
@@ -164,32 +172,59 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
           },
           ...afterItems.filter(item => item.id !== 'payment-method-management')
         ];
+      } else {
+        // If no Course Management found, add at the end
+        items = [
+          ...items,
+          {
+            id: 'student-management-parent',
+            label: 'Student Management',
+            icon: Users,
+            path: 'student-management',
+            children: [
+              {
+                id: 'student-order-management',
+                label: 'Student Orders',
+                icon: ShoppingCart,
+                path: 'student-order-management'
+              },
+              {
+                id: 'payment-method-management',
+                label: 'Payment Methods',
+                icon: CreditCard,
+                path: 'payment-method-management'
+              }
+            ]
+          }
+        ];
       }
       
-      // If no Course Management found, add at the end
-      return [
-        ...managementItems,
-        {
-          id: 'student-management-parent',
-          label: 'Student Management',
-          icon: Users,
-          path: 'student-management',
-          children: [
+      // Insert Book Management after Publisher Management
+      if (publisherMgmtIndex !== -1) {
+        const updatedPublisherIndex = items.findIndex(item => 
+          item.label?.toLowerCase().includes('publisher') || 
+          item.path?.includes('publisher') ||
+          item.id?.includes('publisher')
+        );
+        
+        if (updatedPublisherIndex !== -1) {
+          const beforePublisher = items.slice(0, updatedPublisherIndex + 1);
+          const afterPublisher = items.slice(updatedPublisherIndex + 1);
+          
+          items = [
+            ...beforePublisher,
             {
-              id: 'student-order-management',
-              label: 'Student Orders',
-              icon: ShoppingCart,
-              path: 'student-order-management'
+              id: 'book-management',
+              label: 'Book Management',
+              icon: Book,
+              path: 'book-management'
             },
-            {
-              id: 'payment-method-management',
-              label: 'Payment Methods',
-              icon: CreditCard,
-              path: 'payment-method-management'
-            }
-          ]
+            ...afterPublisher
+          ];
         }
-      ];
+      }
+      
+      return items;
     })(),
     // Ensure Skills management is included
     {
