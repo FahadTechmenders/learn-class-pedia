@@ -188,7 +188,7 @@ const PublisherManagement = () => {
       {/* Search and Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-visible">
         {/* Filter Header Bar */}
-        <div className="px-4 py-3 border-b border-blue-200 dark:border-blue-800 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-900/30 dark:via-indigo-900/30 dark:to-purple-900/30 rounded-t-xl">
+        <div className="px-4 py-3 border-b border-blue-200   rounded-t-xl">
           <div className="flex flex-col lg:flex-row lg:items-center gap-3">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="flex items-center gap-2.5">

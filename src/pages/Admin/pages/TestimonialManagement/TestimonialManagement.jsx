@@ -13,17 +13,11 @@ import {
   SlidersHorizontal,
   ChevronDown,
   RotateCcw,
-  Star,
   Phone,
   Video,
   Quote,
-  FileText,
   Tag,
-  MessageCircle,
   Clock,
-  Hash,
-  Zap,
-  LucideEye,
   SquarePen,
 } from 'lucide-react';
 import useTestimonialManagement from '../../../../hooks/api/useTestimonialManagement';
@@ -33,8 +27,6 @@ import { useToast } from '../../../../components/ToastProvider';
 const TestimonialManagement = () => {
   const { showSuccess, showError } = useToast();
   const {
-    loading,
-    loadingDetail,
     testimonials,
     pagination,
     getAllTestimonials,
@@ -58,14 +50,12 @@ const TestimonialManagement = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showTestimonialsModal, setShowTestimonialsModal] = useState(false);
   const [selectedTestimonial, setSelectedTestimonial] = useState(null);
-  const [loadingTestimonials, setLoadingTestimonials] = useState(false);
   const [testimonialActionLoading, setTestimonialActionLoading] = useState({});
   const [testimonialStatuses, setTestimonialStatuses] = useState([]);
   const [selectedTestimonialStatus, setSelectedTestimonialStatus] = useState({});
   const [testimonialComments, setTestimonialComments] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [filterTestimonialStatuses, setFilterTestimonialStatuses] = useState([]);
-  const [testimonialActionSuccess, setTestimonialActionSuccess] = useState({});
 
   const emptyFiltersRef = useMemo(() => ({
     studentName: '',
