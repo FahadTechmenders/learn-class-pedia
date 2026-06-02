@@ -1,4 +1,4 @@
-import { X, ChevronLeft, ChevronRight, User, LogOut, Star, ChevronDown, Brain, Percent, Award, Mail, Users, ShoppingCart, CreditCard, Book } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, User, LogOut, Star, ChevronDown, Brain, Percent, Award, Mail, Users, ShoppingCart, CreditCard, Book, BookOpen, Tag } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useDynamicRoutes } from '../../../hooks/api/useDynamicRoutes';
@@ -199,25 +199,55 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
         ];
       }
       
-      // Insert Book Management after Publisher Management
+      // Group Publisher Management items
       if (publisherMgmtIndex !== -1) {
         const updatedPublisherIndex = items.findIndex(item => 
-          item.label?.toLowerCase().includes('publisher') || 
-          item.path?.includes('publisher') ||
-          item.id?.includes('publisher')
+          item.label?.toLowerCase().includes('publisher') && 
+          !item.label?.toLowerCase().includes('category')
+        );
+        
+        const publisherCategoryIndex = items.findIndex(item => 
+          item.label?.toLowerCase().includes('publisher category')
         );
         
         if (updatedPublisherIndex !== -1) {
-          const beforePublisher = items.slice(0, updatedPublisherIndex + 1);
-          const afterPublisher = items.slice(updatedPublisherIndex + 1);
+          // Remove Publisher Category from main list if it exists
+          const filteredItems = items.filter(item => 
+            !item.label?.toLowerCase().includes('publisher category')
+          );
+          
+          const beforePublisher = filteredItems.slice(0, updatedPublisherIndex);
+          const afterPublisher = filteredItems.slice(updatedPublisherIndex + 1);
           
           items = [
             ...beforePublisher,
             {
-              id: 'book-management',
+              id: 'publisher-management-parent',
+              label: 'Publisher Management',
+              icon: Users,
+              path: 'publisher-management',
+              children: [
+                {
+                  id: 'publisher-category-management',
+                  label: 'Publisher Category',
+                  icon: Tag,
+                  path: 'publisher-category-management'
+                }
+              ]
+            },
+            {
+              id: 'book-management-parent',
               label: 'Book Management',
               icon: Book,
-              path: 'book-management'
+              path: 'book-management',
+              children: [
+                {
+                  id: 'book-category-management',
+                  label: 'Book Category',
+                  icon: BookOpen,
+                  path: 'book-category-management'
+                }
+              ]
             },
             ...afterPublisher
           ];
@@ -261,6 +291,11 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
     
     // Filter out separate Certificate Template item
     if (item.id === 'certificate-templates' || item.label === 'Certificate Templates') {
+      return null;
+    }
+    
+    // Filter out standalone Publisher Category Management (now a child of Publisher Management)
+    if (item.id === 'publisher-category-management' || item.label?.toLowerCase().includes('publisher category')) {
       return null;
     }
     

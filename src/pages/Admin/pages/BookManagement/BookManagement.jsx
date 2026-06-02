@@ -191,7 +191,7 @@ const BookManagement = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-              <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg">
+              <div className="p-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl shadow-lg">
                 <Book className="w-8 h-8 text-white" />
               </div>
               Book Management
@@ -459,7 +459,7 @@ const BookManagement = () => {
                     <button
                       onClick={() => handleViewBook(book.id)}
                       title="View book details"
-                      className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 rounded-lg shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-300"
+                      className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600  rounded-lg shadow-md   active:scale-95 transition-all duration-300"
                     >
                        <SquarePen className="w-4 h-4" />
                     </button>
@@ -505,7 +505,7 @@ const BookManagement = () => {
           <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col border-2 border-gray-200 dark:border-gray-700">
             
             {/* Header */}
-            <div className="flex-shrink-0 px-8 py-5 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+            <div className="flex-shrink-0 px-8 py-5 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm shadow-lg">
@@ -591,7 +591,7 @@ const BookManagement = () => {
                             <button
                               onClick={handleStatusUpdate}
                               disabled={updatingStatus || selectedStatusId === selectedBook.bookStatusId}
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {updatingStatus ? (
                                 <>
@@ -645,7 +645,7 @@ const BookManagement = () => {
                 {/* Description */}
                 {selectedBook.bookDescription && (
                   <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
-                    <div className="px-5 py-4 bg-gradient-to-r from-purple-500 to-pink-500 flex items-center gap-3">
+                    <div className="px-5 py-4  bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 flex items-center gap-3">
                       <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
                         <FileText className="w-5 h-5 text-white" />
                       </div>
