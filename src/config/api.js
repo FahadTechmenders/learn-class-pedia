@@ -197,6 +197,13 @@ export const ENDPOINTS = {
   BOOK_BY_ID: (id) => `/Book/${id}`,
   BOOK_STATUS: '/Book/BookStatus',
   BOOK_UPDATE_STATUS: (id) => `/Book/${id}/status`,
+
+  // Book Category Management endpoints
+  BOOK_CATEGORY_ALL: '/BookCategory',
+  BOOK_CATEGORY_BY_ID: (id) => `/BookCategory/${id}`,
+  BOOK_CATEGORY_CREATE: '/BookCategory',
+  BOOK_CATEGORY_UPDATE: (id) => `/BookCategory/${id}`,
+  BOOK_CATEGORY_DELETE: (id) => `/BookCategory/${id}`,
 };
 
 // HTTP Status Codes
