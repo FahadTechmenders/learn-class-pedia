@@ -638,12 +638,7 @@ const BookManagement = () => {
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">DRM Protection</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">Disabled</span>
                       </div>
-                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
-                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Classpedia Select</span>
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {selectedBook.isBookEnroll ? 'Enrolled' : 'Not enrolled'}
-                        </span>
-                      </div>
+                     
                       <div className="flex justify-between items-center py-3">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">AI Generated</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
