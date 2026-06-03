@@ -12,12 +12,13 @@ import {
   RotateCcw,
   XCircle,
   FileText,
-  DollarSign,
   SquarePen ,
   User,
   Search,
   Eye,
-  Download
+  Download,
+  Shield,
+  Tag
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
@@ -465,7 +466,7 @@ const BookManagement = () => {
                       title="View book details"
                       className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600  rounded-lg shadow-md   active:scale-95 transition-all duration-300"
                     >
-                       <SquarePen className="w-4 h-4" />
+                       <Eye className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
@@ -530,207 +531,263 @@ const BookManagement = () => {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-              <div className="space-y-6">
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50 dark:bg-gray-900">
+              <div className="p-6 space-y-5">
                 
-                {/* Book Info Card */}
-                <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-900/20 dark:via-purple-900/20 dark:to-pink-900/20 rounded-3xl p-6 border-2 border-indigo-200 dark:border-indigo-800/50 shadow-xl">
-                  <div className="flex items-start gap-6 mb-6">
-                    <div className="relative group">
+                {/* Header Section with Book Cover and Title */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-start gap-6">
+                    <div className="relative flex-shrink-0">
                       {selectedBook.frontCover ? (
                         <img 
                           src={selectedBook.frontCover} 
                           alt={selectedBook.title}
-                          className="w-32 h-44 rounded-2xl object-cover shadow-2xl ring-4 ring-white dark:ring-gray-800 group-hover:scale-105 transition-transform duration-300"
+                          className="w-28 h-40 rounded-lg object-cover shadow-sm border border-gray-200 dark:border-gray-700"
                         />
                       ) : (
-                        <div className="w-32 h-44 bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-600 text-white rounded-2xl flex items-center justify-center shadow-2xl ring-4 ring-white dark:ring-gray-800 group-hover:scale-105 transition-transform duration-300">
-                          <Book className="w-16 h-16" />
+                        <div className="w-28 h-40 bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 rounded-lg flex items-center justify-center shadow-sm">
+                          <Book className="w-12 h-12" />
                         </div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{selectedBook.title}</h3>
-                      {selectedBook.subTitle && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{selectedBook.subTitle}</p>
-                      )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">{selectedBook.title}</h3>
                       <div className="flex flex-wrap items-center gap-2 mb-4">
-                        <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide shadow-md ${getStatusColor(selectedBook.bookStatusCode)} text-white`}>
-                          {selectedBook.bookStatusName}
-                        </span>
-                        {selectedBook.isActive && (
-                          <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Active
+                        {selectedBook.categories && selectedBook.categories.length > 0 && selectedBook.categories.map((category, index) => (
+                          <span key={index} className="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                            {category}
                           </span>
-                        )}
-                        {selectedBook.isRelease && (
-                          <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md">
-                            Released
-                          </span>
-                        )}
+                        ))}
                       </div>
+                      {selectedBook.bookDescription && (
+                        <p className="text-sm font-normal text-gray-600 dark:text-gray-400 leading-relaxed mb-5">{selectedBook.bookDescription}</p>
+                      )}
                       
-                      {/* Status Update - Only show if not Draft */}
-                      {selectedBook.bookStatusCode !== 'draft' && (
-                        <div className="bg-white/70 dark:bg-gray-800/70 rounded-2xl p-4 shadow-md">
-                          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                            Update Status
-                          </label>
-                          <div className="flex items-center gap-3">
-                            <select
-                              value={selectedStatusId || selectedBook.bookStatusId}
-                              onChange={(e) => setSelectedStatusId(parseInt(e.target.value))}
-                              disabled={updatingStatus}
-                              className="flex-1 px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white disabled:opacity-50"
-                            >
-                              {bookStatuses
-                                .filter((status) => status.code !== 'draft')
-                                .map((status) => (
-                                  <option key={status.id} value={status.id}>
-                                    {status.name}
-                                  </option>
-                                ))}
-                            </select>
-                            <button
-                              onClick={handleStatusUpdate}
-                              disabled={updatingStatus || selectedStatusId === selectedBook.bookStatusId}
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {updatingStatus ? (
-                                <>
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                  Updating...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="w-4 h-4" />
-                                  Update
-                                </>
-                              )}
-                            </button>
-                          </div>
+                      {/* Price, Royalty, Language, ISBN */}
+                      <div className="grid grid-cols-4 gap-4">
+                        <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">Price</p>
+                          <p className="text-base font-semibold text-gray-900 dark:text-white">
+                            ${selectedBook.price?.toFixed(2) || '0.00'}
+                          </p>
                         </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">Royalty</p>
+                          <p className="text-base font-semibold text-green-600 dark:text-green-400">
+                            ${selectedBook.royalityPercentage?.toFixed(2) || '0.00'}
+                          </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">Language</p>
+                          <p className="text-base font-semibold text-gray-900 dark:text-white">
+                            {selectedBook.languageName || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">ISBN</p>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {selectedBook.isbn || 'Not assigned'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Two Column Layout for Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  
+                  {/* Publication Details */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Publication Details
+                    </h4>
+                    <div className="space-y-0">
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Created</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.createdAt ? new Date(selectedBook.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Published</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.bookStatusCode === 'published' ? 'Published' : 'Not published'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Edition</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{selectedBook.edition || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Series</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{selectedBook.seriesName || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Rights & Distribution */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Rights & Distribution
+                    </h4>
+                    <div className="space-y-0">
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">DRM Protection</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">Disabled</span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Classpedia Select</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.isBookEnroll ? 'Enrolled' : 'Not enrolled'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">AI Generated</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.isAiGenerated ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content Files */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Content Files
+                    </h4>
+                    <div className="space-y-0">
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Manuscript</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.manuscriptFilename ? 'Uploaded' : 'Not uploaded'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Sample</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.samplePageStart && selectedBook.samplePageEnd ? `Pages ${selectedBook.samplePageStart}-${selectedBook.samplePageEnd}` : 'Not uploaded'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contributors */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Contributors
+                    </h4>
+                    <div className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                      {selectedBook.contributors && selectedBook.contributors.length > 0 ? (
+                        <ul className="space-y-2">
+                          {selectedBook.contributors.map((contributor, index) => (
+                            <li key={index} className="py-1 flex justify-between items-center">
+                              <span>{contributor.name || contributor}</span>
+                              {contributor.roleName && (
+                                <span className="text-xs text-gray-500 dark:text-gray-500">{contributor.roleName}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>No contributors added</p>
                       )}
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3 bg-white/70 dark:bg-gray-800/70 rounded-2xl p-4 shadow-md">
-                      <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-md">
-                        <User className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Author</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate mt-0.5">
-                          {selectedBook.authorFirstName} {selectedBook.authorLastName}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 bg-white/70 dark:bg-gray-800/70 rounded-2xl p-4 shadow-md">
-                      <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-md">
-                        <DollarSign className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Price</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate mt-0.5">
-                          {formatPrice(selectedBook.price)}
-                          {selectedBook.discountedPrice && (
-                            <span className="text-xs text-green-600 dark:text-green-400 ml-2">
-                              ({formatPrice(selectedBook.discountedPrice)})
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Description */}
-                {selectedBook.bookDescription && (
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
-                    <div className="px-5 py-4  bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 flex items-center gap-3">
-                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                        <FileText className="w-5 h-5 text-white" />
-                      </div>
-                      <span className="font-bold text-white text-base">Description</span>
-                    </div>
-                    <div className="p-5">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{selectedBook.bookDescription}</p>
+                {/* Keywords */}
+                {selectedBook.keywords && selectedBook.keywords.length > 0 && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Keywords
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedBook.keywords.map((keyword, index) => (
+                        <span key={index} className="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                          {keyword}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
 
-                {/* Book Details Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedBook.edition && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Edition</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedBook.edition}</p>
-                    </div>
-                  )}
-                  {selectedBook.seriesName && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Series</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedBook.seriesName}</p>
-                    </div>
-                  )}
-                  {selectedBook.isbn && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">ISBN</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedBook.isbn}</p>
-                    </div>
-                  )}
-                  {selectedBook.totalPages && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Pages</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedBook.totalPages}</p>
-                    </div>
-                  )}
-                  {selectedBook.publisherName && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Publisher</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedBook.publisherName}</p>
-                    </div>
-                  )}
-                  {selectedBook.royalityPercentage > 0 && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Royalty</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedBook.royalityPercentage}%</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Preview & Download Book */}
-                {selectedBook.manuscriptFilename && (
-                  <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
-                    <div className="px-5 py-4 bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center gap-3">
-                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                        <Eye className="w-5 h-5 text-white" />
+                {/* Combined Actions Section */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Status Update - Only show if not Draft */}
+                    {selectedBook.bookStatusCode !== 'draft' && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Update Book Status</h4>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={selectedStatusId || selectedBook.bookStatusId}
+                            onChange={(e) => setSelectedStatusId(parseInt(e.target.value))}
+                            disabled={updatingStatus}
+                            className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
+                          >
+                            {bookStatuses
+                              .filter((status) => status.code !== 'draft')
+                              .map((status) => (
+                                <option key={status.id} value={status.id}>
+                                  {status.name}
+                                </option>
+                              ))}
+                          </select>
+                          <button
+                            onClick={handleStatusUpdate}
+                            disabled={updatingStatus || selectedStatusId === selectedBook.bookStatusId}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {updatingStatus ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                Updating
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4" />
+                                Update
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
-                      <span className="font-bold text-white text-base">Book Actions</span>
-                    </div>
-                    <div className="p-5 space-y-3">
-                      <button
-                        onClick={() => setShowPreviewModal(true)}
-                        className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg font-medium"
-                      >
-                        <Eye className="w-5 h-5" />
-                        Preview Book Content
-                      </button>
-                      <a
-                        href={selectedBook.manuscriptFilename}
-                        download
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-md hover:shadow-lg font-medium"
-                      >
-                        <Download className="w-5 h-5" />
-                        Download Book
-                      </a>
-                    </div>
+                    )}
+
+                    {/* Book Actions */}
+                    {selectedBook.manuscriptFilename && (
+                      <div className={selectedBook.bookStatusCode === 'draft' ? 'md:col-span-2' : ''}>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Book Actions</h4>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowPreviewModal(true)}
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                            Preview
+                          </button>
+                          <a
+                            href={selectedBook.manuscriptFilename}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
               </div>
             </div>
