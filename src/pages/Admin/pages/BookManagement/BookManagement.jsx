@@ -15,10 +15,13 @@ import {
   DollarSign,
   SquarePen ,
   User,
-  Search
+  Search,
+  Eye,
+  Download
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
+import EpubReader from '../../../../components/EpubReader';
 
 const BookManagement = () => {
   const { showSuccess, showError } = useToast();
@@ -42,6 +45,7 @@ const BookManagement = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showBookModal, setShowBookModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
@@ -697,9 +701,88 @@ const BookManagement = () => {
                   )}
                 </div>
 
-              
+                {/* Preview & Download Book */}
+                {selectedBook.manuscriptFilename && (
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
+                    <div className="px-5 py-4 bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+                        <Eye className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="font-bold text-white text-base">Book Actions</span>
+                    </div>
+                    <div className="p-5 space-y-3">
+                      <button
+                        onClick={() => setShowPreviewModal(true)}
+                        className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg font-medium"
+                      >
+                        <Eye className="w-5 h-5" />
+                        Preview Book Content
+                      </button>
+                      <a
+                        href={selectedBook.manuscriptFilename}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-md hover:shadow-lg font-medium"
+                      >
+                        <Download className="w-5 h-5" />
+                        Download Book
+                      </a>
+                    </div>
+                  </div>
+                )}
 
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Book Preview Modal */}
+      {showPreviewModal && selectedBook && selectedBook.manuscriptFilename && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col border-2 border-gray-200 dark:border-gray-700">
+            
+            {/* Preview Header */}
+            <div className="flex-shrink-0 px-8 py-5 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm shadow-lg">
+                    <Eye className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white tracking-tight">Book Preview</h2>
+                    <p className="text-sm text-blue-100 mt-1">{selectedBook.title}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="p-2.5 hover:bg-white/20 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-90"
+                >
+                  <X className="w-6 h-6 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Preview Content */}
+            <div className="flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800">
+              <EpubReader 
+                url={selectedBook.manuscriptFilename}
+                title={selectedBook.title}
+              />
+            </div>
+
+            {/* Preview Footer */}
+            <div className="flex-shrink-0 px-8 py-4 border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="font-medium">Pages:</span> {selectedBook.samplePageStart} - {selectedBook.samplePageEnd} of {selectedBook.totalPages}
+              </div>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="inline-flex items-center gap-2 px-6 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200 font-medium"
+              >
+                Close Preview
+              </button>
             </div>
           </div>
         </div>
