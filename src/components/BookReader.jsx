@@ -4,9 +4,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   BookOpen,
-  Bookmark,
-  Maximize,
-  List
 } from 'lucide-react';
 import ApiService from '../services/ApiService';
 import { ENDPOINTS } from '../config/api';
@@ -20,7 +17,6 @@ const BookReader = ({ bookId, onClose }) => {
   const [pages, setPages] = useState([]);
   const [currentSpreadIndex, setCurrentSpreadIndex] = useState(0); // 0 = cover, 1+ = spreads
   const [showTOC, setShowTOC] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [bookmarks, setBookmarks] = useState([]);
   const [isFlipping, setIsFlipping] = useState(false);
   const [showBackCover, setShowBackCover] = useState(false);
@@ -199,7 +195,7 @@ const BookReader = ({ bookId, onClose }) => {
           
           {/* Left TOC Page - Title and Author Only */}
           <div className="bg-white rounded-l-lg shadow-2xl overflow-hidden" style={{ width: '500px', height: '700px' }}>
-            <div className="h-full flex flex-col items-center justify-center p-12">
+            <div className="h-full flex flex-col items-center justify-center p-8">
               {/* Book Title and Author */}
               <div className="text-center">
                 <h2 className="text-3xl font-serif font-bold text-gray-900 mb-4 leading-tight">
@@ -222,7 +218,7 @@ const BookReader = ({ bookId, onClose }) => {
 
           {/* Right TOC Page - Contents */}
           <div className="bg-white rounded-r-lg shadow-2xl overflow-hidden" style={{ width: '500px', height: '700px' }}>
-            <div className="h-full flex flex-col p-12">
+            <div className="h-full flex flex-col p-8">
               {/* Contents Header with Ornament */}
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-serif font-bold text-gray-900 mb-3">Contents</h1>
@@ -454,14 +450,14 @@ const BookReader = ({ bookId, onClose }) => {
           <X className="w-7 h-7" />
         </button>
       {/* Book Container - Two Page Spread */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden p-2">
-        <div className={`flex gap-2 h-full max-w-7xl w-full transition-all flex justify-center  duration-600 ${isFlipping ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}>
+      <div className="flex-1 flex items-center justify-center overflow-hidden pt-16 pb-8 px-8">
+        <div className={`flex gap-2 items-center justify-center transition-all duration-600 ${isFlipping ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`} style={{ height: '700px' }}>
           
           {/* Left Page */}
-          <div className="flex-1 bg-white rounded-l-lg shadow-2xl overflow-hidden" style={{ maxWidth: '500px' }}>
+          <div className="bg-white rounded-l-lg shadow-2xl overflow-hidden" style={{ width: '500px', height: '700px' }}>
             {leftPage ? (
-              <div className="h-full flex flex-col p-12">
-                <div className="flex-1 overflow-y-auto">
+              <div className="h-full flex flex-col p-8">
+                <div className="flex-1 overflow-auto book-content" style={{ maxHeight: 'calc(100% - 50px)' }}>
                   {leftPage.type === 'chapter-title' ? (
                     <div className="h-full flex flex-col items-center justify-center text-center">
                       <div className="text-sm text-gray-600 font-serif mb-4 uppercase tracking-widest">
@@ -479,7 +475,7 @@ const BookReader = ({ bookId, onClose }) => {
                     </div>
                   )}
                 </div>
-                <div className="pt-6 text-center border-t border-gray-300 mt-auto">
+                <div className="pt-4 text-center border-t border-gray-300 mt-auto flex-shrink-0">
                   <span className="text-xs text-gray-500 font-serif">{(currentSpreadIndex - 1) * 2 + 1}</span>
                 </div>
               </div>
@@ -521,10 +517,10 @@ const BookReader = ({ bookId, onClose }) => {
           <div className="w-2 bg-gray-900 shadow-inner rounded"></div>
 
           {/* Right Page */}
-          <div className="flex-1 bg-white rounded-r-lg shadow-2xl overflow-hidden" style={{ maxWidth: '500px' }}>
+          <div className="bg-white rounded-r-lg shadow-2xl overflow-hidden" style={{ width: '500px', height: '700px' }}>
             {rightPage ? (
-              <div className="h-full flex flex-col p-12">
-                <div className="flex-1 overflow-y-auto">
+              <div className="h-full flex flex-col p-8">
+                <div className="flex-1 overflow-auto book-content" style={{ maxHeight: 'calc(100% - 50px)' }}>
                   {rightPage.type === 'chapter-title' ? (
                     <div className="h-full flex flex-col items-center justify-center text-center">
                       <div className="text-sm text-gray-600 font-serif mb-4 uppercase tracking-widest">
@@ -542,7 +538,7 @@ const BookReader = ({ bookId, onClose }) => {
                     </div>
                   )}
                 </div>
-                <div className="pt-6 text-center border-t border-gray-300 mt-auto">
+                <div className="pt-4 text-center border-t border-gray-300 mt-auto flex-shrink-0">
                   <span className="text-xs text-gray-500 font-serif">{(currentSpreadIndex - 1) * 2 + 2}</span>
                 </div>
               </div>
