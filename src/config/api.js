@@ -198,6 +198,30 @@ export const ENDPOINTS = {
   EMAIL_ASSIGN_LABEL: (id) => `/Email/${id}/assign-label`,
   EMAIL_FOLDERS: '/Email/Folders',
   EMAIL_MOVE_TO_FOLDER: (id) => `/Email/${id}/move-to-folder`,
+  // Publisher Management endpoints
+  PUBLISHER_ALL: '/Publisher',
+  PUBLISHER_BY_ID: (id) => `/Publisher/${id}`,
+
+  // Publisher Category Management endpoints
+  PUBLISHER_CATEGORY_ALL: '/PublisherCategory',
+  PUBLISHER_CATEGORY_BY_ID: (id) => `/PublisherCategory/${id}`,
+  PUBLISHER_CATEGORY_CREATE: '/PublisherCategory',
+  PUBLISHER_CATEGORY_UPDATE: (id) => `/PublisherCategory/${id}`,
+  PUBLISHER_CATEGORY_DELETE: (id) => `/PublisherCategory/${id}`,
+
+  // Book Management endpoints
+  BOOK_ALL: '/Book',
+  BOOK_BY_ID: (id) => `/Book/${id}`,
+  BOOK_CONTENT: (id) => `/Book/${id}/content`,
+  BOOK_STATUS: '/Book/BookStatus',
+  BOOK_UPDATE_STATUS: (id) => `/Book/${id}/status`,
+
+  // Book Category Management endpoints
+  BOOK_CATEGORY_ALL: '/BookCategory',
+  BOOK_CATEGORY_BY_ID: (id) => `/BookCategory/${id}`,
+  BOOK_CATEGORY_CREATE: '/BookCategory',
+  BOOK_CATEGORY_UPDATE: (id) => `/BookCategory/${id}`,
+  BOOK_CATEGORY_DELETE: (id) => `/BookCategory/${id}`,
 };
 
 // HTTP Status Codes

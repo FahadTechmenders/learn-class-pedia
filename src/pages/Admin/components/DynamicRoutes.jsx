@@ -27,6 +27,10 @@ import ContactUs from '../pages/ContactUs/ContactUs';
 import CourseContent from '../pages/CourseContent/CourseContent';
 import TestimonialManagement from '../pages/TestimonialManagement/TestimonialManagement';
 import Email from '../pages/Email/Email';
+import PublisherManagement from '../pages/PublisherManagement/PublisherManagement';
+import PublisherCategoryManagement from '../pages/PublisherCategoryManagement/PublisherCategoryManagement';
+import BookManagement from '../pages/BookManagement/BookManagement';
+import BookCategoryManagement from '../pages/BookCategoryManagement/BookCategoryManagement';
 
 // Component mapping
 const componentMap = {
@@ -55,6 +59,10 @@ const componentMap = {
   CourseContent,
   TestimonialManagement,
   Email,
+  PublisherManagement,
+  PublisherCategoryManagement,
+  BookManagement,
+  BookCategoryManagement,
 };
 
 // Protected Route Component
@@ -210,6 +218,16 @@ const DynamicRoutes = () => {
       <Route path="email/:folder/:id" element={
         <ProtectedRoute>
           <Email />
+        </ProtectedRoute>
+      } />
+      <Route path="book-management" element={
+        <ProtectedRoute>
+          <BookManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="book-category-management" element={
+        <ProtectedRoute>
+          <BookCategoryManagement />
         </ProtectedRoute>
       } />
       

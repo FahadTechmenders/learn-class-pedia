@@ -162,6 +162,24 @@
       "icon": "MessageCircle",
       "category": "management",
       "order": 17
+    },
+    {
+      "id": "publisher-management",
+      "path": "/admin/publisher-management",
+      "component": "PublisherManagement",
+      "label": "Publisher Management",
+      "icon": "Users",
+      "category": "management",
+      "order": 18
+    },
+    {
+      "id": "publisher-category-management",
+      "path": "/admin/publisher-category-management",
+      "component": "PublisherCategoryManagement",
+      "label": "Publisher Categories",
+      "icon": "Tag",
+      "category": "management",
+      "order": 19
     }
   ],
   "roles": [
