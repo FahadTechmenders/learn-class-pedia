@@ -12,7 +12,6 @@ import {
   RotateCcw,
   XCircle,
   FileText,
-  SquarePen ,
   User,
   Search,
   Eye,
@@ -25,6 +24,7 @@ import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
 import BookReader from '../../../../components/BookReader';
 import EpubReader from '../../../../components/EpubReader';
+import './BookReader.css';
 
 const BookManagement = () => {
   const { showSuccess, showError } = useToast();
