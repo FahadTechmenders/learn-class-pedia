@@ -52,6 +52,10 @@ export const formatFileSize = (bytes) => {
 };
 
 export const getAttachmentType = (filename) => {
+  if (!filename || typeof filename !== 'string') {
+    return { type: 'OTHER', ...ATTACHMENT_TYPES.OTHER };
+  }
+  
   const extension = filename.substring(filename.lastIndexOf('.')).toLowerCase();
   
   for (const [type, config] of Object.entries(ATTACHMENT_TYPES)) {

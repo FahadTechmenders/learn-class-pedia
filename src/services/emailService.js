@@ -471,9 +471,10 @@ class EmailService {
       
       // Handle attachments
       if (emailData.attachments && emailData.attachments.length > 0) {
-        emailData.attachments.forEach((file, index) => {
+        emailData.attachments.forEach((file) => {
           if (file instanceof File) {
-            formData.append(`Attachments[${index}]`, file);
+            // Try using 'Attachments' without index - some backends expect this format
+            formData.append('Attachments', file);
           }
         });
       }

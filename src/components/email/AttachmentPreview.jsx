@@ -3,7 +3,11 @@ import { FileText, Image, FileSpreadsheet, File, Archive, Video, Music, Download
 import { formatFileSize, getAttachmentType } from '../../utils/emailUtils';
 
 const AttachmentPreview = ({ attachment, compact = false, onDownload }) => {
-  const attachmentType = getAttachmentType(attachment.name);
+  if (!attachment) {
+    return null;
+  }
+
+  const attachmentType = getAttachmentType(attachment.name || attachment.fileName);
 
   const iconMap = {
     FileText,
@@ -28,12 +32,14 @@ const AttachmentPreview = ({ attachment, compact = false, onDownload }) => {
   };
 
   const colorClass = colorClasses[attachmentType.color] || colorClasses.gray;
+  const fileName = attachment.name || attachment.fileName || 'Unknown file';
+  const fileSize = attachment.size || attachment.fileSize || 0;
 
   if (compact) {
     return (
       <div className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
         <Icon className="w-3.5 h-3.5" />
-        <span className="truncate max-w-[150px]">{attachment.name}</span>
+        <span className="truncate max-w-[150px]">{fileName}</span>
       </div>
     );
   }
@@ -48,10 +54,10 @@ const AttachmentPreview = ({ attachment, compact = false, onDownload }) => {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-          {attachment.name}
+          {fileName}
         </p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          {formatFileSize(attachment.size)}
+          {formatFileSize(fileSize)}
         </p>
       </div>
       <button

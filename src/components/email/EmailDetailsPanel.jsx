@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import  { useState, useEffect } from 'react';
 import {
   X,
   Reply,
@@ -7,26 +7,24 @@ import {
   Archive,
   Trash2,
   Star,
-  MoreVertical,
   Printer,
   Download,
   ChevronDown,
   ChevronUp,
   Paperclip,
-  FolderOpen,
-  Inbox,
-  Send,
-  FileText,
-  AlertCircle,
   Mail,
-  MailOpen
+  MailOpen,
+  Tag,
+  ArrowLeft,
+  CornerUpLeft,
+  CornerUpRight
 } from 'lucide-react';
 import UserAvatar from './UserAvatar';
-import EmailBadge from './EmailBadge';
 import AttachmentPreview from './AttachmentPreview';
 import { formatFullDate, formatRecipients } from '../../utils/emailUtils';
 import { useTheme } from '../../context/ThemeContext';
-import emailService from '../../services/emailService';
+import ApiService from '../../services/ApiService';
+import { ENDPOINTS } from '../../config/api';
 
 const EmailDetailsPanel = ({
   email,
@@ -37,60 +35,58 @@ const EmailDetailsPanel = ({
   onArchive,
   onDelete,
   onStar,
-  onMoveToFolder,
-  onMarkRead
+  onMarkRead,
+  onAssignLabel
 }) => {
   const { theme } = useTheme();
   const [showDetails, setShowDetails] = useState(false);
-  const [showFolderDropdown, setShowFolderDropdown] = useState(false);
-  const [folders, setFolders] = useState([]);
+  const [showLabelMenu, setShowLabelMenu] = useState(false);
+  const [labels, setLabels] = useState([]);
+  const [loadingLabels, setLoadingLabels] = useState(false);
 
-  // Icon mapping for folder icons
-  const iconMap = {
-    'fas fa-inbox': Inbox,
-    'fas fa-paper-plane': Send,
-    'fas fa-file-alt': FileText,
-    'fas fa-trash-alt': Trash2,
-    'fas fa-exclamation-circle': AlertCircle
-  };
-
+  // Fetch labels from API
   useEffect(() => {
-    loadFolders();
+    const fetchLabels = async () => {
+      try {
+        setLoadingLabels(true);
+        const response = await ApiService.get(ENDPOINTS.EMAIL_LABELS);
+        setLabels(response.data || response || []);
+      } catch (error) {
+        setLabels([]);
+      } finally {
+        setLoadingLabels(false);
+      }
+    };
+
+    fetchLabels();
   }, []);
 
-  const loadFolders = async () => {
-    const apiFolders = await emailService.getFolders();
-    // Map API folders to include Lucide icons
-    const mappedFolders = apiFolders.map(folder => ({
-      ...folder,
-      icon: iconMap[folder.icon] || Inbox
-    }));
-    setFolders(mappedFolders);
-  };
-
-  const handleMoveToFolder = async (folderId) => {
-    setShowFolderDropdown(false);
-    onMoveToFolder?.(folderId);
-  };
-
-  const getCurrentFolderId = () => {
-    return email.emailFolderId || null;
-  };
-
-  const getCurrentFolderName = () => {
-    return email.folderName || null;
-  };
-
-  const isStarredFolder = (folder) => {
-    return folder.name === 'Starred' && email.starred;
-  };
-
-  const isCurrentFolder = (folder) => {
-    const currentFolderId = getCurrentFolderId();
-    const currentFolderName = getCurrentFolderName();
-    
-    // Check by ID first, then by name as fallback
-    return folder.id === currentFolderId || folder.name === currentFolderName;
+  const handleDownloadAttachment = async (attachment) => {
+    try {
+      const fileUrl = attachment.fileUrl || attachment.filePath || attachment.url;
+      const fileName = attachment.fileName || attachment.name || 'download';
+      
+      if (fileUrl) {
+        // For images, open in new tab for viewing
+        const contentType = attachment.contentType || attachment.type || '';
+        if (contentType.startsWith('image/')) {
+          window.open(fileUrl, '_blank');
+        } else {
+          // For other files, trigger download
+          const link = document.createElement('a');
+          link.href = fileUrl;
+          link.download = fileName;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      } else {
+        alert('Unable to download attachment');
+      }
+    } catch (error) {
+      alert('Failed to download attachment');
+    }
   };
 
   if (!email) {
@@ -105,7 +101,7 @@ const EmailDetailsPanel = ({
     <button
       onClick={onClick}
       className={`
-        p-2 rounded-lg transition-all duration-200 group relative
+        p-2 rounded-full transition-all duration-200
         ${danger
           ? 'hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400'
           : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -119,95 +115,106 @@ const EmailDetailsPanel = ({
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
-      <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <ActionButton icon={Archive} label="Archive" onClick={() => onArchive?.(email.id)} />
-            <ActionButton icon={Trash2} label="Delete" onClick={() => onDelete?.(email.id)} danger />
+      <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between px-4 py-3">
+          {/* Back Button */}
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
+            title="Back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+
+          {/* Action Icons */}
+          <div className="flex items-center gap-1">
             <ActionButton
-              icon={email.read ? Mail : MailOpen}
+              icon={email.read ? MailOpen : Mail}
               label={email.read ? 'Mark as Unread' : 'Mark as Read'}
               onClick={() => onMarkRead?.(email.id, !email.read)}
             />
             <button
               onClick={() => onStar?.(email.id)}
               className={`
-                p-2 rounded-lg transition-all duration-200 group relative
+                p-2 rounded-full transition-all duration-200
                 ${email.starred 
-                  ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-500' 
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  ? 'text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' 
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }
-                hover:bg-gray-100 dark:hover:bg-gray-800
               `}
               title={email.starred ? 'Unstar' : 'Star'}
             >
               <Star 
                 className={`w-5 h-5 transition-all ${email.starred ? 'fill-current' : ''}`}
               />
-              <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                {email.starred ? 'Unstar' : 'Star'}
-              </span>
             </button>
+            <ActionButton icon={Trash2} label="Delete" onClick={() => onDelete?.(email.id)} danger />
             <div className="relative">
-              <ActionButton 
-                icon={FolderOpen} 
-                label="Move to Folder" 
-                onClick={() => setShowFolderDropdown(!showFolderDropdown)} 
-              />
+              <button
+                onClick={() => setShowLabelMenu(!showLabelMenu)}
+                className="p-2 rounded-full transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                title="Assign Label"
+              >
+                <Tag className="w-5 h-5" />
+              </button>
               
-              {showFolderDropdown && (
+              {showLabelMenu && (
                 <>
                   <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setShowFolderDropdown(false)}
+                    className="fixed inset-0 z-20" 
+                    onClick={() => setShowLabelMenu(false)}
                   />
-                  <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20">
-                    {folders.map((folder) => {
-                      const FolderIcon = folder.icon;
-                      const isCurrent = isCurrentFolder(folder);
-                      const isStarred = isStarredFolder(folder);
-                      const isSelected = isCurrent || isStarred;
-                      return (
-                        <button
-                          key={folder.id}
-                          onClick={() => handleMoveToFolder(folder.id)}
-                          disabled={isSelected}
-                          className={`w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left ${
-                            isSelected
-                              ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed'
-                              : 'hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer'
-                          }`}
-                        >
-                          <FolderIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                          <span className="text-sm text-gray-900 dark:text-white flex-1">
-                            {folder.name}
-                          </span>
-                          {isSelected && (
-                            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                              ✓
+                  <div className="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-30 max-h-80 overflow-y-auto">
+                    <div className="p-2">
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Assign Label
+                      </div>
+                      {loadingLabels ? (
+                        <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 border-2 border-gray-300 dark:border-gray-600 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin"></div>
+                            <span>Loading labels...</span>
+                          </div>
+                        </div>
+                      ) : labels.length > 0 ? (
+                        labels.map((label) => (
+                          <button
+                            key={label.id}
+                            onClick={() => {
+                              onAssignLabel?.(email.id, label.id);
+                              setShowLabelMenu(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                          >
+                            <span 
+                              className="w-3 h-3 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: label.color || label.bgColor }}
+                            />
+                            <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+                              {label.name}
                             </span>
-                          )}
-                        </button>
-                      );
-                    })}
+                            {email.labelId === label.id && (
+                              <span className="text-xs text-green-600 dark:text-green-400">✓</span>
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                          No labels available
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
             </div>
-            <div className="w-px h-6 bg-gray-300 dark:bg-gray-700 mx-1" />
-            <ActionButton icon={Printer} label="Print" onClick={() => window.print()} />
-            <ActionButton icon={Download} label="Download" onClick={() => {}} />
+            <ActionButton icon={CornerUpLeft} label="Reply" onClick={() => onReply?.(email)} />
+            <ActionButton icon={Reply} label="Reply All" onClick={() => onReplyAll?.(email)} />
+            <ActionButton icon={CornerUpRight} label="Forward" onClick={() => onForward?.(email)} />
           </div>
-          
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all duration-200"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white px-4 py-3">
           {email.subject}
         </h1>
 
@@ -296,11 +303,11 @@ const EmailDetailsPanel = ({
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {email.attachments.map(attachment => (
+                {email.attachments.map((attachment, index) => (
                   <AttachmentPreview
-                    key={attachment.id}
+                    key={attachment.id || index}
                     attachment={attachment}
-                    onDownload={() => console.log('Download', attachment)}
+                    onDownload={() => handleDownloadAttachment(attachment)}
                   />
                 ))}
               </div>
