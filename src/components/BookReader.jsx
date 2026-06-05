@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import ApiService from '../services/ApiService';
 import { ENDPOINTS } from '../config/api';
-import './BookReader.css';
+
 
 const WORDS_PER_PAGE = 300;
 
