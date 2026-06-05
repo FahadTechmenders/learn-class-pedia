@@ -16,6 +16,7 @@ import {
   User,
   Search,
   Eye,
+  BookOpen,
   Download,
   Shield,
   Tag
@@ -23,6 +24,7 @@ import {
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
 import BookReader from '../../../../components/BookReader';
+import EpubReader from '../../../../components/EpubReader';
 
 const BookManagement = () => {
   const { showSuccess, showError } = useToast();
@@ -47,6 +49,7 @@ const BookManagement = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showBookModal, setShowBookModal] = useState(false);
   const [bookReaderBookId, setBookReaderBookId] = useState(null);
+  const [epubReaderBook, setEpubReaderBook] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
@@ -461,13 +464,24 @@ const BookManagement = () => {
                     </span>
                   </td>
                   <td className="px-4 py-4 text-center">
-                    <button
-                      onClick={() => handleViewBook(book.id)}
-                      title="View book details"
-                      className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600  rounded-lg shadow-md   active:scale-95 transition-all duration-300"
-                    >
-                       <Eye className="w-4 h-4" />
-                    </button>
+                    <div className="inline-flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleViewBook(book.id)}
+                        title="View book details"
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600  rounded-lg shadow-md   active:scale-95 transition-all duration-300"
+                      >
+                         <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setEpubReaderBook({ url: book.manuscriptFilename, title: book.title })}
+                        disabled={!book.manuscriptFilename}
+                        title="Open Book"
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-md active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        Open Book
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -796,6 +810,30 @@ const BookManagement = () => {
           bookId={bookReaderBookId} 
           onClose={() => setBookReaderBookId(null)} 
         />
+      )}
+
+      {epubReaderBook && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-600 to-teal-600">
+              <div className="flex items-center gap-3 min-w-0">
+                <BookOpen className="w-5 h-5 text-white flex-shrink-0" />
+                <h2 className="text-lg font-semibold text-white truncate">
+                  {epubReaderBook.title || 'Open Book'}
+                </h2>
+              </div>
+              <button
+                onClick={() => setEpubReaderBook(null)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <EpubReader url={epubReaderBook.url} title={epubReaderBook.title} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
