@@ -133,20 +133,8 @@ const Email = () => {
 
   const loadEmailById = async (emailId) => {
     try {
-      // Check if email is already read before fetching
-      const currentEmail = emails.find(e => e.id === emailId);
-      const wasUnread = currentEmail && !currentEmail.read;
-      
-      await fetchEmailById(emailId);
-      
-      // Only reload list and counts if email was previously unread
-      // This avoids unnecessary API calls when viewing already-read emails
-      if (wasUnread) {
-        setTimeout(() => {
-          loadEmails();
-          loadFolderCounts();
-        }, 300);
-      }
+      // Fetch email without marking as read (handled in handleEmailClick)
+      await fetchEmailById(emailId, false);
     } catch (error) {
       console.error('Failed to load email:', error);
     }
@@ -194,6 +182,8 @@ const Email = () => {
         console.error('Failed to fetch draft email:', error);
       }
     } else {
+      // Mark as read immediately in UI and backend without checking current status
+      markAsRead([email.id], true);
       navigate(`/admin/email/${currentFolder}/${email.id}`);
     }
   };
