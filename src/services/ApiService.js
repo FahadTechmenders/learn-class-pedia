@@ -2193,6 +2193,23 @@ async uploadCsvFileByName(formData) {
       method: 'GET',
     });
   }
+
+  // ==================== BOOK BADGE MAPPING ====================
+
+  // GET book badge mapping by book ID
+  async getBookBadgeMapping(bookId) {
+    return this.request(ENDPOINTS.BOOK_BADGE_MAPPING_GET(bookId), {
+      method: 'GET',
+    });
+  }
+
+  // POST assign badges to book
+  async assignBookBadgeMapping(mappingData) {
+    return this.request(ENDPOINTS.BOOK_BADGE_MAPPING_ASSIGN, {
+      method: 'POST',
+      body: JSON.stringify(mappingData),
+    });
+  }
 }
 
 export default new ApiService();

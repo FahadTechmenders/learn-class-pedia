@@ -222,6 +222,10 @@ export const ENDPOINTS = {
   BOOK_CATEGORY_CREATE: '/BookCategory',
   BOOK_CATEGORY_UPDATE: (id) => `/BookCategory/${id}`,
   BOOK_CATEGORY_DELETE: (id) => `/BookCategory/${id}`,
+
+  // Book Badge Mapping endpoints
+  BOOK_BADGE_MAPPING_ASSIGN: '/BookBadgeMapping/assign',
+  BOOK_BADGE_MAPPING_GET: (bookId) => `/BookBadgeMapping/${bookId}`,
 };
 
 // HTTP Status Codes

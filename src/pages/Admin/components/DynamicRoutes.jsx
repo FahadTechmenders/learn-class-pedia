@@ -31,6 +31,7 @@ import PublisherManagement from '../pages/PublisherManagement/PublisherManagemen
 import PublisherCategoryManagement from '../pages/PublisherCategoryManagement/PublisherCategoryManagement';
 import BookManagement from '../pages/BookManagement/BookManagement';
 import BookCategoryManagement from '../pages/BookCategoryManagement/BookCategoryManagement';
+import BookBadgeMapping from '../pages/BookBadgeMapping/BookBadgeMapping';
 
 // Component mapping
 const componentMap = {
@@ -63,6 +64,7 @@ const componentMap = {
   PublisherCategoryManagement,
   BookManagement,
   BookCategoryManagement,
+  BookBadgeMapping,
 };
 
 // Protected Route Component
@@ -228,6 +230,11 @@ const DynamicRoutes = () => {
       <Route path="book-category-management" element={
         <ProtectedRoute>
           <BookCategoryManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="book-badge-mapping" element={
+        <ProtectedRoute>
+          <BookBadgeMapping />
         </ProtectedRoute>
       } />
       
