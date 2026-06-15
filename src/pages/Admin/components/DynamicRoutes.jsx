@@ -32,8 +32,8 @@ import PublisherCategoryManagement from '../pages/PublisherCategoryManagement/Pu
 import BookManagement from '../pages/BookManagement/BookManagement';
 import BookCategoryManagement from '../pages/BookCategoryManagement/BookCategoryManagement';
 import BookBadgeMapping from '../pages/BookBadgeMapping/BookBadgeMapping';
+import BookBadgeManagement from '../pages/BookBadgeManagement/BookBadgeManagement';
 
-// Component mapping
 const componentMap = {
   Dashboard,
   CourseManagement,
@@ -65,9 +65,9 @@ const componentMap = {
   BookManagement,
   BookCategoryManagement,
   BookBadgeMapping,
+  BookBadgeManagement,
 };
 
-// Protected Route Component
 export const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -104,7 +104,6 @@ const DynamicRoutes = () => {
 
   useEffect(() => {
     const loadRoutes = async () => {
-      // Check if user exists
       if (!user) {
         setLoading(false);
         setError('No user authenticated');
@@ -148,16 +147,12 @@ const DynamicRoutes = () => {
     );
   }
 
-  // Extract route path from full path (e.g., /admin/dashboard -> dashboard)
-  // But preserve the full path for navigation
   const getRoutePath = (fullPath) => {
-    // Remove /admin prefix and keep the rest
     return fullPath.replace('/admin/', '');
   };
 
   return (
     <Routes>
-      {/* Default redirect to dashboard */}
       <Route index element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="career-paths/:id" element={
         <ProtectedRoute>
@@ -237,8 +232,12 @@ const DynamicRoutes = () => {
           <BookBadgeMapping />
         </ProtectedRoute>
       } />
-      
-      {/* Dynamic routes based on user role */}
+      <Route path="book-badge-management" element={
+        <ProtectedRoute>
+          <BookBadgeManagement />
+        </ProtectedRoute>
+      } />
+
       {routes.map((route) => {
         const Component = componentMap[route.component];
         const routePath = getRoutePath(route.path);
@@ -261,7 +260,6 @@ const DynamicRoutes = () => {
         );
       })}
 
-      {/* Fallback for unauthorized routes */}
       <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
   );

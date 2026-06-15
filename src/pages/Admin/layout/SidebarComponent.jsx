@@ -248,9 +248,15 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                   path: 'book-category-management'
                 },
                 {
+                  id: 'book-badge-management',
+                  label: 'Book Badge Management',
+                  icon: Award,
+                  path: 'book-badge-management'
+                },
+                {
                   id: 'book-badge-mapping',
                   label: 'Book Badge Mapping',
-                  icon: Award,
+                  icon: Tag,
                   path: 'book-badge-mapping'
                 }
               ]

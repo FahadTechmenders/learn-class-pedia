@@ -23,6 +23,7 @@ const BookBadgeMapping = () => {
     getAllBooks,
     getAllBadges,
     getBookBadgeMapping,
+    getBookBadgeMappingByBook,
     assignBookBadgeMapping,
     clearError,
     setMappedBadges
@@ -62,24 +63,22 @@ const BookBadgeMapping = () => {
     setAssignedBooks([]);
     
     try {
-      // Get all books that have this badge assigned
-      const booksWithBadge = [];
-      for (const book of books) {
-        const badgeIds = await getBookBadgeMapping(book.id);
-        if (badgeIds && badgeIds.includes(badge.id)) {
-          booksWithBadge.push(book.id);
-        }
-      }
-      setSelectedBooks(booksWithBadge);
-      setAssignedBooks(booksWithBadge);
+      // Load assigned books for this badge with single API call
+      const bookIds = await getBookBadgeMapping(badge.id);
+      // Ensure bookIds is always an array
+      const bookIdsArray = Array.isArray(bookIds) ? bookIds : [];
+      setSelectedBooks(bookIdsArray);
+      setAssignedBooks(bookIdsArray);
     } catch (err) {
       console.error('Failed to fetch book mappings:', err);
       setMappingError('Failed to load book mappings. Please try again.');
       setTimeout(() => setMappingError(''), 3000);
+      setSelectedBooks([]);
+      setAssignedBooks([]);
     } finally {
       setLoadingMapping(false);
     }
-  }, [getBookBadgeMapping, books]);
+  }, [getBookBadgeMapping]);
 
   const closeMappingModal = useCallback(() => {
     setShowMappingModal(false);
@@ -102,10 +101,11 @@ const BookBadgeMapping = () => {
   const saveMappings = useCallback(async () => {
     if (!selectedBadge) return;
 
+    setLoadingMapping(true);
     try {
-      // Assign the badge to all selected books
+      // Add badge to newly selected books
       for (const bookId of selectedBooks) {
-        const existingBadges = await getBookBadgeMapping(bookId);
+        const existingBadges = await getBookBadgeMappingByBook(bookId);
         const badgeIds = existingBadges || [];
         
         if (!badgeIds.includes(selectedBadge.id)) {
@@ -113,10 +113,10 @@ const BookBadgeMapping = () => {
         }
       }
       
-      // Remove badge from books that were unselected
+      // Remove badge from unselected books
       const removedBooks = assignedBooks.filter(id => !selectedBooks.includes(id));
       for (const bookId of removedBooks) {
-        const existingBadges = await getBookBadgeMapping(bookId);
+        const existingBadges = await getBookBadgeMappingByBook(bookId);
         const badgeIds = (existingBadges || []).filter(id => id !== selectedBadge.id);
         await assignBookBadgeMapping(bookId, badgeIds);
       }
@@ -132,8 +132,10 @@ const BookBadgeMapping = () => {
       console.error('Failed to save mappings:', err);
       setMappingError('Failed to save mappings. Please try again.');
       setTimeout(() => setMappingError(''), 3000);
+    } finally {
+      setLoadingMapping(false);
     }
-  }, [selectedBadge, selectedBooks, assignedBooks, assignBookBadgeMapping, getBookBadgeMapping, closeMappingModal]);
+  }, [selectedBadge, selectedBooks, assignedBooks, assignBookBadgeMapping, getBookBadgeMappingByBook, closeMappingModal]);
 
   const handlePageChange = useCallback((newPage) => {
     setCurrentPage(newPage);

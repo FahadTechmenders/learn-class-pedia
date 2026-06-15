@@ -2196,9 +2196,16 @@ async uploadCsvFileByName(formData) {
 
   // ==================== BOOK BADGE MAPPING ====================
 
-  // GET book badge mapping by book ID
-  async getBookBadgeMapping(bookId) {
-    return this.request(ENDPOINTS.BOOK_BADGE_MAPPING_GET(bookId), {
+  // GET books by badge ID (returns book IDs that have this badge)
+  async getBookBadgeMapping(badgeId) {
+    return this.request(ENDPOINTS.BOOK_BADGE_MAPPING_GET_BY_BADGE(badgeId), {
+      method: 'GET',
+    });
+  }
+
+  // GET badges for a specific book ID (returns badge IDs for a book)
+  async getBookBadgeMappingByBook(bookId) {
+    return this.request(ENDPOINTS.BOOK_BADGE_MAPPING_GET_BY_BADGE(bookId), {
       method: 'GET',
     });
   }
@@ -2208,6 +2215,45 @@ async uploadCsvFileByName(formData) {
     return this.request(ENDPOINTS.BOOK_BADGE_MAPPING_ASSIGN, {
       method: 'POST',
       body: JSON.stringify(mappingData),
+    });
+  }
+
+  // ==================== BOOK BADGE MANAGEMENT ====================
+
+  // GET all book badges with pagination and optional badgeName filter
+  async getAllBookBadges(page = 1, pageSize = 10, badgeName = '') {
+    let url = `${ENDPOINTS.BOOK_BADGE_ALL}?page=${page}&pageSize=${pageSize}`;
+    if (badgeName && badgeName.trim() !== '') {
+      url += `&BadgeName=${encodeURIComponent(badgeName.trim())}`;
+    }
+    return this.request(url);
+  }
+
+  // GET book badge by ID
+  async getBookBadgeById(badgeId) {
+    return this.request(ENDPOINTS.BOOK_BADGE_BY_ID(badgeId));
+  }
+
+  // POST create new book badge
+  async createBookBadge(badgeData) {
+    return this.request(ENDPOINTS.BOOK_BADGE_CREATE, {
+      method: 'POST',
+      body: JSON.stringify(badgeData),
+    });
+  }
+
+  // PUT update book badge
+  async updateBookBadge(badgeId, badgeData) {
+    return this.request(ENDPOINTS.BOOK_BADGE_UPDATE(badgeId), {
+      method: 'PUT',
+      body: JSON.stringify(badgeData),
+    });
+  }
+
+  // DELETE book badge
+  async deleteBookBadge(badgeId) {
+    return this.request(ENDPOINTS.BOOK_BADGE_DELETE(badgeId), {
+      method: 'DELETE',
     });
   }
 }

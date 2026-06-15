@@ -225,7 +225,14 @@ export const ENDPOINTS = {
 
   // Book Badge Mapping endpoints
   BOOK_BADGE_MAPPING_ASSIGN: '/BookBadgeMapping/assign',
-  BOOK_BADGE_MAPPING_GET: (bookId) => `/BookBadgeMapping/${bookId}`,
+  BOOK_BADGE_MAPPING_GET_BY_BADGE: (badgeId) => `/BookBadgeMapping/${badgeId}`,
+
+  // Book Badge Management endpoints
+  BOOK_BADGE_ALL: '/BookBadges',
+  BOOK_BADGE_BY_ID: (id) => `/BookBadges/${id}`,
+  BOOK_BADGE_CREATE: '/BookBadges',
+  BOOK_BADGE_UPDATE: (id) => `/BookBadges/${id}`,
+  BOOK_BADGE_DELETE: (id) => `/BookBadges/${id}`,
 };
 
 // HTTP Status Codes

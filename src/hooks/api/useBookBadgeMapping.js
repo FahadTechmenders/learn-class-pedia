@@ -54,7 +54,7 @@ export const useBookBadgeMapping = () => {
 
   const getAllBadges = useCallback(async () => {
     try {
-      const response = await ApiService.get('/Badges');
+      const response = await ApiService.get('/BookBadges');
       
       if (response && (response.items || response.data?.items || Array.isArray(response))) {
         const responseData = response.data || response;
@@ -71,28 +71,44 @@ export const useBookBadgeMapping = () => {
     }
   }, []);
 
-  const getBookBadgeMapping = useCallback(async (bookId) => {
+  const getBookBadgeMapping = useCallback(async (badgeId) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await ApiService.getBookBadgeMapping(bookId);
+      // Call API with badgeId to get all books that have this badge
+      const response = await ApiService.getBookBadgeMapping(badgeId);
+      
+      if (response) {
+        const responseData = response.data || response;
+        // Response should be array of book IDs: [1, 5, 12, 45]
+        const bookIds = Array.isArray(responseData) ? responseData : (responseData.bookIds || responseData || []);
+        return bookIds;
+      }
+      return [];
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch books by badge';
+      setError(errorMessage);
+      console.error('getBookBadgeMapping error:', err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getBookBadgeMappingByBook = useCallback(async (bookId) => {
+    try {
+      const response = await ApiService.getBookBadgeMappingByBook(bookId);
       
       if (response) {
         const responseData = response.data || response;
         const badgeIds = responseData.badgeIds || responseData || [];
-        setMappedBadges(Array.isArray(badgeIds) ? badgeIds : []);
-        return badgeIds;
+        return Array.isArray(badgeIds) ? badgeIds : [];
       }
       return [];
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch book badge mapping';
-      setError(errorMessage);
-      console.error('getBookBadgeMapping error:', err);
-      setMappedBadges([]);
+      console.error('getBookBadgeMappingByBook error:', err);
       return [];
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -141,6 +157,7 @@ export const useBookBadgeMapping = () => {
     getAllBooks,
     getAllBadges,
     getBookBadgeMapping,
+    getBookBadgeMappingByBook,
     assignBookBadgeMapping,
     clearError,
     resetState,
