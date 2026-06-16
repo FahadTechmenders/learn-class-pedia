@@ -9,7 +9,9 @@ import {
   XCircle,
   Edit,
   Trash2,
-  BookOpen
+  BookOpen,
+  Search,
+  Filter
 } from 'lucide-react';
 import useBookCategoryManagement from '../../../../hooks/api/useBookCategoryManagement';
 import { useToast } from '../../../../components/ToastProvider';
@@ -30,6 +32,8 @@ const BookCategoryManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterTerm, setFilterTerm] = useState('');
   const [formData, setFormData] = useState({
     id: null,
     title: '',
@@ -40,9 +44,9 @@ const BookCategoryManagement = () => {
     loadCategories();
   }, []);
 
-  const loadCategories = useCallback(async (page = 1, pageSize = 20) => {
+  const loadCategories = useCallback(async (page = 1, pageSize = 20, title = '') => {
     try {
-      await getAllCategories(page, pageSize);
+      await getAllCategories(page, pageSize, title);
     } catch (err) {
       console.error('Failed to load categories:', err);
     }
@@ -51,22 +55,39 @@ const BookCategoryManagement = () => {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await loadCategories(pagination.page, pagination.pageSize);
+      await loadCategories(pagination.page, pagination.pageSize, filterTerm);
       showSuccess('Categories refreshed successfully');
     } catch (err) {
       console.error('Failed to refresh categories:', err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [loadCategories, pagination.page, pagination.pageSize, showSuccess]);
+  }, [loadCategories, pagination.page, pagination.pageSize, filterTerm, showSuccess]);
 
   const handlePageChange = useCallback(async (newPage) => {
     try {
-      await getAllCategories(newPage, pagination.pageSize);
+      await getAllCategories(newPage, pagination.pageSize, filterTerm);
     } catch (err) {
       console.error('Failed to change page:', err);
     }
-  }, [getAllCategories, pagination.pageSize]);
+  }, [getAllCategories, pagination.pageSize, filterTerm]);
+
+  const handleFilter = useCallback(() => {
+    setFilterTerm(searchTerm);
+    loadCategories(1, pagination.pageSize, searchTerm);
+  }, [searchTerm, loadCategories, pagination.pageSize]);
+
+  const handleClearFilter = useCallback(() => {
+    setSearchTerm('');
+    setFilterTerm('');
+    loadCategories(1, pagination.pageSize, '');
+  }, [loadCategories, pagination.pageSize]);
+
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter') {
+      handleFilter();
+    }
+  }, [handleFilter]);
 
   const handleOpenModal = (mode, category = null) => {
     setModalMode(mode);
@@ -114,7 +135,7 @@ const BookCategoryManagement = () => {
       }
 
       handleCloseModal();
-      await loadCategories(pagination.page, pagination.pageSize);
+      await loadCategories(pagination.page, pagination.pageSize, filterTerm);
     } catch (err) {
       console.error('Failed to save category:', err);
       showError(err.response?.data?.message || 'Failed to save category');
@@ -126,7 +147,7 @@ const BookCategoryManagement = () => {
       await deleteCategory(id);
       showSuccess('Category deleted successfully');
       setDeleteConfirm(null);
-      await loadCategories(pagination.page, pagination.pageSize);
+      await loadCategories(pagination.page, pagination.pageSize, filterTerm);
     } catch (err) {
       console.error('Failed to delete category:', err);
       showError(err.response?.data?.message || 'Failed to delete category');
@@ -182,6 +203,44 @@ const BookCategoryManagement = () => {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="mb-6 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search categories by title..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white placeholder-gray-400 transition-all"
+            />
+          </div>
+          <button
+            onClick={handleFilter}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-medium rounded-xl hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            <Filter className="w-5 h-5" />
+            Filter
+          </button>
+          {filterTerm && (
+            <button
+              onClick={handleClearFilter}
+              className="flex items-center gap-2 px-6 py-3 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 transition-all duration-200 shadow-md"
+            >
+              <X className="w-5 h-5" />
+              Clear
+            </button>
+          )}
+        </div>
+        {filterTerm && (
+          <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+            Filtering by: <span className="font-semibold text-purple-600 dark:text-purple-400">{filterTerm}</span>
+          </div>
+        )}
       </div>
 
       {/* Categories Table */}

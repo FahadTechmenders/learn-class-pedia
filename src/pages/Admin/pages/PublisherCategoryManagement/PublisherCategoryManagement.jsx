@@ -35,6 +35,8 @@ const PublisherCategoryManagement = () => {
   const [modalMode, setModalMode] = useState('create');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterTerm, setFilterTerm] = useState('');
   const [formData, setFormData] = useState({
     categoryName: '',
   });
@@ -47,21 +49,38 @@ const PublisherCategoryManagement = () => {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await getAllCategories(pagination.page, pagination.pageSize);
+      await getAllCategories(pagination.page, pagination.pageSize, filterTerm);
     } catch (err) {
       console.error('Failed to refresh categories:', err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [getAllCategories, pagination.page, pagination.pageSize]);
+  }, [getAllCategories, pagination.page, pagination.pageSize, filterTerm]);
 
   const handlePageChange = useCallback(async (newPage) => {
     try {
-      await getAllCategories(newPage, pagination.pageSize);
+      await getAllCategories(newPage, pagination.pageSize, filterTerm);
     } catch (err) {
       console.error('Failed to change page:', err);
     }
+  }, [getAllCategories, pagination.pageSize, filterTerm]);
+
+  const handleFilter = useCallback(() => {
+    setFilterTerm(searchTerm);
+    getAllCategories(1, pagination.pageSize, searchTerm);
+  }, [searchTerm, getAllCategories, pagination.pageSize]);
+
+  const handleClearFilter = useCallback(() => {
+    setSearchTerm('');
+    setFilterTerm('');
+    getAllCategories(1, pagination.pageSize, '');
   }, [getAllCategories, pagination.pageSize]);
+
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter') {
+      handleFilter();
+    }
+  }, [handleFilter]);
 
   const openCreateModal = () => {
     setModalMode('create');
@@ -119,7 +138,7 @@ const PublisherCategoryManagement = () => {
         showSuccess('Category updated successfully!');
       }
       
-      await getAllCategories(pagination.page, pagination.pageSize);
+      await getAllCategories(pagination.page, pagination.pageSize, filterTerm);
       closeModal();
     } catch (err) {
       console.error('Failed to save category:', err);
@@ -135,7 +154,7 @@ const PublisherCategoryManagement = () => {
     try {
       await deleteCategory(category.id);
       showSuccess('Category deleted successfully!');
-      await getAllCategories(pagination.page, pagination.pageSize);
+      await getAllCategories(pagination.page, pagination.pageSize, filterTerm);
     } catch (err) {
       console.error('Failed to delete category:', err);
       showError(err.response?.data?.message || 'Failed to delete category');
@@ -204,6 +223,44 @@ const PublisherCategoryManagement = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="mt-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search categories by title..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="w-full pl-12 pr-4 py-2.5 text-sm border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white placeholder-gray-400 transition-all"
+            />
+          </div>
+          <button
+            onClick={handleFilter}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+          >
+            <Filter className="w-4 h-4" />
+            Filter
+          </button>
+          {filterTerm && (
+            <button
+              onClick={handleClearFilter}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-xl shadow-md transition-all duration-200"
+            >
+              <X className="w-4 h-4" />
+              Clear
+            </button>
+          )}
+        </div>
+        {filterTerm && (
+          <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+            Filtering by: <span className="font-semibold text-blue-600 dark:text-blue-400">{filterTerm}</span>
+          </div>
+        )}
       </div>
 
       {/* Categories Table */}

@@ -8,7 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
-  Plus
+  Plus,
+  Filter
 } from 'lucide-react';
 import { useBookBadgeMapping } from '../../../../hooks/api/useBookBadgeMapping';
 
@@ -30,6 +31,7 @@ const BookBadgeMapping = () => {
   } = useBookBadgeMapping();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterTerm, setFilterTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [showMappingModal, setShowMappingModal] = useState(false);
@@ -44,7 +46,7 @@ const BookBadgeMapping = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        await getAllBadges();
+        await getAllBadges(1, 100, '');
         await getAllBooks(1, 100);
       } catch (err) {
         console.error('Failed to load initial data:', err);
@@ -53,6 +55,23 @@ const BookBadgeMapping = () => {
     
     loadInitialData();
   }, [getAllBooks, getAllBadges]);
+
+  const handleFilter = useCallback(() => {
+    setFilterTerm(searchTerm);
+    getAllBadges(1, 100, searchTerm);
+  }, [searchTerm, getAllBadges]);
+
+  const handleClearFilter = useCallback(() => {
+    setSearchTerm('');
+    setFilterTerm('');
+    getAllBadges(1, 100, '');
+  }, [getAllBadges]);
+
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter') {
+      handleFilter();
+    }
+  }, [handleFilter]);
 
   const openMappingModal = useCallback(async (badge) => {
     setSelectedBadge(badge);
@@ -141,12 +160,6 @@ const BookBadgeMapping = () => {
     setCurrentPage(newPage);
   }, []);
 
-  const filteredBadges = badges.filter(badge => {
-    const searchValue = searchTerm.toLowerCase().trim();
-    const badgeName = (badge.name || badge.title || badge.badgeName || '')?.toLowerCase();
-    return badgeName.includes(searchValue);
-  });
-
   const filteredBooks = books.filter(book => {
     const searchValue = searchBookTerm.toLowerCase().trim();
     const bookTitle = (book.title || '')?.toLowerCase();
@@ -184,7 +197,7 @@ const BookBadgeMapping = () => {
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 flex items-center gap-2">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                    {filteredBadges.length} Badges
+                    {badges.length} Badges
                   </span>
                   <span className="text-gray-400">•</span>
                   <span>Manage badge assignments for books</span>
@@ -215,25 +228,41 @@ const BookBadgeMapping = () => {
         <div className="mb-8">
           <div className="relative group">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl blur opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-            <div className="relative flex items-center">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors group-hover:text-blue-500" />
-              <input
-                type="text"
-                placeholder="Search badges by name..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12 pr-4 py-3.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:border-blue-500 w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
-              />
-              {searchTerm && (
+            <div className="relative flex items-center gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors group-hover:text-blue-500" />
+                <input
+                  type="text"
+                  placeholder="Search badges by name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="pl-12 pr-4 py-3.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:border-blue-500 w-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
+                />
+              </div>
+              <button
+                onClick={handleFilter}
+                className="flex items-center px-6 py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                <Filter className="w-5 h-5 mr-2" />
+                Filter
+              </button>
+              {filterTerm && (
                 <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  onClick={handleClearFilter}
+                  className="flex items-center px-6 py-3.5 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-300 dark:hover:bg-gray-500 transition-all duration-200 shadow-md"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5 mr-2" />
+                  Clear
                 </button>
               )}
             </div>
           </div>
+          {filterTerm && (
+            <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+              Filtering by: <span className="font-semibold text-blue-600 dark:text-blue-400">{filterTerm}</span>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -241,14 +270,14 @@ const BookBadgeMapping = () => {
             <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
             <span className="ml-3 text-gray-600 dark:text-gray-300">Loading badges...</span>
           </div>
-        ) : filteredBadges.length === 0 ? (
+        ) : badges.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <Award className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <p className="text-gray-600 dark:text-gray-300">No badges found</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredBadges.map((badge, index) => (
+            {badges.map((badge, index) => (
               <div
                 key={badge.id}
                 className="group relative bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-2xl p-6 hover:shadow-2xl hover:border-blue-300 dark:hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-1"

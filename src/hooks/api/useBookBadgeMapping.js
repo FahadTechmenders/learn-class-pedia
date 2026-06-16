@@ -52,9 +52,9 @@ export const useBookBadgeMapping = () => {
     }
   }, []);
 
-  const getAllBadges = useCallback(async () => {
+  const getAllBadges = useCallback(async (page = 1, pageSize = 100, badgeName = '') => {
     try {
-      const response = await ApiService.get('/BookBadges');
+      const response = await ApiService.getAllBookBadges(page, pageSize, badgeName);
       
       if (response && (response.items || response.data?.items || Array.isArray(response))) {
         const responseData = response.data || response;
