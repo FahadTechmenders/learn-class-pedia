@@ -1,9 +1,20 @@
 import { useState } from 'react';
 import { ReactReader } from 'react-reader';
+import appSettings, { isProduction } from '../config/appSettings';
+
+const getBaseUrl = () =>
+  isProduction() ? appSettings.api.baseUrl : appSettings.api.baseUrlLocal;
+
+const buildEpubProxyUrl = (originalUrl) => {
+  if (!originalUrl) return null;
+  return `${getBaseUrl()}/Book/epub?url=${encodeURIComponent(originalUrl)}`;
+};
 
 const EpubReader = ({ url, title }) => {
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
+
+  const proxyUrl = buildEpubProxyUrl(url);
 
   const handleError = (err) => {
     console.error('EPUB Reader Error:', err);
@@ -48,7 +59,7 @@ const EpubReader = ({ url, title }) => {
   return (
     <div className="w-full h-full" style={{ position: 'relative' }}>
       <ReactReader
-        url={url}
+        url={proxyUrl}
         location={location}
         locationChanged={(epubcfi) => setLocation(epubcfi)}
         title={title}
