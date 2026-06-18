@@ -246,6 +246,18 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                   label: 'Book Category',
                   icon: BookOpen,
                   path: 'book-category-management'
+                },
+                {
+                  id: 'book-badge-management',
+                  label: 'Book Badge Management',
+                  icon: Award,
+                  path: 'book-badge-management'
+                },
+                {
+                  id: 'book-badge-mapping',
+                  label: 'Book Badge Mapping',
+                  icon: Tag,
+                  path: 'book-badge-mapping'
                 }
               ]
             },
@@ -296,6 +308,21 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
     
     // Filter out standalone Publisher Category Management (now a child of Publisher Management)
     if (item.id === 'publisher-category-management' || item.label?.toLowerCase().includes('publisher category')) {
+      return null;
+    }
+    
+    // Filter out standalone Book Management (now a parent with children)
+    if (item.id === 'book-management' || (item.label?.toLowerCase() === 'book management' && !item.children)) {
+      return null;
+    }
+    
+    // Filter out standalone Book Category Management (now a child of Book Management)
+    if (item.id === 'book-category-management' || item.label?.toLowerCase().includes('book categor')) {
+      return null;
+    }
+    
+    // Filter out standalone Book Badge Mapping (now a child of Book Management)
+    if (item.id === 'book-badge-mapping' || item.label?.toLowerCase().includes('book badge')) {
       return null;
     }
     

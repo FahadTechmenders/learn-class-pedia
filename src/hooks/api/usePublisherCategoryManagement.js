@@ -19,7 +19,7 @@ export const usePublisherCategoryManagement = () => {
   }, []);
 
   // Get all publisher categories with pagination
-  const getAllCategories = useCallback(async (pageNumber = 1, pageSize = 20) => {
+  const getAllCategories = useCallback(async (pageNumber = 1, pageSize = 20, title = '') => {
     setLoading(true);
     setError(null);
 
@@ -28,6 +28,10 @@ export const usePublisherCategoryManagement = () => {
         page: pageNumber.toString(),
         pageSize: pageSize.toString(),
       });
+
+      if (title && title.trim() !== '') {
+        queryParams.append('title', title.trim());
+      }
 
       const response = await ApiService.get(`${ENDPOINTS.PUBLISHER_CATEGORY_ALL}?${queryParams}`);
 

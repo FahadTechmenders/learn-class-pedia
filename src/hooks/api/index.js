@@ -1,6 +1,8 @@
 // API-related hooks
 export { useAdmin } from './useAdmin';
 export { useBadgeManagement } from './useBadgeManagement';
+export { useBookBadgeManagement } from './useBookBadgeManagement';
+export { useBookBadgeMapping } from './useBookBadgeMapping';
 export { useCareerPath } from './useCareerPath';
 export { useCareerPathDiscount } from './useCareerPathDiscount';
 export { useCareerRoles } from './useCareerRoles';
