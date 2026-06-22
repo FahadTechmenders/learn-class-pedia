@@ -9,7 +9,6 @@ import {
   Award,
   Search,
   DollarSign,
-  Star,
   ChevronRight,
   Upload,
   CheckCircle,
@@ -24,7 +23,6 @@ const CareerPathForm = ({
   careerPath = null, 
   onSave, 
   onCancel, 
-  loading = false,
   showToast = () => {} 
 }) => {
   const {
@@ -33,7 +31,6 @@ const CareerPathForm = ({
     levels,
     skills,
     careerRoles,
-    courseTypes,
     badges,
     initializeDropdownData,
     searchCoursesByTitle,

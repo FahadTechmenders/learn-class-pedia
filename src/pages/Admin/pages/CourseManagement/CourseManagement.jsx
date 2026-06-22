@@ -35,7 +35,6 @@ const CourseManagement = () => {
     setPaginationInfo, 
     handleFilterChange, 
     resetFilters, 
-    getActiveFilters 
   } = useCourseFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -841,7 +840,7 @@ const CourseManagement = () => {
       {filtersExpanded && (
         <div className="relative z-10">
           <div className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800">
-          <div className="py-2 sm:py-3">
+          <div className="py-2 sm:py-3 px-2 rounded-lg">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-end mb-2">
               <button
                 onClick={() => {
