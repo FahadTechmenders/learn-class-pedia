@@ -59,6 +59,7 @@ const CareerPathForm = ({
     skills: [],
     careerPathBadges: [],
     iconUrl: '',
+    altTextImage: '',
     iconFile: null,
     RemoveIcon: false // Track if user explicitly removes icon (uppercase to match backend)
   });
@@ -107,6 +108,7 @@ const CareerPathForm = ({
         skills: careerPath.skills || [],
         careerPathBadges: careerPath.careerPathBadges || [],
         iconUrl: careerPath.iconUrl || '',
+        altTextImage: careerPath.altTextImage || '',
         iconFile: null,
         RemoveIcon: false // Reset flag for editing (but preserve if user sets it to true)
       });
@@ -692,6 +694,7 @@ const CareerPathForm = ({
         submitData.append('durationMaxMonths', parseInt(formData.durationMaxMonths));
         submitData.append('outcome', formData.outcome);
         submitData.append('overview', formData.Overview);
+        submitData.append('altTextImage', formData.altTextImage || '');
         submitData.append('roleId', parseInt(formData.roleId));
         
         // Add arrays using only proper form field notation
@@ -777,6 +780,7 @@ const CareerPathForm = ({
           durationMaxMonths: parseInt(formData.durationMaxMonths) || 0,
           outcome: formData.outcome,
           overview: formData.Overview,
+          altTextImage: formData.altTextImage || '',
           roleId: parseInt(formData.roleId),
           levels: formData.levels.map(level => ({
             levelMapId: parseInt(level.levelMapId) || parseInt(level.levelId) || 0,
@@ -1093,6 +1097,26 @@ const CareerPathForm = ({
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Alt Text for Image */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                Alt Text for Image
+              </label>
+              <input
+                type="text"
+                value={formData.altTextImage}
+                onChange={(e) => handleInputChange('altTextImage', e.target.value)}
+                placeholder="Enter alternative text for the image"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Provide descriptive text for accessibility or when image is not available
+              </p>
+              {errors.altTextImage && (
+                <p className="mt-1 text-sm text-red-600">{errors.altTextImage}</p>
+              )}
             </div>
 
             {/* Career Path Badges */}

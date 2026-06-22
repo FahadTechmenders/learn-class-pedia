@@ -59,6 +59,7 @@ const CareerRoles = () => {
     name: '',
     description: '',
     iconUrl: '',
+    altTextImage: '',
     iconFile: null,
     IsIconRemoved: false
   });
@@ -149,6 +150,7 @@ const CareerRoles = () => {
       name: '',
       description: '',
       iconUrl: '',
+      altTextImage: '',
       iconFile: null,
       IsIconRemoved: false
     });
@@ -169,6 +171,7 @@ const CareerRoles = () => {
       submitData.append('name', formData.name);
       submitData.append('description', formData.description || '');
       submitData.append('iconUrl', formData.iconUrl || '');
+      submitData.append('altTextImage', formData.altTextImage || '');
       
       // Add the file only if it exists
       if (formData.iconFile) {
@@ -255,6 +258,7 @@ const CareerRoles = () => {
         name: careerRoleDetails.name || '',
         description: careerRoleDetails.description || '',
         iconUrl: careerRoleDetails.iconUrl || '',
+        altTextImage: careerRoleDetails.altTextImage || '',
         iconFile: null,
         IsIconRemoved: false
       });
@@ -635,6 +639,25 @@ const CareerRoles = () => {
                 )}
               </div>
             </div>
+            
+            <div>
+              <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Alt Text for Image</label>
+              <input
+                type="text"
+                name="altTextImage"
+                value={formData.altTextImage}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                }`}
+                placeholder="Enter alternative text for the image"
+              />
+              <p className={`mt-1 text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                Provide descriptive text for accessibility or when image is not available
+              </p>
+            </div>
           </div>
           
           <div className="flex justify-end space-x-3 mt-6">
@@ -779,6 +802,25 @@ const CareerRoles = () => {
                 )}
               </div>
             </div>
+            
+            <div>
+              <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Alt Text for Image</label>
+              <input
+                type="text"
+                name="altTextImage"
+                value={formData.altTextImage}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                }`}
+                placeholder="Enter alternative text for the image"
+              />
+              <p className={`mt-1 text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                Provide descriptive text for accessibility or when image is not available
+              </p>
+            </div>
           </div>
           
           <div className="flex justify-end space-x-3 mt-6">
@@ -831,6 +873,13 @@ const CareerRoles = () => {
                     className="w-12 h-12 rounded-xl border border-gray-200 dark:border-gray-700"
                   />
                 </div>
+              </div>
+            )}
+            
+            {selectedCareerRole.altTextImage && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Alt Text for Image</h3>
+                <p className="mt-1 text-sm text-gray-900 dark:text-white">{selectedCareerRole.altTextImage}</p>
               </div>
             )}
             

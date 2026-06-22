@@ -229,6 +229,7 @@ const CareerPath = () => {
           if (careerPathData.durationMaxMonths !== undefined) formData.append('DurationMaxMonths', careerPathData.durationMaxMonths);
           if (careerPathData.outcome) formData.append('Outcome', careerPathData.outcome);
           if (careerPathData.overview) formData.append('overview', careerPathData.overview);
+          if (careerPathData.altTextImage) formData.append('AltTextImage', careerPathData.altTextImage);
           if (careerPathData.roleId !== undefined) formData.append('RoleId', careerPathData.roleId);
           if (editingCareerPath) {
             if (careerPathData.iconFile === null && careerPathData.iconUrl === editingCareerPath.iconUrl) {
@@ -304,6 +305,7 @@ const CareerPath = () => {
           if (careerPathData.durationMaxMonths !== undefined) formData.append('DurationMaxMonths', careerPathData.durationMaxMonths);
           if (careerPathData.outcome) formData.append('Outcome', careerPathData.outcome);
           if (careerPathData.overview) formData.append('overview', careerPathData.overview);
+          if (careerPathData.altTextImage) formData.append('AltTextImage', careerPathData.altTextImage);
           if (careerPathData.certificateCount !== undefined) formData.append('CertificateCount', careerPathData.certificateCount);
           if (careerPathData.roleId !== undefined) formData.append('RoleId', careerPathData.roleId);
     

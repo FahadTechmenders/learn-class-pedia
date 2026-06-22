@@ -51,6 +51,7 @@ const CourseModal = ({
     discountedPrice: '',
     currencyCode: 'USD',
     thumbnailUrl: '',
+    altTextImage: '',
     promoVideoUrl: '',
     promoVideoDurationSeconds: 0,
     promoVideoDurationText: '',
@@ -332,6 +333,7 @@ const CourseModal = ({
         discountedPrice: course.discountedPrice || '',
         currencyCode: course.currencyCode || 'USD',
         thumbnailUrl: course.thumbnailUrl || '',
+        altTextImage: course.altTextImage || '',
         promoVideoUrl: course.promoVideoUrl || '',
         promoVideoDurationSeconds: course.promoVideoDurationSeconds || 0,
         promoVideoDurationText: course.promoVideoDurationSeconds ? formatDuration(course.promoVideoDurationSeconds) : (course.promoVideoDurationText || ''),
@@ -360,6 +362,7 @@ const CourseModal = ({
         discountedPrice: '',
         currencyCode: 'USD',
         thumbnailUrl: '',
+        altTextImage: '',
         promoVideoUrl: '',
         promoVideoDurationSeconds: 0,
         promoVideoDurationText: '',
@@ -685,6 +688,7 @@ const CourseModal = ({
     submitData.append('price', String(parseFloat(formData.price) || 0));
     submitData.append('discountedPrice', String(parseFloat(formData.discountedPrice) || 0));
     submitData.append('currencyCode', formData.currencyCode || '');
+    submitData.append('altTextImage', formData.altTextImage || '');
     submitData.append('promoVideoUrl', formData.promoVideoUrl || '');
     submitData.append('instructionForCourseCreation', formData.instructionForCourseCreation || '');
     submitData.append('IsThumbnailRemoved', String(!!formData.IsThumbnailRemoved));
@@ -1381,6 +1385,26 @@ const CourseModal = ({
                 </div>
                 )}
               </div>
+
+              {/* Alt Text for Image */}
+              <div className="md:col-span-2">
+                <label htmlFor="altTextImage" className="block text-sm font-medium text-gray-700 mb-2">
+                  Alt Text for Image
+                </label>
+                <input
+                  type="text"
+                  id="altTextImage"
+                  value={formData.altTextImage}
+                  onChange={(e) => setFormData(prev => ({ ...prev, altTextImage: e.target.value }))}
+                  placeholder="Enter alternative text for the image"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Provide descriptive text for accessibility or when image is not available
+                </p>
+              </div>
+
   <div className="md:col-span-2">
                     {shouldShowExistingCreationCheckbox && (
                       <div className="flex items-center gap-2">

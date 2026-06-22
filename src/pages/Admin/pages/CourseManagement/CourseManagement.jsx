@@ -438,6 +438,7 @@ const CourseManagement = () => {
           if (formData.price !== undefined) convertedFormData.append('price', parseFloat(formData.price) || 0);
           if (formData.discountedPrice !== undefined) convertedFormData.append('discountedPrice', parseFloat(formData.discountedPrice) || 0);
           if (formData.currencyCode) convertedFormData.append('currencyCode', formData.currencyCode);
+          if (formData.altTextImage) convertedFormData.append('altTextImage', formData.altTextImage);
           if (formData.promoVideoUrl) convertedFormData.append('promoVideoUrl', formData.promoVideoUrl);
           
           // Add badges array (always include, even if empty)
@@ -516,6 +517,7 @@ const CourseManagement = () => {
           if (formData.price !== undefined) convertedFormData.append('price', parseFloat(formData.price) || 0);
           if (formData.discountedPrice !== undefined) convertedFormData.append('discountedPrice', parseFloat(formData.discountedPrice) || 0);
           if (formData.currencyCode) convertedFormData.append('currencyCode', formData.currencyCode);
+          if (formData.altTextImage) convertedFormData.append('altTextImage', formData.altTextImage);
           if (formData.promoVideoUrl) convertedFormData.append('promoVideoUrl', formData.promoVideoUrl);
           
           // Add badges array (always include, even if empty)
@@ -952,6 +954,13 @@ const CourseManagement = () => {
                     </h4>
                     {details?.subtitle && (
                       <p className="text-sm text-gray-600 dark:text-gray-300">{details.subtitle}</p>
+                    )}
+                    {(details?.altTextImage || course?.altTextImage) && (
+                      <div className="mt-2 inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                        <Image className="w-3 h-3 mr-1" />
+                        <span className="font-medium">Alt Text:</span>
+                        <span className="ml-1">{details?.altTextImage || course?.altTextImage}</span>
+                      </div>
                     )}
                   </div>
                   
