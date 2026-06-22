@@ -488,20 +488,12 @@ const CareerPath = () => {
       {/* Filters Section */}
       {showFilters && (
         <div className="relative z-[9998] bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800 px-4 sm:px-6 lg:px-8">
-          <div className="py-2 sm:py-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 space-y-2 sm:space-y-0">
+          <div className="py-3 sm:py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Options</h3>
-              <button
-                onClick={() => {
-                  dispatchTempFilters({ type: 'SET_TEMP_SEARCH_TERM', payload: '' });
-                }}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
-              >
-                Clear All
-              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
                 <input
@@ -522,10 +514,18 @@ const CareerPath = () => {
                   className="w-full"
                 />
               </div>
-              <div>
-              </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <button
+                  onClick={() => {
+                    dispatchTempFilters({ type: 'SET_TEMP_SEARCH_TERM', payload: '' });
+                    dispatchTempFilters({ type: 'SET_TEMP_TITLE', payload: '' });
+                    dispatchTempFilters({ type: 'SET_TEMP_ROLE_ID', payload: '' });
+                  }}
+                  className="w-50 px-4 sm:px-6 py-2 sm:py-3 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium text-sm"
+                >
+                  Clear All
+                </button>
+                 <button
                   onClick={() => {
                     setTitle(tempFilters.tempTitle);
                     setSearchTerm(tempFilters.tempSearchTerm);
@@ -533,11 +533,12 @@ const CareerPath = () => {
                     setCurrentPage(1);
                     setShowFilters(false);
                   }}
-                  className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 text-white rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-indigo-700 dark:hover:from-blue-600 dark:hover:to-indigo-600 transition-all duration-200 font-medium shadow-lg hover:shadow-xl text-sm"
+                  className="w-50 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 text-white rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-indigo-700 dark:hover:from-blue-600 dark:hover:to-indigo-600 transition-all duration-200 font-medium shadow-lg hover:shadow-xl text-sm"
                 >
                   Apply Filters
                 </button>
               </div>
+            
             </div>
           </div>
         </div>
