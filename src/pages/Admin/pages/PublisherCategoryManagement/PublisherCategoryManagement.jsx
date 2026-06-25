@@ -15,6 +15,8 @@ import {
   Search,
   Calendar,
   Save,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import usePublisherCategoryManagement from '../../../../hooks/api/usePublisherCategoryManagement';
 import { useToast } from '../../../../components/ToastProvider';
@@ -26,6 +28,7 @@ const PublisherCategoryManagement = () => {
     categories,
     pagination,
     getAllCategories,
+    getCategoryById,
     createCategory,
     updateCategory,
     deleteCategory,
@@ -39,7 +42,13 @@ const PublisherCategoryManagement = () => {
   const [filterTerm, setFilterTerm] = useState('');
   const [formData, setFormData] = useState({
     categoryName: '',
+    description: '',
+    altTextImage: '',
+    file: null,
+    iconUrl: '',
   });
+  const [filePreview, setFilePreview] = useState(null);
+  const [isIconRemoved, setIsIconRemoved] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
@@ -86,19 +95,48 @@ const PublisherCategoryManagement = () => {
     setModalMode('create');
     setFormData({
       categoryName: '',
+      description: '',
+      altTextImage: '',
+      file: null,
+      iconUrl: '',
     });
+    setFilePreview(null);
+    setIsIconRemoved(false);
     setFormErrors({});
     setSelectedCategory(null);
     setShowModal(true);
   };
 
-  const openEditModal = (category) => {
+  const openEditModal = async (category) => {
     setModalMode('edit');
-    setFormData({
-      categoryName: category.categoryName,
-    });
-    setFormErrors({});
-    setSelectedCategory(category);
+    try {
+      const categoryDetails = await getCategoryById(category.id);
+      setFormData({
+        categoryName: categoryDetails.categoryName || '',
+        description: categoryDetails.description || '',
+        altTextImage: categoryDetails.altTextImage || '',
+        file: null,
+        iconUrl: categoryDetails.iconUrl || '',
+      });
+      setFilePreview(categoryDetails.iconUrl || null);
+      setIsIconRemoved(false);
+      setFormErrors({});
+      setSelectedCategory(category);
+    } catch (err) {
+      console.error('Failed to fetch category details:', err);
+      showError('Failed to load category details');
+      setFormData({
+        categoryName: category.categoryName || '',
+        description: category.description || '',
+        altTextImage: category.altTextImage || '',
+        file: null,
+        iconUrl: category.iconUrl || '',
+      });
+      setFilePreview(category.iconUrl || null);
+      setIsIconRemoved(false);
+      setFormErrors({});
+      setSelectedCategory(category);
+    }
     setShowModal(true);
   };
 
@@ -106,7 +144,13 @@ const PublisherCategoryManagement = () => {
     setShowModal(false);
     setFormData({
       categoryName: '',
+      description: '',
+      altTextImage: '',
+      file: null,
+      iconUrl: '',
     });
+    setFilePreview(null);
+    setIsIconRemoved(false);
     setFormErrors({});
     setSelectedCategory(null);
   };
@@ -122,6 +166,25 @@ const PublisherCategoryManagement = () => {
     return Object.keys(errors).length === 0;
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({ ...formData, file });
+      setIsIconRemoved(false);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFilePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveIcon = () => {
+    setFormData({ ...formData, file: null, iconUrl: '' });
+    setFilePreview(null);
+    setIsIconRemoved(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -130,11 +193,31 @@ const PublisherCategoryManagement = () => {
     }
 
     try {
+      const categoryData = {
+        CategoryName: formData.categoryName.trim(),
+        Description: formData.description.trim(),
+        AltTextImage: formData.altTextImage.trim(),
+      };
+
       if (modalMode === 'create') {
-        await createCategory(formData);
+        categoryData.CreatedBy = 1;
+      } else {
+        categoryData.UpdatedBy = 1;
+      }
+
+      if (formData.file) {
+        categoryData.File = formData.file;
+      }
+
+      if (modalMode === 'edit' && isIconRemoved) {
+        categoryData.IsIconRemoved = true;
+      }
+
+      if (modalMode === 'create') {
+        await createCategory(categoryData);
         showSuccess('Category created successfully!');
       } else {
-        await updateCategory(selectedCategory.id, formData);
+        await updateCategory(selectedCategory.id, categoryData);
         showSuccess('Category updated successfully!');
       }
       
@@ -269,16 +352,17 @@ const PublisherCategoryManagement = () => {
             <thead className="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
               <tr>
                 <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">ID</th>
+                <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Icon</th>
                 <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Category Name</th>
+                <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Description</th>
                 <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Created At</th>
-                <th className="px-3 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Updated At</th>
                 <th className="px-3 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="6" className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center gap-3">
                       <div className="relative">
                         <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
@@ -290,7 +374,7 @@ const PublisherCategoryManagement = () => {
                 </tr>
               ) : categories.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-16 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan="6" className="px-4 py-16 text-center text-gray-500 dark:text-gray-400">
                     <div className="flex flex-col items-center gap-4">
                       <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center shadow-inner">
                         <Tag className="w-10 h-10 text-gray-400 dark:text-gray-500" />
@@ -309,25 +393,30 @@ const PublisherCategoryManagement = () => {
                       <span className="text-sm font-medium text-gray-900 dark:text-white">#{category.id}</span>
                     </td>
                     <td className="px-3 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-900/40 dark:to-indigo-800/40 rounded-lg shadow-sm">
-                          <Tag className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      {category.iconUrl ? (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+                          <img
+                            src={category.iconUrl}
+                            alt={category.altTextImage || category.categoryName}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-300 font-normal">{category.categoryName}</span>
-                      </div>
+                      ) : (
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-900/40 dark:to-indigo-800/40 rounded-lg flex items-center justify-center">
+                          <ImageIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-gradient-to-br from-green-100 to-emerald-200 dark:from-green-900/40 dark:to-emerald-800/40 rounded-lg shadow-sm">
-                          <Calendar className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
-                        </div>
-                        <span className="text-sm text-gray-700 dark:text-gray-300 font-normal">{formatDateTime(category.createdAt)}</span>
-                      </div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{category.categoryName}</span>
                     </td>
                     <td className="px-3 py-4">
-                      <span className="text-sm text-gray-700 dark:text-gray-300 font-normal">
-                        {category.updatedAt ? formatDateTime(category.updatedAt) : '-'}
+                      <span className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
+                        {category.description || 'N/A'}
                       </span>
+                    </td>
+                    <td className="px-3 py-4">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{formatDateTime(category.createdAt)}</span>
                     </td>
                     <td className="px-3 py-4 text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -413,7 +502,7 @@ const PublisherCategoryManagement = () => {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   Category Name <span className="text-red-500">*</span>
@@ -430,6 +519,72 @@ const PublisherCategoryManagement = () => {
                 {formErrors.categoryName && (
                   <p className="mt-1 text-xs text-red-500">{formErrors.categoryName}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Enter category description..."
+                  rows="3"
+                  className="w-full px-4 py-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white transition-all shadow-sm resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Category Icon
+                </label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 cursor-pointer">
+                      <div className="flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-500 dark:hover:border-blue-500 transition-all">
+                        <Upload className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {formData.file ? formData.file.name : 'Choose file'}
+                        </span>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {filePreview && (
+                    <div className="relative w-full h-32 bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+                      <img
+                        src={filePreview}
+                        alt="Preview"
+                        className="w-full h-full object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveIcon}
+                        className="absolute top-2 right-2 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Alt Text for Image
+                </label>
+                <input
+                  type="text"
+                  value={formData.altTextImage}
+                  onChange={(e) => setFormData({ ...formData, altTextImage: e.target.value })}
+                  placeholder="Enter alt text for accessibility"
+                  className="w-full px-4 py-2.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white transition-all shadow-sm"
+                />
               </div>
 
               {/* Actions */}

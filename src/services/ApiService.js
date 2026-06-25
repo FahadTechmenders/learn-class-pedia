@@ -2339,6 +2339,89 @@ async uploadCsvFileByName(formData) {
       method: 'DELETE',
     });
   }
+
+  // ==================== PUBLISHER CATEGORY MANAGEMENT ====================
+
+  // GET all publisher categories with pagination and title filter
+  async getAllPublisherCategories(page = 1, pageSize = 20, title = '') {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      pageSize: pageSize.toString(),
+    });
+
+    if (title && title.trim() !== '') {
+      queryParams.append('title', title.trim());
+    }
+
+    return this.request(`${ENDPOINTS.PUBLISHER_CATEGORY_ALL}?${queryParams}`);
+  }
+
+  // GET publisher category by ID
+  async getPublisherCategoryById(id) {
+    return this.request(ENDPOINTS.PUBLISHER_CATEGORY_BY_ID(id));
+  }
+
+  // POST create new publisher category with file upload
+  async createPublisherCategory(categoryData) {
+    const formData = new FormData();
+    
+    if (categoryData.CategoryName !== undefined) {
+      formData.append('CategoryName', categoryData.CategoryName);
+    }
+    if (categoryData.Description !== undefined) {
+      formData.append('Description', categoryData.Description);
+    }
+    if (categoryData.File) {
+      formData.append('File', categoryData.File);
+    }
+    if (categoryData.AltTextImage !== undefined) {
+      formData.append('AltTextImage', categoryData.AltTextImage);
+    }
+    if (categoryData.CreatedBy !== undefined) {
+      formData.append('CreatedBy', categoryData.CreatedBy);
+    }
+
+    return this.request(ENDPOINTS.PUBLISHER_CATEGORY_CREATE, {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  // PUT update publisher category with file upload
+  async updatePublisherCategory(id, categoryData) {
+    const formData = new FormData();
+    
+    if (categoryData.CategoryName !== undefined) {
+      formData.append('CategoryName', categoryData.CategoryName);
+    }
+    if (categoryData.Description !== undefined) {
+      formData.append('Description', categoryData.Description);
+    }
+    if (categoryData.File) {
+      formData.append('File', categoryData.File);
+    }
+    if (categoryData.AltTextImage !== undefined) {
+      formData.append('AltTextImage', categoryData.AltTextImage);
+    }
+    if (categoryData.UpdatedBy !== undefined) {
+      formData.append('UpdatedBy', categoryData.UpdatedBy);
+    }
+    if (categoryData.IsIconRemoved !== undefined) {
+      formData.append('IsIconRemoved', categoryData.IsIconRemoved);
+    }
+
+    return this.request(ENDPOINTS.PUBLISHER_CATEGORY_UPDATE(id), {
+      method: 'PUT',
+      body: formData,
+    });
+  }
+
+  // DELETE publisher category
+  async deletePublisherCategory(id) {
+    return this.request(ENDPOINTS.PUBLISHER_CATEGORY_DELETE(id), {
+      method: 'DELETE',
+    });
+  }
 }
 
 export default new ApiService();
