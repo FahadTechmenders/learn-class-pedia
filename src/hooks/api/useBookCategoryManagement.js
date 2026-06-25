@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import ApiService from '../../services/ApiService';
-import { ENDPOINTS } from '../../config/api';
 
 export const useBookCategoryManagement = () => {
   const [loading, setLoading] = useState(false);
@@ -24,16 +23,7 @@ export const useBookCategoryManagement = () => {
     setError(null);
 
     try {
-      const queryParams = new URLSearchParams({
-        page: pageNumber.toString(),
-        pageSize: pageSize.toString(),
-      });
-
-      if (title && title.trim() !== '') {
-        queryParams.append('title', title.trim());
-      }
-
-      const response = await ApiService.get(`${ENDPOINTS.BOOK_CATEGORY_ALL}?${queryParams}`);
+      const response = await ApiService.getAllBookCategories(pageNumber, pageSize, title);
 
       if (response) {
         const responseData = response.data || response;
@@ -72,7 +62,7 @@ export const useBookCategoryManagement = () => {
     setError(null);
 
     try {
-      const response = await ApiService.get(ENDPOINTS.BOOK_CATEGORY_BY_ID(id));
+      const response = await ApiService.getBookCategoryById(id);
 
       if (response && (response.id || response.data?.id)) {
         const responseData = response.data || response;
@@ -95,7 +85,7 @@ export const useBookCategoryManagement = () => {
     setError(null);
 
     try {
-      const response = await ApiService.post(ENDPOINTS.BOOK_CATEGORY_CREATE, categoryData);
+      const response = await ApiService.createBookCategory(categoryData);
 
       if (response) {
         const responseData = response.data || response;
@@ -117,7 +107,7 @@ export const useBookCategoryManagement = () => {
     setError(null);
 
     try {
-      const response = await ApiService.put(ENDPOINTS.BOOK_CATEGORY_UPDATE(id), categoryData);
+      const response = await ApiService.updateBookCategory(id, categoryData);
 
       if (response) {
         const responseData = response.data || response;
@@ -139,7 +129,7 @@ export const useBookCategoryManagement = () => {
     setError(null);
 
     try {
-      await ApiService.delete(ENDPOINTS.BOOK_CATEGORY_DELETE(id));
+      await ApiService.deleteBookCategory(id);
       return true;
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Failed to delete category';

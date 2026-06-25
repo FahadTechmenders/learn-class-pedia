@@ -2256,6 +2256,89 @@ async uploadCsvFileByName(formData) {
       method: 'DELETE',
     });
   }
+
+  // ==================== BOOK CATEGORY MANAGEMENT ====================
+
+  // GET all book categories with pagination and title filter
+  async getAllBookCategories(page = 1, pageSize = 20, title = '') {
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      pageSize: pageSize.toString(),
+    });
+
+    if (title && title.trim() !== '') {
+      queryParams.append('title', title.trim());
+    }
+
+    return this.request(`${ENDPOINTS.BOOK_CATEGORY_ALL}?${queryParams}`);
+  }
+
+  // GET book category by ID
+  async getBookCategoryById(id) {
+    return this.request(ENDPOINTS.BOOK_CATEGORY_BY_ID(id));
+  }
+
+  // POST create new book category with file upload
+  async createBookCategory(categoryData) {
+    const formData = new FormData();
+    
+    if (categoryData.Name !== undefined) {
+      formData.append('Name', categoryData.Name);
+    }
+    if (categoryData.Description !== undefined) {
+      formData.append('Description', categoryData.Description);
+    }
+    if (categoryData.File) {
+      formData.append('File', categoryData.File);
+    }
+    if (categoryData.AltTextImage !== undefined) {
+      formData.append('AltTextImage', categoryData.AltTextImage);
+    }
+    if (categoryData.CreatedBy !== undefined) {
+      formData.append('CreatedBy', categoryData.CreatedBy);
+    }
+
+    return this.request(ENDPOINTS.BOOK_CATEGORY_CREATE, {
+      method: 'POST',
+      body: formData,
+    });
+  }
+
+  // PUT update book category with file upload
+  async updateBookCategory(id, categoryData) {
+    const formData = new FormData();
+    
+    if (categoryData.Name !== undefined) {
+      formData.append('Name', categoryData.Name);
+    }
+    if (categoryData.Description !== undefined) {
+      formData.append('Description', categoryData.Description);
+    }
+    if (categoryData.File) {
+      formData.append('File', categoryData.File);
+    }
+    if (categoryData.AltTextImage !== undefined) {
+      formData.append('AltTextImage', categoryData.AltTextImage);
+    }
+    if (categoryData.UpdatedBy !== undefined) {
+      formData.append('UpdatedBy', categoryData.UpdatedBy);
+    }
+    if (categoryData.IsIconRemoved !== undefined) {
+      formData.append('IsIconRemoved', categoryData.IsIconRemoved);
+    }
+
+    return this.request(ENDPOINTS.BOOK_CATEGORY_UPDATE(id), {
+      method: 'PUT',
+      body: formData,
+    });
+  }
+
+  // DELETE book category
+  async deleteBookCategory(id) {
+    return this.request(ENDPOINTS.BOOK_CATEGORY_DELETE(id), {
+      method: 'DELETE',
+    });
+  }
 }
 
 export default new ApiService();
