@@ -16,16 +16,12 @@ import {
   Search,
   Eye,
   BookOpen,
-  Download,
   Shield,
   Tag
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
-import BookReader from '../../../../components/BookReader';
 import EpubReader from '../../../../components/EpubReader';
-import './BookReader.css';
-
 const BookManagement = () => {
   const { showSuccess, showError } = useToast();
   const {
@@ -48,7 +44,6 @@ const BookManagement = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showBookModal, setShowBookModal] = useState(false);
-  const [bookReaderBookId, setBookReaderBookId] = useState(null);
   const [epubReaderBook, setEpubReaderBook] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -157,16 +152,6 @@ const BookManagement = () => {
     }
   }, [emptyFiltersRef, getAllBooks, pagination.pageSize]);
 
-  const formatDateTime = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   const formatPrice = (price) => {
     if (!price && price !== 0) return 'N/A';
@@ -473,8 +458,8 @@ const BookManagement = () => {
                          <Eye className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setEpubReaderBook({ url: book.manuscriptFilename, title: book.title })}
-                        disabled={!book.manuscriptFilename}
+                        onClick={() => setEpubReaderBook({ url: book.manuscriptFilePath, title: book.title })}
+                        disabled={!book.manuscriptFilePath}
                         title="Open Book"
                         className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-md active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -672,7 +657,7 @@ const BookManagement = () => {
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Manuscript</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {selectedBook.manuscriptFilename ? 'Uploaded' : 'Not uploaded'}
+                          {selectedBook.manuscriptFilePath ? 'Uploaded' : 'Not uploaded'}
                         </span>
                       </div>
                       <div className="flex justify-between items-center py-3">
@@ -771,30 +756,7 @@ const BookManagement = () => {
                     )}
 
                     {/* Book Actions */}
-                    {selectedBook.manuscriptFilename && (
-                      <div className={selectedBook.bookStatusCode === 'draft' ? 'md:col-span-2' : ''}>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Book Actions</h4>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setBookReaderBookId(selectedBook.id)}
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                            Preview
-                          </button>
-                          <a
-                            href={selectedBook.manuscriptFilename}
-                            download
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            <Download className="w-4 h-4" />
-                            Download
-                          </a>
-                        </div>
-                      </div>
-                    )}
+                   
                   </div>
                 </div>
 
@@ -804,13 +766,7 @@ const BookManagement = () => {
         </div>
       )}
 
-      {/* Book Reader */}
-      {bookReaderBookId && (
-        <BookReader 
-          bookId={bookReaderBookId} 
-          onClose={() => setBookReaderBookId(null)} 
-        />
-      )}
+   
 
       {epubReaderBook && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
