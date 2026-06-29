@@ -232,6 +232,13 @@ export const ENDPOINTS = {
   BOOK_BADGE_CREATE: '/BookBadges',
   BOOK_BADGE_UPDATE: (id) => `/BookBadges/${id}`,
   BOOK_BADGE_DELETE: (id) => `/BookBadges/${id}`,
+
+  // Publisher Book Sale endpoints
+  PUBLISHER_BOOK_SALE: '/PublisherBookSale',
+  PUBLISHER_BOOK_SALE_BY_ID: (id) => `/PublisherBookSale/${id}`,
+  
+  // Publisher Payout endpoints
+  PUBLISHER_PAYOUT: '/PublisherPayout',
 };
 
 // HTTP Status Codes

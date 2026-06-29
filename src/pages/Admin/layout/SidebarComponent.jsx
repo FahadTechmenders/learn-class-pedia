@@ -258,6 +258,12 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                   label: 'Book Badge Mapping',
                   icon: Tag,
                   path: 'book-badge-mapping'
+                },
+                {
+                  id: 'publisher-book-sale',
+                  label: 'Publisher Book Sales',
+                  icon: ShoppingCart,
+                  path: 'publisher-book-sale'
                 }
               ]
             },
