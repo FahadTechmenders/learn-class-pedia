@@ -44,9 +44,13 @@ const BookCategoryManagement = () => {
     altTextImage: '',
     file: null,
     iconUrl: '',
+    coverFile: null,
+    categoryCover: '',
   });
   const [filePreview, setFilePreview] = useState(null);
+  const [coverPreview, setCoverPreview] = useState(null);
   const [isIconRemoved, setIsIconRemoved] = useState(false);
+  const [isCoverRemoved, setIsCoverRemoved] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
@@ -110,9 +114,13 @@ const BookCategoryManagement = () => {
           altTextImage: categoryDetails.altTextImage || '',
           file: null,
           iconUrl: categoryDetails.iconUrl || '',
+          coverFile: null,
+          categoryCover: categoryDetails.categoryCover || '',
         });
         setFilePreview(categoryDetails.iconUrl || null);
+        setCoverPreview(categoryDetails.categoryCover || null);
         setIsIconRemoved(false);
+        setIsCoverRemoved(false);
       } catch (err) {
         console.error('Failed to fetch category details:', err);
         showError('Failed to load category details');
@@ -123,9 +131,13 @@ const BookCategoryManagement = () => {
           altTextImage: category.altTextImage || '',
           file: null,
           iconUrl: category.iconUrl || '',
+          coverFile: null,
+          categoryCover: category.categoryCover || '',
         });
         setFilePreview(category.iconUrl || null);
+        setCoverPreview(category.categoryCover || null);
         setIsIconRemoved(false);
+        setIsCoverRemoved(false);
       }
     } else {
       setFormData({
@@ -135,9 +147,13 @@ const BookCategoryManagement = () => {
         altTextImage: '',
         file: null,
         iconUrl: '',
+        coverFile: null,
+        categoryCover: '',
       });
       setFilePreview(null);
+      setCoverPreview(null);
       setIsIconRemoved(false);
+      setIsCoverRemoved(false);
     }
     setShowModal(true);
   };
@@ -151,9 +167,13 @@ const BookCategoryManagement = () => {
       altTextImage: '',
       file: null,
       iconUrl: '',
+      coverFile: null,
+      categoryCover: '',
     });
     setFilePreview(null);
+    setCoverPreview(null);
     setIsIconRemoved(false);
+    setIsCoverRemoved(false);
   };
 
   const handleFileChange = (e) => {
@@ -173,6 +193,25 @@ const BookCategoryManagement = () => {
     setFormData({ ...formData, file: null, iconUrl: '' });
     setFilePreview(null);
     setIsIconRemoved(true);
+  };
+
+  const handleCoverFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({ ...formData, coverFile: file });
+      setIsCoverRemoved(false);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveCover = () => {
+    setFormData({ ...formData, coverFile: null, categoryCover: '' });
+    setCoverPreview(null);
+    setIsCoverRemoved(true);
   };
 
   const handleSubmit = async (e) => {
@@ -200,8 +239,16 @@ const BookCategoryManagement = () => {
         categoryData.File = formData.file;
       }
 
+      if (formData.coverFile) {
+        categoryData.CoverFile = formData.coverFile;
+      }
+
       if (modalMode === 'edit' && isIconRemoved) {
         categoryData.IsIconRemoved = true;
+      }
+
+      if (modalMode === 'edit' && isCoverRemoved) {
+        categoryData.IsCoverRemoved = true;
       }
 
       if (modalMode === 'create') {
@@ -216,7 +263,8 @@ const BookCategoryManagement = () => {
       await loadCategories(pagination.page, pagination.pageSize, filterTerm);
     } catch (err) {
       console.error('Failed to save category:', err);
-      showError(err.response?.data?.message || 'Failed to save category');
+
+     showError(err.response?.data || err.message || 'Failed to save category');
     }
   };
 
@@ -544,6 +592,46 @@ const BookCategoryManagement = () => {
                       <button
                         type="button"
                         onClick={handleRemoveIcon}
+                        className="absolute top-2 right-2 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Category Cover Image
+                </label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 cursor-pointer">
+                      <div className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-purple-500 dark:hover:border-purple-500 transition-all">
+                        <Upload className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {formData.coverFile ? formData.coverFile.name : 'Choose cover image'}
+                        </span>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCoverFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {coverPreview && (
+                    <div className="relative w-full h-48 bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+                      <img
+                        src={coverPreview}
+                        alt="Cover Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveCover}
                         className="absolute top-2 right-2 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
                       >
                         <X className="w-4 h-4" />
