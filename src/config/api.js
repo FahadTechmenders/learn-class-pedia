@@ -214,6 +214,7 @@ export const ENDPOINTS = {
   BOOK_BY_ID: (id) => `/Book/${id}`,
   BOOK_STATUS: '/Book/BookStatus',
   BOOK_UPDATE_STATUS: (id) => `/Book/${id}/status`,
+  BOOK_ISSUES: (id) => `/Book/${id}/issues`,
 
   // Book Category Management endpoints
   BOOK_CATEGORY_ALL: '/BookCategory',

@@ -17,11 +17,14 @@ import {
   Eye,
   BookOpen,
   Shield,
-  Tag
+  Tag,
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
-import EpubReader from '../../../../components/EpubReader';
+import BookPreviewer from '../../../../components/EpubReaderComponent';
+
 const BookManagement = () => {
   const { showSuccess, showError } = useToast();
   const {
@@ -35,6 +38,7 @@ const BookManagement = () => {
     getBookById,
     getBookStatuses,
     updateBookStatus,
+    getBookIssues,
     setSelectedBook,
   } = useBookManagement();
 
@@ -48,6 +52,11 @@ const BookManagement = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [statusReason, setStatusReason] = useState('');
+  const [showIssuesModal, setShowIssuesModal] = useState(false);
+  const [bookIssues, setBookIssues] = useState([]);
+  const [loadingIssues, setLoadingIssues] = useState(false);
 
   const emptyFiltersRef = useMemo(() => ({
     publisherName: '',
@@ -126,12 +135,19 @@ const BookManagement = () => {
       return;
     }
 
+    const selectedStatus = bookStatuses.find(status => status.id === selectedStatusId);
+    const requiresReason = selectedStatus && (selectedStatus.code === 'rejected' || selectedStatus.code === 'unpublished');
+
+    if (requiresReason) {
+      setShowReasonModal(true);
+      return;
+    }
+
     setUpdatingStatus(true);
     try {
       await updateBookStatus(selectedBook.id, selectedStatusId);
       showSuccess('Book status updated successfully');
       
-      // Update the selected book if modal is open
       const updatedBook = await getBookById(selectedBook.id);
       setSelectedBook(updatedBook);
       setSelectedStatusId(updatedBook.bookStatusId);
@@ -141,7 +157,48 @@ const BookManagement = () => {
     } finally {
       setUpdatingStatus(false);
     }
-  }, [selectedBook, selectedStatusId, updateBookStatus, getBookById, setSelectedBook, showSuccess, showError]);
+  }, [selectedBook, selectedStatusId, bookStatuses, updateBookStatus, getBookById, setSelectedBook, showSuccess, showError]);
+
+  const handleStatusUpdateWithReason = useCallback(async () => {
+    if (!statusReason.trim()) {
+      showError('Please provide a reason for this status change');
+      return;
+    }
+
+    setUpdatingStatus(true);
+    setShowReasonModal(false);
+    
+    try {
+      await updateBookStatus(selectedBook.id, selectedStatusId, statusReason);
+      showSuccess('Book status updated successfully');
+      
+      const updatedBook = await getBookById(selectedBook.id);
+      setSelectedBook(updatedBook);
+      setSelectedStatusId(updatedBook.bookStatusId);
+      setStatusReason('');
+    } catch (err) {
+      console.error('Failed to update book status:', err);
+      showError('Failed to update book status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }, [selectedBook, selectedStatusId, statusReason, updateBookStatus, getBookById, setSelectedBook, showSuccess, showError]);
+
+  const handleViewIssues = useCallback(async (bookId) => {
+    setLoadingIssues(true);
+    setShowIssuesModal(true);
+    setBookIssues([]);
+    
+    try {
+      const issues = await getBookIssues(bookId);
+      setBookIssues(issues || []);
+    } catch (err) {
+      console.error('Failed to fetch book issues:', err);
+      showError('Failed to fetch book issues');
+    } finally {
+      setLoadingIssues(false);
+    }
+  }, [getBookIssues, showError]);
 
   const handleResetFilters = useCallback(async () => {
     setFilters(emptyFiltersRef);
@@ -151,7 +208,6 @@ const BookManagement = () => {
       console.error('Failed to reset filters:', err);
     }
   }, [emptyFiltersRef, getAllBooks, pagination.pageSize]);
-
 
   const formatPrice = (price) => {
     if (!price && price !== 0) return 'N/A';
@@ -176,6 +232,18 @@ const BookManagement = () => {
   const totalPages = Math.ceil(pagination.totalCount / pagination.pageSize);
   const hasNextPage = pagination.page < totalPages;
   const hasPreviousPage = pagination.page > 1;
+
+  // Helper to get full manuscript URL with proper base URL
+  const getFullManuscriptUrl = (filePath) => {
+    if (!filePath) return null;
+    // If it's already a full URL, return it
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      return filePath;
+    }
+    // Otherwise, prepend the base URL
+    const baseUrl = process.env.REACT_APP_API_URL || '';
+    return `${baseUrl}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
@@ -205,142 +273,134 @@ const BookManagement = () => {
       </div>
 
       {/* Filters */}
-     <div className="mb-6 bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-all">
-  {/* Filter Header */}
-  <button
-    onClick={() => setShowFilters(!showFilters)}
-    className={`w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-all duration-200 ${showFilters ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}
-    aria-expanded={showFilters}
-  >
-    <div className="flex items-center gap-2.5">
-      <SlidersHorizontal className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-      <span className="font-semibold text-gray-900 dark:text-white">Filters</span>
-      {/* Active filter indicator */}
-      {(filters.publisherName || filters.bookStatusId) && (
-        <span className="ml-1.5 px-2 py-0.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-full">
-          {[filters.publisherName, filters.bookStatusId].filter(Boolean).length}
-        </span>
-      )}
-    </div>
-    <ChevronDown
-      className={`w-4.5 h-4.5 text-gray-500 transition-transform duration-300 ${
-        showFilters ? 'rotate-180' : ''
-      }`}
-    />
-  </button>
+      <div className="mb-6 bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-all">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-all duration-200 ${showFilters ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}
+          aria-expanded={showFilters}
+        >
+          <div className="flex items-center gap-2.5">
+            <SlidersHorizontal className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+            <span className="font-semibold text-gray-900 dark:text-white">Filters</span>
+            {(filters.publisherName || filters.bookStatusId) && (
+              <span className="ml-1.5 px-2 py-0.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-full">
+                {[filters.publisherName, filters.bookStatusId].filter(Boolean).length}
+              </span>
+            )}
+          </div>
+          <ChevronDown
+            className={`w-4.5 h-4.5 text-gray-500 transition-transform duration-300 ${
+              showFilters ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
 
-  {/* Filter Panel */}
-  <div
-    className={`transition-all duration-300 ease-out ${
-      showFilters ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
-    }`}
-  >
-    <div className="p-5 bg-gray-50/80 dark:bg-gray-800/50 space-y-4">
-      {/* Main filter inputs */}
-      <div className="flex flex-col md:flex-row md:items-end gap-4">
-        {/* Publisher Name with search icon */}
-        <div className="flex-1 min-w-0">
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-            Publisher Name
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <input
-              type="text"
-              value={filters.publisherName}
-              onChange={(e) => setFilters({ ...filters, publisherName: e.target.value })}
-              placeholder="e.g., Penguin Random House"
-              className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-            />
-            {filters.publisherName && (
-              <button
-                onClick={() => setFilters({ ...filters, publisherName: '' })}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
-                <X className="w-3.5 h-3.5 text-gray-500" />
-              </button>
+        <div
+          className={`transition-all duration-300 ease-out ${
+            showFilters ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+          }`}
+        >
+          <div className="p-5 bg-gray-50/80 dark:bg-gray-800/50 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-end gap-4">
+              <div className="flex-1 min-w-0">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                  Publisher Name
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  <input
+                    type="text"
+                    value={filters.publisherName}
+                    onChange={(e) => setFilters({ ...filters, publisherName: e.target.value })}
+                    placeholder="e.g., Penguin Random House"
+                    className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  />
+                  {filters.publisherName && (
+                    <button
+                      onClick={() => setFilters({ ...filters, publisherName: '' })}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                    >
+                      <X className="w-3.5 h-3.5 text-gray-500" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                  Status
+                </label>
+                <div className="relative">
+                  <select
+                    value={filters.bookStatusId}
+                    onChange={(e) => setFilters({ ...filters, bookStatusId: e.target.value })}
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer transition-all"
+                  >
+                    <option value="">All Statuses</option>
+                    {bookStatuses.map((status) => (
+                      <option key={status.id} value={status.id}>
+                        {status.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="flex flex-row gap-2.5 flex-shrink-0">
+                <button
+                  onClick={handleFilter}
+                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl hover:from-indigo-700 hover:to-indigo-600 focus:ring-2 focus:ring-indigo-500/30 shadow-sm transition-all duration-200 active:scale-95"
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  Apply
+                </button>
+                <button
+                  onClick={handleResetFilters}
+                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-400 focus:ring-2 focus:ring-gray-400/30 transition-all duration-200 active:scale-95"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {(filters.publisherName || filters.bookStatusId) && (
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
+                <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Active filters:</span>
+                {filters.publisherName && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
+                    <span>Publisher: {filters.publisherName}</span>
+                    <button
+                      onClick={() => setFilters({ ...filters, publisherName: '' })}
+                      className="hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-full p-0.5 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                {filters.bookStatusId && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
+                    <span>Status: {bookStatuses.find(s => s.id === filters.bookStatusId)?.name}</span>
+                    <button
+                      onClick={() => setFilters({ ...filters, bookStatusId: '' })}
+                      className="hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-full p-0.5 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={handleResetFilters}
+                  className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors ml-1 underline-offset-2 hover:underline"
+                >
+                  Clear all
+                </button>
+              </div>
             )}
           </div>
         </div>
-
-        {/* Status Select */}
-        <div className="flex-1 min-w-0">
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-            Status
-          </label>
-          <div className="relative">
-            <select
-              value={filters.bookStatusId}
-              onChange={(e) => setFilters({ ...filters, bookStatusId: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer transition-all"
-            >
-              <option value="">All Statuses</option>
-              {bookStatuses.map((status) => (
-                <option key={status.id} value={status.id}>
-                  {status.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-row gap-2.5 flex-shrink-0">
-          <button
-            onClick={handleFilter}
-            className="inline-flex items-center justify-center gap-1.5 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl hover:from-indigo-700 hover:to-indigo-600 focus:ring-2 focus:ring-indigo-500/30 shadow-sm transition-all duration-200 active:scale-95"
-          >
-            <Filter className="w-3.5 h-3.5" />
-            Apply
-          </button>
-          <button
-            onClick={handleResetFilters}
-            className="inline-flex items-center justify-center gap-1.5 px-5 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-400 focus:ring-2 focus:ring-gray-400/30 transition-all duration-200 active:scale-95"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset
-          </button>
-        </div>
       </div>
-
-      {/* Active filter chips (only show if filters are active) */}
-      {(filters.publisherName || filters.bookStatusId) && (
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
-          <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Active filters:</span>
-          {filters.publisherName && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
-              <span>Publisher: {filters.publisherName}</span>
-              <button
-                onClick={() => setFilters({ ...filters, publisherName: '' })}
-                className="hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-full p-0.5 transition-colors"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-          {filters.bookStatusId && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
-              <span>Status: {bookStatuses.find(s => s.id === filters.bookStatusId)?.name}</span>
-              <button
-                onClick={() => setFilters({ ...filters, bookStatusId: '' })}
-                className="hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-full p-0.5 transition-colors"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-          <button
-            onClick={handleResetFilters}
-            className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors ml-1 underline-offset-2 hover:underline"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
-    </div>
-  </div>
-</div>
 
       {/* Books Table */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -449,22 +509,43 @@ const BookManagement = () => {
                     </span>
                   </td>
                   <td className="px-4 py-4 text-center">
-                    <div className="inline-flex items-center justify-center gap-2">
+                    <div className="inline-flex items-center justify-center gap-1.5 flex-wrap">
                       <button
                         onClick={() => handleViewBook(book.id)}
                         title="View book details"
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600  rounded-lg shadow-md   active:scale-95 transition-all duration-300"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-200"
                       >
-                         <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5" />
                       </button>
+                      {(book.bookStatusCode === 'in_review' || book.bookStatusCode === 'published' || book.bookStatusCode ==='rejected') && (
+                        <button
+                          onClick={() => handleViewIssues(book.id)}
+                          title="View book issues"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-200"
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
-                        onClick={() => setEpubReaderBook({ url: book.manuscriptFilePath, title: book.title })}
+                        onClick={() => {
+                          const fullUrl = getFullManuscriptUrl(book.manuscriptFilePath);
+                          setEpubReaderBook({ 
+                            url: fullUrl, 
+                            title: book.title,
+                            author_name: book.authorName || `${book.authorFirstName} ${book.authorLastName}`,
+                            cover_url: book.frontCover,
+                            description: book.description,
+                            filename: book.manuscriptFileName || 'manuscript.epub',
+                            structure: book.manuscriptStructure || null,
+                            manuscript_url: fullUrl,
+                            manuscript_filename: book.manuscriptFileName || 'manuscript.epub'
+                          });
+                        }}
                         disabled={!book.manuscriptFilePath}
-                        title="Open Book"
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg shadow-md active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={book.manuscriptFilePath ? "Read book" : "Manuscript not available"}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
                       >
-                        <BookOpen className="w-4 h-4" />
-                        Open Book
+                        <BookOpen className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </td>
@@ -711,6 +792,21 @@ const BookManagement = () => {
                   </div>
                 )}
 
+                {/* Status Reason */}
+                {selectedBook.bookStatusReason && (
+                  <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-lg p-5 shadow-sm border-2 border-orange-200 dark:border-orange-800">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                      Status Change Reason
+                    </h4>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-orange-200 dark:border-orange-700">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                        {selectedBook.bookStatusReason}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Combined Actions Section */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -754,39 +850,222 @@ const BookManagement = () => {
                         </div>
                       </div>
                     )}
-
-                    {/* Book Actions */}
-                   
                   </div>
                 </div>
-
               </div>
             </div>
           </div>
         </div>
       )}
 
-   
-
       {epubReaderBook && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-600 to-teal-600">
-              <div className="flex items-center gap-3 min-w-0">
-                <BookOpen className="w-5 h-5 text-white flex-shrink-0" />
-                <h2 className="text-lg font-semibold text-white truncate">
-                  {epubReaderBook.title || 'Open Book'}
-                </h2>
+        <BookPreviewer
+          book={{
+            title: epubReaderBook.title,
+            author_name: epubReaderBook.author_name || 'Author',
+            manuscript_url: epubReaderBook.url || epubReaderBook.manuscript_url,
+            manuscript_filename: epubReaderBook.filename || epubReaderBook.manuscript_filename || 'manuscript.epub',
+            manuscript_structure: epubReaderBook.structure || null,
+            cover_url: epubReaderBook.cover_url || null,
+            description: epubReaderBook.description || '',
+            subtitle: epubReaderBook.subtitle || '',
+            contributors: epubReaderBook.contributors || [],
+            edition: epubReaderBook.edition || '',
+            seriesName: epubReaderBook.seriesName || '',
+          }}
+          onClose={() => setEpubReaderBook(null)}
+          onApprove={() => {
+            showSuccess('Book approved successfully');
+          }}
+        />
+      )}
+
+      {/* Reason Modal */}
+      {showReasonModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-in slide-in-from-bottom-4 duration-300 border-2 border-gray-200 dark:border-gray-700">
+            
+            {/* Header */}
+            <div className="px-6 py-4 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-orange-600 via-red-600 to-pink-600">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm shadow-lg">
+                    <AlertCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white tracking-tight">Status Change Reason</h2>
+                    <p className="text-sm text-orange-100 mt-0.5">Please provide a reason for this status change</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowReasonModal(false);
+                    setStatusReason('');
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-xl transition-all duration-200 hover:scale-110"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
               </div>
-              <button
-                onClick={() => setEpubReaderBook(null)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-white" />
-              </button>
             </div>
-            <div className="flex-1 min-h-0">
-              <EpubReader url={epubReaderBook.url} title={epubReaderBook.title} />
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={statusReason}
+                  onChange={(e) => setStatusReason(e.target.value)}
+                  placeholder="Enter the reason for rejecting or unpublishing this book..."
+                  rows={4}
+                  className="w-full px-4 py-3 text-sm border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:bg-gray-800 dark:text-white resize-none transition-all"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  This reason will be recorded and may be shared with the publisher.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowReasonModal(false);
+                    setStatusReason('');
+                  }}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleStatusUpdateWithReason}
+                  disabled={!statusReason.trim() || updatingStatus}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-orange-600 to-red-600 rounded-xl hover:from-orange-700 hover:to-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                >
+                  {updatingStatus ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Confirm Update
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Book Issues Modal */}
+      {showIssuesModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden animate-in slide-in-from-bottom-4 duration-300 border-2 border-gray-200 dark:border-gray-700 flex flex-col">
+            
+            {/* Header */}
+            <div className="flex-shrink-0 px-6 py-4 border-b-2 border-gray-200 dark:border-gray-700 bg-gradient-to-r from-orange-600 via-red-600 to-pink-600">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm shadow-lg">
+                    <AlertTriangle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white tracking-tight">Book Issues</h2>
+                    <p className="text-sm text-orange-100 mt-0.5">
+                      {loadingIssues ? 'Loading issues...' : `${bookIssues.length} issue${bookIssues.length !== 1 ? 's' : ''} found`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowIssuesModal(false);
+                    setBookIssues([]);
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-xl transition-all duration-200 hover:scale-110"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-900">
+              {loadingIssues ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <RefreshCw className="w-10 h-10 text-orange-500 animate-spin mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">Loading book issues...</p>
+                </div>
+              ) : bookIssues.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-200 dark:from-green-900/40 dark:to-emerald-800/40 rounded-full flex items-center justify-center shadow-inner mb-4">
+                    <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
+                  </div>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">No Issues Found</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">This book has no reported issues</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {bookIssues.map((issue) => (
+                    <div
+                      key={issue.id}
+                      className={`bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border-l-4 ${
+                        issue.severity === 'high'
+                          ? 'border-red-500'
+                          : issue.severity === 'medium'
+                          ? 'border-orange-500'
+                          : 'border-yellow-500'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4 mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                              {issue.title}
+                            </h3>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
+                                issue.severity === 'high'
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                  : issue.severity === 'medium'
+                                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                  : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              }`}
+                            >
+                              {issue.severity}
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
+                                issue.status === 'open'
+                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                  : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              }`}
+                            >
+                              {issue.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                            {issue.description}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <span>Created: {new Date(issue.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        {issue.reporterName && (
+                          <span>Reporter: {issue.reporterName}</span>
+                        )}
+                        {issue.resolvedAt && (
+                          <span>Resolved: {new Date(issue.resolvedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

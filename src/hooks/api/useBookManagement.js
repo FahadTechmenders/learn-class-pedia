@@ -92,11 +92,18 @@ export const useBookManagement = () => {
     }
   }, []);
 
-  const updateBookStatus = useCallback(async (bookId, bookStatusId) => {
+  const updateBookStatus = useCallback(async (bookId, bookStatusId, bookStatusReason = null) => {
     try {
-      const response = await ApiService.put(ENDPOINTS.BOOK_UPDATE_STATUS(bookId), {
+      const payload = {
         bookStatusId
-      });
+      };
+      
+      // Add bookStatusReason if provided
+      if (bookStatusReason) {
+        payload.bookStatusReason = bookStatusReason;
+      }
+      
+      const response = await ApiService.put(ENDPOINTS.BOOK_UPDATE_STATUS(bookId), payload);
 
       // Refresh the book list after status update
       await getAllBooks(pagination.page, pagination.pageSize);
@@ -108,6 +115,22 @@ export const useBookManagement = () => {
       throw err;
     }
   }, [getAllBooks, pagination.page, pagination.pageSize]);
+
+  const getBookIssues = useCallback(async (bookId) => {
+    try {
+      const response = await ApiService.get(ENDPOINTS.BOOK_ISSUES(bookId));
+      
+      if (response && (response.data || Array.isArray(response))) {
+        const responseData = response.data || response;
+        return responseData;
+      }
+      throw new Error('Invalid response format');
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch book issues';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
 
   const resetState = useCallback(() => {
     setBooks([]);
@@ -132,6 +155,7 @@ export const useBookManagement = () => {
     getBookById,
     getBookStatuses,
     updateBookStatus,
+    getBookIssues,
     clearError,
     setSelectedBook,
     resetState

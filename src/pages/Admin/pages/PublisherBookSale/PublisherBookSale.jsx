@@ -246,10 +246,14 @@ const PublisherBookSale = () => {
       if (isSelected) {
         return prev.filter(s => s.saleId !== sale.saleId);
       } else {
+        if (prev.length > 0 && prev[0].publisherId !== sale.publisherId) {
+          showError('You can only select sales from the same publisher. Please clear your current selection first.');
+          return prev;
+        }
         return [...prev, sale];
       }
     });
-  }, []);
+  }, [showError]);
 
   const handleSelectAll = useCallback((checked) => {
     if (checked) {
@@ -330,10 +334,13 @@ const PublisherBookSale = () => {
 
     setProcessingPayment(true);
     try {
+      const selectedSaleIds = selectedSales.map(sale => sale.saleId);
+      
       await makePayment(
         selectedPublisherData.publisherId,
         selectedPublisherData.totalAmount,
-        parseInt(paymentMethodId)
+        parseInt(paymentMethodId),
+        selectedSaleIds
       );
       
       showSuccess(`Payment of ${formatCurrency(selectedPublisherData.totalAmount)} processed successfully for ${selectedPublisherData.publisherName}`);

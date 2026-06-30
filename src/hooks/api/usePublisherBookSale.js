@@ -112,7 +112,7 @@ const usePublisherBookSale = () => {
     return getAllSales(pageNumber, pageSize, activeFilters);
   }, [getAllSales]);
 
-  const makePayment = useCallback(async (publisherId, amount, customerPaymentMethodId) => {
+  const makePayment = useCallback(async (publisherId, amount, customerPaymentMethodId, selectedSaleIds) => {
     setLoading(true);
     setError(null);
     
@@ -120,7 +120,8 @@ const usePublisherBookSale = () => {
       const payload = {
         publisherId: publisherId,
         amount: amount,
-        customerPaymentMethodId: customerPaymentMethodId
+        customerPaymentMethodId: customerPaymentMethodId,
+        selectedSaleIds: selectedSaleIds
       };
 
       const response = await ApiService.post(ENDPOINTS.PUBLISHER_PAYOUT, payload);
