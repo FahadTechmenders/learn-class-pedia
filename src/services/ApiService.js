@@ -2291,6 +2291,9 @@ async uploadCsvFileByName(formData) {
     if (categoryData.File) {
       formData.append('File', categoryData.File);
     }
+    if (categoryData.CoverFile) {
+      formData.append('CoverFile', categoryData.CoverFile);
+    }
     if (categoryData.AltTextImage !== undefined) {
       formData.append('AltTextImage', categoryData.AltTextImage);
     }
@@ -2317,6 +2320,9 @@ async uploadCsvFileByName(formData) {
     if (categoryData.File) {
       formData.append('File', categoryData.File);
     }
+    if (categoryData.CoverFile) {
+      formData.append('CoverFile', categoryData.CoverFile);
+    }
     if (categoryData.AltTextImage !== undefined) {
       formData.append('AltTextImage', categoryData.AltTextImage);
     }
@@ -2325,6 +2331,9 @@ async uploadCsvFileByName(formData) {
     }
     if (categoryData.IsIconRemoved !== undefined) {
       formData.append('IsIconRemoved', categoryData.IsIconRemoved);
+    }
+    if (categoryData.IsCoverRemoved !== undefined) {
+      formData.append('IsCoverRemoved', categoryData.IsCoverRemoved);
     }
 
     return this.request(ENDPOINTS.BOOK_CATEGORY_UPDATE(id), {
