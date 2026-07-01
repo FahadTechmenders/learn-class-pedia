@@ -129,25 +129,19 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
   const allManagementItems = [
     // Find Course Management index to insert Student Management after it
     ...(function() {
-      const courseMgmtIndex = managementItems.findIndex(item => 
-        item.label?.toLowerCase().includes('course') || 
+      const courseMgmtIndex = managementItems.findIndex(item =>
+        item.label?.toLowerCase().includes('course') ||
         item.path?.includes('course') ||
         item.id?.includes('course')
       );
-      
-      const publisherMgmtIndex = managementItems.findIndex(item => 
-        item.label?.toLowerCase().includes('publisher') || 
-        item.path?.includes('publisher') ||
-        item.id?.includes('publisher')
-      );
-      
+
       let items = [...managementItems];
-      
+
       if (courseMgmtIndex !== -1) {
         // Insert Student Management as parent menu after Course Management
         const beforeItems = items.slice(0, courseMgmtIndex + 1);
         const afterItems = items.slice(courseMgmtIndex + 1);
-        
+
         items = [
           ...beforeItems,
           {
@@ -167,6 +161,60 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 label: 'Payment Methods',
                 icon: CreditCard,
                 path: 'payment-method-management'
+              }
+            ]
+          },
+          // Add Book Management right after Student Management
+          {
+            id: 'book-management-parent',
+            label: 'Book Management',
+            icon: Book,
+            path: 'book-management',
+            children: [
+              {
+                id: 'book-category-management',
+                label: 'Book Category',
+                icon: BookOpen,
+                path: 'book-category-management'
+              },
+              {
+                id: 'book-badge-management',
+                label: 'Book Badge Management',
+                icon: Award,
+                path: 'book-badge-management'
+              },
+              {
+                id: 'book-badge-mapping',
+                label: 'Book Badge Mapping',
+                icon: Tag,
+                path: 'book-badge-mapping'
+              },
+              {
+                id: 'publisher-book-sale',
+                label: 'Publisher Book Sales',
+                icon: ShoppingCart,
+                path: 'publisher-book-sale'
+              }
+            ]
+          },
+          // Add Publisher Management right after Book Management
+          {
+            id: 'publisher-management-parent',
+            label: 'Publisher Management',
+            icon: Users,
+            path: 'publisher-management',
+            children: [
+              {
+                id: 'publisher-category-management',
+                label: 'Publisher Category',
+                icon: Tag,
+                path: 'publisher-category-management'
+              },
+              {
+                id: 'publisher-badge-mapping',
+                label: 'Publisher Badge Mapping',
+                icon: Award,
+                path: 'publisher-badge-mapping'
               }
             ]
           },
@@ -195,83 +243,82 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 path: 'payment-method-management'
               }
             ]
+          },
+          {
+            id: 'book-management-parent',
+            label: 'Book Management',
+            icon: Book,
+            path: 'book-management',
+            children: [
+              {
+                id: 'book-category-management',
+                label: 'Book Category',
+                icon: BookOpen,
+                path: 'book-category-management'
+              },
+              {
+                id: 'book-badge-management',
+                label: 'Book Badge Management',
+                icon: Award,
+                path: 'book-badge-management'
+              },
+              {
+                id: 'book-badge-mapping',
+                label: 'Book Badge Mapping',
+                icon: Tag,
+                path: 'book-badge-mapping'
+              },
+              {
+                id: 'publisher-book-sale',
+                label: 'Publisher Book Sales',
+                icon: ShoppingCart,
+                path: 'publisher-book-sale'
+              }
+            ]
+          },
+          {
+            id: 'publisher-management-parent',
+            label: 'Publisher Management',
+            icon: Users,
+            path: 'publisher-management',
+            children: [
+              {
+                id: 'publisher-category-management',
+                label: 'Publisher Category',
+                icon: Tag,
+                path: 'publisher-category-management'
+              },
+              {
+                id: 'publisher-badge-mapping',
+                label: 'Publisher Badge Mapping',
+                icon: Award,
+                path: 'publisher-badge-mapping'
+              }
+            ]
           }
         ];
       }
-      
-      // Group Publisher Management items
-      if (publisherMgmtIndex !== -1) {
-        const updatedPublisherIndex = items.findIndex(item => 
-          item.label?.toLowerCase().includes('publisher') && 
-          !item.label?.toLowerCase().includes('category')
-        );
-        
-        const publisherCategoryIndex = items.findIndex(item => 
-          item.label?.toLowerCase().includes('publisher category')
-        );
-        
-        if (updatedPublisherIndex !== -1) {
-          // Remove Publisher Category from main list if it exists
-          const filteredItems = items.filter(item => 
-            !item.label?.toLowerCase().includes('publisher category')
-          );
-          
-          const beforePublisher = filteredItems.slice(0, updatedPublisherIndex);
-          const afterPublisher = filteredItems.slice(updatedPublisherIndex + 1);
-          
-          items = [
-            ...beforePublisher,
-            {
-              id: 'publisher-management-parent',
-              label: 'Publisher Management',
-              icon: Users,
-              path: 'publisher-management',
-              children: [
-                {
-                  id: 'publisher-category-management',
-                  label: 'Publisher Category',
-                  icon: Tag,
-                  path: 'publisher-category-management'
-                }
-              ]
-            },
-            {
-              id: 'book-management-parent',
-              label: 'Book Management',
-              icon: Book,
-              path: 'book-management',
-              children: [
-                {
-                  id: 'book-category-management',
-                  label: 'Book Category',
-                  icon: BookOpen,
-                  path: 'book-category-management'
-                },
-                {
-                  id: 'book-badge-management',
-                  label: 'Book Badge Management',
-                  icon: Award,
-                  path: 'book-badge-management'
-                },
-                {
-                  id: 'book-badge-mapping',
-                  label: 'Book Badge Mapping',
-                  icon: Tag,
-                  path: 'book-badge-mapping'
-                },
-                {
-                  id: 'publisher-book-sale',
-                  label: 'Publisher Book Sales',
-                  icon: ShoppingCart,
-                  path: 'publisher-book-sale'
-                }
-              ]
-            },
-            ...afterPublisher
-          ];
+
+      // Filter out any existing Publisher Management, Book Management, and related items from the original list
+      // But keep the manually added items (student-management-parent, book-management-parent, publisher-management-parent)
+      items = items.filter(item => {
+        const label = item.label?.toLowerCase() || '';
+        const id = item.id?.toLowerCase() || '';
+        // Keep manually added items
+        if (id === 'student-management-parent' || id === 'book-management-parent' || id === 'publisher-management-parent') {
+          return true;
         }
-      }
-      
+        // Filter out original publisher, book category, book badge, and publisher book sales items
+        return !label.includes('publisher') &&
+               !label.includes('book category') &&
+               !label.includes('book badge') &&
+               !label.includes('publisher book sale') &&
+               !id.includes('publisher') &&
+               !id.includes('book-category') &&
+               !id.includes('book-badge') &&
+               !id.includes('publisher-book-sale');
+      });
+
       return items;
     })(),
     // Ensure Skills management is included
@@ -289,6 +336,21 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
         }
       ]
     },
+    // Add Publisher Management
+    {
+      id: 'publisher-management-parent',
+      label: 'Publisher Management',
+      icon: Users,
+      path: 'publisher-management',
+      children: [
+        {
+          id: 'publisher-category-management',
+          label: 'Publisher Category',
+          icon: Tag,
+          path: 'publisher-category-management'
+        }
+      ]
+    },
     // Add Templates after Skills
     {
       id: 'templates',
@@ -297,36 +359,41 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
       path: 'templates'
     }
   ].map(item => {
+    // Preserve manually added items
+    if (item.id === 'student-management-parent' || item.id === 'book-management-parent' || item.id === 'publisher-management-parent') {
+      return item;
+    }
+
     // Filter out separate Course Skill Mapping item
     if (item.id === 'skill-mapping' || item.label === 'Skill Mapping') {
       return null;
     }
-    
+
     // Filter out old email templates item
     if (item.id === 'email-templates' || item.label === 'Email Templates') {
       return null;
     }
-    
+
     // Filter out separate Certificate Template item
     if (item.id === 'certificate-templates' || item.label === 'Certificate Templates') {
       return null;
     }
-    
+
     // Filter out standalone Publisher Category Management (now a child of Publisher Management)
     if (item.id === 'publisher-category-management' || item.label?.toLowerCase().includes('publisher category')) {
       return null;
     }
-    
+
     // Filter out standalone Book Management (now a parent with children)
     if (item.id === 'book-management' || (item.label?.toLowerCase() === 'book management' && !item.children)) {
       return null;
     }
-    
+
     // Filter out standalone Book Category Management (now a child of Book Management)
     if (item.id === 'book-category-management' || item.label?.toLowerCase().includes('book categor')) {
       return null;
     }
-    
+
     // Filter out standalone Book Badge Mapping (now a child of Book Management)
     if (item.id === 'book-badge-mapping' || item.label?.toLowerCase().includes('book badge')) {
       return null;
@@ -396,6 +463,21 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
     
     return item;
   }).filter(Boolean); // Remove null items
+
+  // Reorder items to place Publisher Management right after Book Management
+  const reorderedItems = (function() {
+    const bookMgmtIndex = allManagementItems.findIndex(item => item.id === 'book-management-parent');
+    const publisherMgmtIndex = allManagementItems.findIndex(item => item.id === 'publisher-management-parent');
+
+    if (bookMgmtIndex !== -1 && publisherMgmtIndex !== -1 && publisherMgmtIndex > bookMgmtIndex + 1) {
+      // Publisher Management exists but is not right after Book Management
+      const items = [...allManagementItems];
+      const publisherItem = items.splice(publisherMgmtIndex, 1)[0];
+      items.splice(bookMgmtIndex + 1, 0, publisherItem);
+      return items;
+    }
+    return allManagementItems;
+  })();
   
   // Handle loading state
   if (loading) {
@@ -540,7 +622,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 </h3>
               )}
               <div className="space-y-1">
-                {allManagementItems.map((item) => renderMenuItem(item))}
+                {reorderedItems.map((item) => renderMenuItem(item))}
               </div>
             </div>
 

@@ -33,6 +33,7 @@ import BookManagement from '../pages/BookManagement/BookManagement';
 import BookCategoryManagement from '../pages/BookCategoryManagement/BookCategoryManagement';
 import BookBadgeMapping from '../pages/BookBadgeMapping/BookBadgeMapping';
 import BookBadgeManagement from '../pages/BookBadgeManagement/BookBadgeManagement';
+import PublisherBadgeMapping from '../pages/PublisherBadgeMapping/PublisherBadgeMapping';
 import PublisherBookSale from '../pages/PublisherBookSale/PublisherBookSale';
 
 const componentMap = {
@@ -67,6 +68,7 @@ const componentMap = {
   BookCategoryManagement,
   BookBadgeMapping,
   BookBadgeManagement,
+  PublisherBadgeMapping,
   PublisherBookSale,
 };
 
@@ -237,6 +239,11 @@ const DynamicRoutes = () => {
       <Route path="book-badge-management" element={
         <ProtectedRoute>
           <BookBadgeManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="publisher-badge-mapping" element={
+        <ProtectedRoute>
+          <PublisherBadgeMapping />
         </ProtectedRoute>
       } />
       <Route path="publisher-book-sale" element={

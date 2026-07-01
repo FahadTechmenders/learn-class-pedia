@@ -227,6 +227,10 @@ export const ENDPOINTS = {
   BOOK_BADGE_MAPPING_ASSIGN: '/BookBadgeMapping/assign',
   BOOK_BADGE_MAPPING_GET_BY_BADGE: (badgeId) => `/BookBadgeMapping/${badgeId}`,
 
+  // Publisher Badge Mapping endpoints
+  PUBLISHER_BADGE_MAPPING_ASSIGN: '/PublisherBadgeMapping/assign',
+  PUBLISHER_BADGE_MAPPING_GET_BY_BADGE: (badgeId) => `/PublisherBadgeMapping/${badgeId}`,
+
   // Book Badge Management endpoints
   BOOK_BADGE_ALL: '/BookBadges',
   BOOK_BADGE_BY_ID: (id) => `/BookBadges/${id}`,

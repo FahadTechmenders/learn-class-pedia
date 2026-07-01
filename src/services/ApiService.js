@@ -2218,6 +2218,23 @@ async uploadCsvFileByName(formData) {
     });
   }
 
+  // ==================== PUBLISHER BADGE MAPPING ====================
+
+  // GET publishers by badge ID (returns publisher IDs that have this badge)
+  async getPublisherBadgeMapping(badgeId) {
+    return this.request(ENDPOINTS.PUBLISHER_BADGE_MAPPING_GET_BY_BADGE(badgeId), {
+      method: 'GET',
+    });
+  }
+
+  // POST assign badges to publisher
+  async assignPublisherBadgeMapping(mappingData) {
+    return this.request(ENDPOINTS.PUBLISHER_BADGE_MAPPING_ASSIGN, {
+      method: 'POST',
+      body: JSON.stringify(mappingData),
+    });
+  }
+
   // ==================== BOOK BADGE MANAGEMENT ====================
 
   // GET all book badges with pagination and optional badgeName filter
