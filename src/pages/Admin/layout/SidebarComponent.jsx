@@ -336,21 +336,6 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
         }
       ]
     },
-    // Add Publisher Management
-    {
-      id: 'publisher-management-parent',
-      label: 'Publisher Management',
-      icon: Users,
-      path: 'publisher-management',
-      children: [
-        {
-          id: 'publisher-category-management',
-          label: 'Publisher Category',
-          icon: Tag,
-          path: 'publisher-category-management'
-        }
-      ]
-    },
     // Add Templates after Skills
     {
       id: 'templates',
