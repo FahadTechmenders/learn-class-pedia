@@ -184,6 +184,64 @@ const BookManagement = () => {
     }
   }, [selectedBook, selectedStatusId, statusReason, updateBookStatus, getBookById, setSelectedBook, showSuccess, showError]);
 
+  const formatIssueDescription = (description) => {
+    if (!description) return null;
+    
+    const regex = /(\d+)\.\s+(.+?)(?=\d+\.\s+|$)/gs;
+    const matches = [...description.matchAll(regex)];
+    
+    if (matches.length === 0) {
+      return <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{description}</p>;
+    }
+    
+    return (
+      <div className="space-y-3">
+        {matches.map((match, index) => {
+          const [, number, content] = match;
+          
+          const suggestionMatch = content.match(/Suggested correction\(s\):\s*(.+?)(?:\s+Context:|$)/s);
+          const contextMatch = content.match(/Context:\s*(.+?)$/s);
+          
+          let mainText = content;
+          if (suggestionMatch) {
+            mainText = content.substring(0, content.indexOf('Suggested correction(s):'));
+          } else if (contextMatch) {
+            mainText = content.substring(0, content.indexOf('Context:'));
+          }
+          
+          mainText = mainText.trim();
+          const suggestions = suggestionMatch ? suggestionMatch[1].trim() : null;
+          const context = contextMatch ? contextMatch[1].trim().replace(/^["']|["']$/g, '') : null;
+          
+          return (
+            <div key={index} className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+              <div className="flex gap-2">
+                <span className="flex-shrink-0 w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                  {number}
+                </span>
+                <div className="flex-1 space-y-2">
+                  <p className="text-sm text-gray-900 dark:text-white font-medium leading-relaxed">{mainText}</p>
+                  {suggestions && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded p-2 border border-blue-200 dark:border-blue-800">
+                      <span className="font-semibold text-blue-700 dark:text-blue-400 text-xs">Suggested corrections: </span>
+                      <span className="text-gray-700 dark:text-gray-300 text-xs">{suggestions}</span>
+                    </div>
+                  )}
+                  {context && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded p-2 border border-purple-200 dark:border-purple-800">
+                      <span className="font-semibold text-purple-700 dark:text-purple-400 text-xs">Context: </span>
+                      <span className="text-gray-700 dark:text-gray-300 text-xs italic">"{context}"</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const handleViewIssues = useCallback(async (bookId) => {
     setLoadingIssues(true);
     setShowIssuesModal(true);
@@ -1022,7 +1080,7 @@ const BookManagement = () => {
                     >
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center gap-2 mb-3">
                             <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                               {issue.title}
                             </h3>
@@ -1047,9 +1105,9 @@ const BookManagement = () => {
                               {issue.status}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                            {issue.description}
-                          </p>
+                          <div className="mt-3">
+                            {formatIssueDescription(issue.description)}
+                          </div>
                         </div>
                       </div>
                       
