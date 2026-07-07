@@ -1113,9 +1113,7 @@ const BookManagement = () => {
                       
                       <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <span>Created: {new Date(issue.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                        {issue.reporterName && (
-                          <span>Reporter: {issue.reporterName}</span>
-                        )}
+                       
                         {issue.resolvedAt && (
                           <span>Resolved: {new Date(issue.resolvedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                         )}
