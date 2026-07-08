@@ -242,6 +242,7 @@ export const ENDPOINTS = {
   // Publisher Book Sale endpoints
   PUBLISHER_BOOK_SALE: '/PublisherBookSale',
   PUBLISHER_BOOK_SALE_BY_ID: (id) => `/PublisherBookSale/${id}`,
+  PUBLISHER_BOOK_SALE_PAYMENT_INFO: (publisherId) => `/PublisherBookSale/payment-info/${publisherId}`,
   
   // Publisher Payout endpoints
   PUBLISHER_PAYOUT: '/PublisherPayout',

@@ -292,7 +292,7 @@ const PublisherBookSale = () => {
           salesCount: 0
         };
       }
-      acc[publisherId].totalAmount += sale.salePrice || 0;
+      acc[publisherId].totalAmount += sale.royaltyAmount || 0;
       acc[publisherId].salesCount += 1;
       return acc;
     }, {});
@@ -315,16 +315,16 @@ const PublisherBookSale = () => {
     setShowPaymentModal(true);
     setLoadingPaymentMethods(true);
     try {
-      const methods = await getPaymentMethods(selectedPublisherData.customerId);
+      const methods = await getPaymentMethods(selectedPublisherData.publisherId);
       
       setPaymentMethods(methods);
       
       if (methods.length === 0) {
-        showError('No payment methods found for this customer');
+        showError('No payment information found for this publisher');
       }
     } catch (err) {
-      console.error('Failed to load payment methods:', err);
-      showError('Failed to load payment methods');
+      console.error('Failed to load payment information:', err);
+      showError('Failed to load payment information');
     } finally {
       setLoadingPaymentMethods(false);
     }
@@ -711,7 +711,7 @@ const PublisherBookSale = () => {
                                 {formatCurrency(
                                   selectedSales
                                     .filter(s => s.publisherId === publisher.publisherId)
-                                    .reduce((sum, s) => sum + (s.salePrice || 0), 0)
+                                    .reduce((sum, s) => sum + (s.royaltyAmount || 0), 0)
                                 )}
                               </span>
                             </div>
@@ -1020,21 +1020,21 @@ const PublisherBookSale = () => {
                                   )}
                                 </div>
 
-                                {(method.customerFullName || method.customerEmail) && (
-                                  <div className="space-y-1">
-                                    {method.customerFullName && (
-                                      <div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Account Holder</p>
-                                        <p className="font-medium text-gray-900 dark:text-white">
-                                          {method.customerFullName}
-                                        </p>
-                                      </div>
-                                    )}
-                                    {method.customerEmail && (
-                                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        {method.customerEmail}
-                                      </p>
-                                    )}
+                                {method.accountHolderName && (
+                                  <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Account Holder Name</p>
+                                    <p className="font-medium text-gray-900 dark:text-white">
+                                      {method.accountHolderName}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {method.publisherName && (
+                                  <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Publisher</p>
+                                    <p className="font-medium text-gray-900 dark:text-white">
+                                      {method.publisherName}
+                                    </p>
                                   </div>
                                 )}
                                 
@@ -1042,7 +1042,7 @@ const PublisherBookSale = () => {
                                   <div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Account Number</p>
                                     <p className="font-mono font-medium text-gray-900 dark:text-white">
-                                      {method.bankAccountNumber ? `****${method.bankAccountLast4 || method.bankAccountNumber.slice(-4)}` : 'N/A'}
+                                      {method.bankAccountNumber || 'N/A'}
                                     </p>
                                   </div>
                                   <div>
@@ -1053,16 +1053,16 @@ const PublisherBookSale = () => {
                                   </div>
                                 </div>
 
-                                {(method.cardBrand || method.externalToken) && (
+                                {(method.accountType || method.paymentMethod) && (
                                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-1">
-                                    {method.cardBrand && (
+                                    {method.paymentMethod && (
                                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Card Brand: <span className="font-medium text-gray-700 dark:text-gray-300">{method.cardBrand}</span>
+                                        Payment Method: <span className="font-medium text-gray-700 dark:text-gray-300">{method.paymentMethod}</span>
                                       </p>
                                     )}
-                                    {method.externalToken && (
+                                    {method.accountType && (
                                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Token: <span className="font-mono text-gray-700 dark:text-gray-300">{method.externalToken}</span>
+                                        Account Type: <span className="font-medium text-gray-700 dark:text-gray-300">{method.accountType}</span>
                                       </p>
                                     )}
                                   </div>

@@ -113,7 +113,7 @@ const usePublisherBookSale = () => {
     return getAllSales(pageNumber, pageSize, activeFilters);
   }, [getAllSales]);
 
-  const makePayment = useCallback(async (publisherId, amount, customerPaymentMethodId, selectedSaleIds) => {
+  const makePayment = useCallback(async (publisherId, amount, publisherPaymentInfoId, selectedSaleIds) => {
     setLoading(true);
     setError(null);
     
@@ -121,7 +121,7 @@ const usePublisherBookSale = () => {
       const payload = {
         publisherId: publisherId,
         amount: amount,
-        customerPaymentMethodId: customerPaymentMethodId,
+        publisherPaymentInfoId: publisherPaymentInfoId,
         selectedSaleIds: selectedSaleIds
       };
 
@@ -141,13 +141,13 @@ const usePublisherBookSale = () => {
     }
   }, []);
 
-  const getPaymentMethods = useCallback(async (customerId) => {
+  const getPaymentMethods = useCallback(async (publisherId) => {
     try {
-      if (!customerId) {
+      if (!publisherId) {
         return [];
       }
 
-      const response = await ApiService.get(ENDPOINTS.PAYMENT_METHOD_BY_CUSTOMER(customerId));
+      const response = await ApiService.get(ENDPOINTS.PUBLISHER_BOOK_SALE_PAYMENT_INFO(publisherId));
       
       if (response && response.success && response.data) {
         return response.data;
@@ -156,7 +156,7 @@ const usePublisherBookSale = () => {
       }
       return [];
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch payment methods';
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch payment information';
       setError(errorMessage);
       return [];
     }
