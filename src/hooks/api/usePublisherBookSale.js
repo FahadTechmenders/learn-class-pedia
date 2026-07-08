@@ -41,6 +41,7 @@ const usePublisherBookSale = () => {
       const response = await ApiService.get(`${ENDPOINTS.PUBLISHER_BOOK_SALE}?${queryParams}`);
       
       if (response && response.success) {
+        // Handle grouped publisher data structure
         setSales(response.data || []);
         setSummary({
           totalRoyaltyAmount: response.totalRoyaltyAmount || 0,
@@ -140,17 +141,16 @@ const usePublisherBookSale = () => {
     }
   }, []);
 
-  const getPaymentMethods = useCallback(async (pageNumber = 1, pageSize = 100) => {
+  const getPaymentMethods = useCallback(async (customerId) => {
     try {
-      const queryParams = new URLSearchParams({
-        PageNumber: pageNumber.toString(),
-        PageSize: pageSize.toString()
-      });
+      if (!customerId) {
+        return [];
+      }
 
-      const response = await ApiService.get(`${ENDPOINTS.PAYMENT_METHOD}?${queryParams}`);
+      const response = await ApiService.get(ENDPOINTS.PAYMENT_METHOD_BY_CUSTOMER(customerId));
       
-      if (response && response.items) {
-        return response.items;
+      if (response && response.success && response.data) {
+        return response.data;
       } else if (response && Array.isArray(response)) {
         return response;
       }

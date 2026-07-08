@@ -161,6 +161,7 @@ export const ENDPOINTS = {
   STUDENT_ORDER_BY_ID: (id) => `/StudentOrder/${id}`,
   STUDENT_ORDER_PAYMENT_STATUSES: '/StudentOrder/dropdown/order-statuses',
   PAYMENT_METHOD: '/PaymentMethod',
+  PAYMENT_METHOD_BY_CUSTOMER: (customerId) => `/PaymentMethod/customer/${customerId}`,
   // Course Lecture Content endpoints
   COURSE_LECTURE_CONTENT: (lectureId) => `/courses/lecture-content/${lectureId}`,
   COURSE_GENERATE_CONTENT: '/courses/generate-content',

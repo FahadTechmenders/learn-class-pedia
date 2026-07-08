@@ -21,7 +21,8 @@ import {
   User,
   Package,
   CreditCard,
-  Check
+  Check,
+  ChevronUp
 } from 'lucide-react';
 import usePublisherBookSale from '../../../../hooks/api/usePublisherBookSale';
 import { useToast } from '../../../../components/ToastProvider';
@@ -62,6 +63,7 @@ const PublisherBookSale = () => {
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
+  const [expandedPublishers, setExpandedPublishers] = useState({});
 
   const { activeFilterCount, activeFilterChips } = useMemo(() => {
     const labels = {
@@ -240,28 +242,41 @@ const PublisherBookSale = () => {
     }
   }, []);
 
-  const handleCheckboxChange = useCallback((sale) => {
+  const togglePublisher = useCallback((publisherId) => {
+    setExpandedPublishers(prev => ({
+      ...prev,
+      [publisherId]: !prev[publisherId]
+    }));
+  }, []);
+
+  const handleCheckboxChange = useCallback((publisherId, publisherName, sale) => {
     setSelectedSales(prev => {
       const isSelected = prev.some(s => s.saleId === sale.saleId);
       if (isSelected) {
         return prev.filter(s => s.saleId !== sale.saleId);
       } else {
-        if (prev.length > 0 && prev[0].publisherId !== sale.publisherId) {
+        if (prev.length > 0 && prev[0].publisherId !== publisherId) {
           showError('You can only select sales from the same publisher. Please clear your current selection first.');
           return prev;
         }
-        return [...prev, sale];
+        return [...prev, { ...sale, publisherId, publisherName }];
       }
     });
   }, [showError]);
 
-  const handleSelectAll = useCallback((checked) => {
+  const handleSelectAllForPublisher = useCallback((publisherId, publisherName, orderItems, checked) => {
     if (checked) {
-      setSelectedSales(sales);
+      const itemsWithPublisherId = orderItems.map(item => ({ ...item, publisherId, publisherName }));
+      setSelectedSales(prev => {
+        // Remove any existing items from other publishers
+        const filtered = prev.filter(s => s.publisherId === publisherId);
+        // Add all items from this publisher
+        return itemsWithPublisherId;
+      });
     } else {
-      setSelectedSales([]);
+      setSelectedSales(prev => prev.filter(s => s.publisherId !== publisherId));
     }
-  }, [sales]);
+  }, []);
 
   const selectedPublisherData = useMemo(() => {
     if (selectedSales.length === 0) return null;
@@ -300,17 +315,11 @@ const PublisherBookSale = () => {
     setShowPaymentModal(true);
     setLoadingPaymentMethods(true);
     try {
-      const methods = await getPaymentMethods();
+      const methods = await getPaymentMethods(selectedPublisherData.customerId);
       
-      // Filter payment methods by customer ID from selected sales
-      // Handle both string and number types for customer ID comparison
-      const filteredMethods = methods.filter(method => 
-        String(method.customerId) === String(selectedPublisherData.customerId)
-      );
+      setPaymentMethods(methods);
       
-      setPaymentMethods(filteredMethods);
-      
-      if (filteredMethods.length === 0) {
+      if (methods.length === 0) {
         showError('No payment methods found for this customer');
       }
     } catch (err) {
@@ -600,205 +609,273 @@ const PublisherBookSale = () => {
         </div>
       )}
 
-      {selectedSales.length > 0 && (
-        <div className="mt-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Check className="w-5 h-5 text-green-600" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {selectedSales.length} sale{selectedSales.length === 1 ? '' : 's'} selected
-              </span>
-            </div>
-            {selectedPublisherData && !selectedPublisherData.error && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <span className="text-xs text-gray-600 dark:text-gray-400">Total Amount:</span>
-                <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                  {formatCurrency(selectedPublisherData.totalAmount)}
-                </span>
-              </div>
-            )}
-            {selectedPublisherData?.error && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                <AlertCircle className="w-4 h-4 text-red-600" />
-                <span className="text-xs text-red-600 dark:text-red-400">
-                  {selectedPublisherData.error}
-                </span>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={handleMakePayment}
-            disabled={selectedPublisherData?.error}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title={selectedPublisherData?.error || `Make payment for ${selectedSales.length} selected sale(s)`}
-          >
-            <CreditCard className="w-5 h-5" />
-            <span>Make Payment</span>
-          </button>
-        </div>
-      )}
 
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 mt-5 overflow-hidden">
-        <div className="hidden md:block w-full overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-          <table className="w-full min-w-[1300px] table-fixed border-collapse">
-            <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th className="w-[50px] pl-4 pr-2 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectedSales.length === sales.length && sales.length > 0}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                  />
-                </th>
-                <th className="w-[140px] px-2 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                  Order No
-                </th>
-                <th className="w-[180px] px-2 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                  Book Title
-                </th>
-                <th className="w-[150px] px-2 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                  Customer
-                </th>
-                <th className="w-[100px] px-2 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                  Quantity
-                </th>
-                <th className="w-[120px] px-2 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                  Sale Price
-                </th>
-                <th className="w-[120px] px-2 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                  Royalty
-                </th>
-                <th className="w-[100px] px-2 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                  Status
-                </th>
-                <th className="w-[120px] px-2 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
-                  Sale Date
-                </th>
-              </tr>
-            </thead>
+        <div className="hidden md:block w-full overflow-x-auto">
+          {loading ? (
+            <div className="px-6 py-14 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+                <span className="font-medium text-gray-500 dark:text-gray-400">
+                  Loading sales...
+                </span>
+              </div>
+            </div>
+          ) : sales.length === 0 ? (
+            <div className="px-6 py-14 text-center">
+              <div className="flex flex-col items-center gap-3">
+                <BookOpen className="h-12 w-12 text-gray-400" />
+                <span className="text-lg font-medium text-gray-500 dark:text-gray-400">
+                  No sales found
+                </span>
+                <span className="text-sm text-gray-400 dark:text-gray-500">
+                  Try adjusting your search or filters
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 p-4">
+              {sales.map((publisher) => {
+                const isExpanded = expandedPublishers[publisher.publisherId];
+                const publisherSelectedCount = selectedSales.filter(s => s.publisherId === publisher.publisherId).length;
+                const allPublisherItemsSelected = publisher.orderItems && publisherSelectedCount === publisher.orderItems.length;
+                
+                return (
+                  <div key={publisher.publisherId} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+                    {/* Publisher Header Row */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-4 py-4">
+                      <div 
+                        className="flex items-center gap-4 cursor-pointer"
+                        onClick={() => togglePublisher(publisher.publisherId)}
+                      >
+                        <button className="p-1 hover:bg-white/50 dark:hover:bg-gray-700/50 rounded transition-colors">
+                          {isExpanded ? (
+                            <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                          )}
+                        </button>
+                        
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                            <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                              {publisher.publisherName}
+                            </h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                               {publisher.orderItems?.length || 0} book sale{(publisher.orderItems?.length || 0) !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </div>
 
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {loading ? (
-                <tr>
-                  <td colSpan="9" className="px-6 py-14 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
-                      <span className="font-medium text-gray-500 dark:text-gray-400">
-                        Loading sales...
-                      </span>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Total Sale Amount</p>
+                            <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                              {formatCurrency(publisher.totalSaleAmount)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Total Royalty</p>
+                            <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                              {formatCurrency(publisher.totalRoyaltyAmount)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Payment Status Section */}
+                      {publisher.isPaid ? (
+                        <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800/50">
+                          <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800 w-fit">
+                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+                               Paid
+                            </span>
+                          </div>
+                        </div>
+                      ) : publisherSelectedCount > 0 && (
+                        <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800/50 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/40 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                              <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                                {publisherSelectedCount} item{publisherSelectedCount !== 1 ? 's' : ''} selected
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                              <span className="text-xs text-gray-600 dark:text-gray-400">Total:</span>
+                              <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                                {formatCurrency(
+                                  selectedSales
+                                    .filter(s => s.publisherId === publisher.publisherId)
+                                    .reduce((sum, s) => sum + (s.salePrice || 0), 0)
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Filter selected sales for this publisher
+                              const publisherSales = selectedSales.filter(s => s.publisherId === publisher.publisherId);
+                              if (publisherSales.length > 0) {
+                                setSelectedSales(publisherSales);
+                                handleMakePayment();
+                              }
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-lg shadow-sm hover:shadow-md transition-all"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                            <span>Make Payment</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </td>
-                </tr>
-              ) : sales.length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="px-6 py-14 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <BookOpen className="h-12 w-12 text-gray-400" />
-                      <span className="text-lg font-medium text-gray-500 dark:text-gray-400">
-                        No sales found
-                      </span>
-                      <span className="text-sm text-gray-400 dark:text-gray-500">
-                        Try adjusting your search or filters
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                sales.map((sale) => {
-                  const isSelected = selectedSales.some(s => s.saleId === sale.saleId);
-                  return (
-                  <tr
-                    key={sale.saleId}
-                    className={`transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-800/60 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                  >
-                    <td className="pl-4 pr-2 py-3 align-top">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleCheckboxChange(sale)}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-2 py-3 align-top">
-                      <div className="min-w-0 space-y-1.5">
-                        <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                          {sale.orderNo}
-                        </div>
+
+                    {/* Nested Book Sales */}
+                    {isExpanded && publisher.orderItems && publisher.orderItems.length > 0 && (
+                      <div className="border-t border-gray-200 dark:border-gray-700">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 dark:bg-gray-900/50">
+                            <tr>
+                              {!publisher.isPaid && (
+                                <th className="w-[50px] pl-4 pr-2 py-2 text-left">
+                                  <input
+                                    type="checkbox"
+                                    checked={allPublisherItemsSelected && publisher.orderItems.length > 0}
+                                    onChange={(e) => handleSelectAllForPublisher(publisher.publisherId, publisher.publisherName, publisher.orderItems, e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                                  />
+                                </th>
+                              )}
+                              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                                Order No
+                              </th>
+                              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                                Book Title
+                              </th>
+                              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                                Customer
+                              </th>
+                              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                                Quantity
+                              </th>
+                              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                                Sale Price
+                              </th>
+                              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                                Royalty
+                              </th>
+                              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                                Status
+                              </th>
+                              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                                Sale Date
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                            {publisher.orderItems.map((item) => {
+                              const isSelected = selectedSales.some(s => s.saleId === item.saleId);
+                              return (
+                                <tr
+                                  key={item.saleId}
+                                  className={`transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-gray-800/40 ${isSelected && !publisher.isPaid ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                                >
+                                  {!publisher.isPaid && (
+                                    <td className="pl-4 pr-2 py-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() => handleCheckboxChange(publisher.publisherId, publisher.publisherName, item)}
+                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                                      />
+                                    </td>
+                                  )}
+                                  <td className="px-3 py-3">
+                                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                      {item.orderNo}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                        {item.bookTitle || item.orderItemTitleSnapshot || 'N/A'}
+                                      </div>
+                                      {item.bookISBN && (
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                          ISBN: {item.bookISBN}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                        {item.customerName || 'N/A'}
+                                      </div>
+                                      {item.customerEmail && (
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                          {item.customerEmail}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                      {item.quantity}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {formatCurrency(item.salePrice, item.orderCurrencyCode)}
+                                      </div>
+                                      {item.orderItemDiscount > 0 && (
+                                        <div className="text-xs text-green-600 dark:text-green-400">
+                                          -{formatCurrency(item.orderItemDiscount, item.orderCurrencyCode)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        {formatCurrency(item.royaltyAmount, item.orderCurrencyCode)}
+                                      </div>
+                                      {item.royaltyPercentage > 0 && (
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                          {item.royaltyPercentage}%
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.statusId)}`}>
+                                      {getStatusIcon(item.statusId)}
+                                      {getStatusName(item.statusId)}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <div className="text-sm text-gray-900 dark:text-white">
+                                      {formatDate(item.saleDate)}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
-                    </td>
-                    <td className="px-2 py-3 align-top">
-                      <div className="min-w-0 space-y-1">
-                        <div className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                          {sale.bookTitle || sale.orderItemTitleSnapshot || 'N/A'}
-                        </div>
-                        {sale.bookISBN && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            ISBN: {sale.bookISBN}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 align-top">
-                      <div className="min-w-0 space-y-1">
-                        <div className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                          {sale.customerName || 'N/A'}
-                        </div>
-                        {sale.customerEmail && (
-                          <div className="truncate text-xs text-gray-500 dark:text-gray-400">
-                            {sale.customerEmail}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 align-top">
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {sale.quantity}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 align-top">
-                      <div className="min-w-0 space-y-1">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {formatCurrency(sale.salePrice, sale.orderCurrencyCode)}
-                        </div>
-                        {sale.orderItemDiscount > 0 && (
-                          <div className="text-xs text-green-600 dark:text-green-400">
-                            -{formatCurrency(sale.orderItemDiscount, sale.orderCurrencyCode)}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 align-top">
-                      <div className="min-w-0 space-y-1">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {formatCurrency(sale.royaltyAmount, sale.orderCurrencyCode)}
-                        </div>
-                        {sale.royaltyPercentage > 0 && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {sale.royaltyPercentage}%
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3 align-top">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(sale.statusId)}`}>
-                        {getStatusIcon(sale.statusId)}
-                        {getStatusName(sale.statusId)}
-                      </span>
-                    </td>
-                    <td className="px-2 py-3 align-top">
-                      <div className="min-w-0 space-y-1">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {formatDate(sale.saleDate)}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {pagination.totalPages > 1 && (
@@ -883,64 +960,119 @@ const PublisherBookSale = () => {
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Publisher</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Publisher Name</p>
                       <p className="font-semibold text-gray-900 dark:text-white">{selectedPublisherData.publisherName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Publisher ID</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">{selectedPublisherData.publisherId}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Sales Count</p>
-                      <p className="font-semibold text-gray-900 dark:text-white">{selectedPublisherData.salesCount}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Amount</p>
                       <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(selectedPublisherData.totalAmount)}</p>
                     </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Sales Count</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{selectedPublisherData.salesCount} sale{selectedPublisherData.salesCount !== 1 ? 's' : ''}</p>
+                    </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Payment Method <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Bank Account Details
                   </label>
                   {loadingPaymentMethods ? (
                     <div className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 flex items-center justify-center">
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Loading payment methods...</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Loading payment details...</span>
                       </div>
                     </div>
                   ) : paymentMethods.length === 0 ? (
                     <div className="w-full px-4 py-3 border border-red-300 dark:border-red-600 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center gap-2">
                       <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
                       <span className="text-sm text-red-600 dark:text-red-400">
-                        No payment methods found for this customer
+                        No payment method found
                       </span>
                     </div>
                   ) : (
-                    <>
-                      <div className="relative">
-                        <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <select
-                          value={paymentMethodId}
-                          onChange={(e) => setPaymentMethodId(e.target.value)}
-                          className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white appearance-none cursor-pointer"
-                        >
-                          <option value="">Select payment method</option>
-                          {paymentMethods.map((method) => (
-                            <option key={method.id} value={method.id}>
-                              {method.cardHolderName} - {method.cardType} (**** {method.last4Digits})
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                      </div>
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        {paymentMethods.length} payment method{paymentMethods.length === 1 ? '' : 's'} available for customer ID: {selectedPublisherData.customerId}
-                      </p>
-                    </>
+                    <div className="space-y-3">
+                      {paymentMethods.map((method) => {
+                        // Auto-select the payment method
+                        if (!paymentMethodId) {
+                          setPaymentMethodId(method.id);
+                        }
+                        return (
+                          <div
+                            key={method.id}
+                            className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                                <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <div className="flex-1 space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-semibold text-gray-900 dark:text-white">
+                                    {method.bankName || 'Bank Account Details'}
+                                  </h4>
+                                  {method.isDefault && (
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full">
+                                      Default
+                                    </span>
+                                  )}
+                                </div>
+
+                                {(method.customerFullName || method.customerEmail) && (
+                                  <div className="space-y-1">
+                                    {method.customerFullName && (
+                                      <div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Account Holder</p>
+                                        <p className="font-medium text-gray-900 dark:text-white">
+                                          {method.customerFullName}
+                                        </p>
+                                      </div>
+                                    )}
+                                    {method.customerEmail && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        {method.customerEmail}
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                  <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Account Number</p>
+                                    <p className="font-mono font-medium text-gray-900 dark:text-white">
+                                      {method.bankAccountNumber ? `****${method.bankAccountLast4 || method.bankAccountNumber.slice(-4)}` : 'N/A'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">Routing Number</p>
+                                    <p className="font-mono font-medium text-gray-900 dark:text-white">
+                                      {method.bankRoutingNumber || 'N/A'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {(method.cardBrand || method.externalToken) && (
+                                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-1">
+                                    {method.cardBrand && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Card Brand: <span className="font-medium text-gray-700 dark:text-gray-300">{method.cardBrand}</span>
+                                      </p>
+                                    )}
+                                    {method.externalToken && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Token: <span className="font-mono text-gray-700 dark:text-gray-300">{method.externalToken}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
