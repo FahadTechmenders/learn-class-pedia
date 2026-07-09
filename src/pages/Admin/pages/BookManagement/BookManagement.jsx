@@ -55,7 +55,7 @@ const BookManagement = () => {
   const [showReasonModal, setShowReasonModal] = useState(false);
   const [statusReason, setStatusReason] = useState('');
   const [showIssuesModal, setShowIssuesModal] = useState(false);
-  const [bookIssues, setBookIssues] = useState([]);
+  const [bookIssues, setBookIssues] = useState({ copyright: [], grammar: [] });
   const [loadingIssues, setLoadingIssues] = useState(false);
 
   const emptyFiltersRef = useMemo(() => ({
@@ -184,8 +184,19 @@ const BookManagement = () => {
     }
   }, [selectedBook, selectedStatusId, statusReason, updateBookStatus, getBookById, setSelectedBook, showSuccess, showError]);
 
-  const formatIssueDescription = (description) => {
-    if (!description) return null;
+  const formatIssueDescription = (issue) => {
+    if (!issue) return null;
+    
+    // Handle string input (new format)
+    if (typeof issue === 'string') {
+      return <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{issue}</p>;
+    }
+    
+    // Handle object input (old format with description property)
+    const description = issue.description || issue;
+    if (typeof description !== 'string') {
+      return <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">Invalid issue format</p>;
+    }
     
     const regex = /(\d+)\.\s+(.+?)(?=\d+\.\s+|$)/gs;
     const matches = [...description.matchAll(regex)];
@@ -245,11 +256,11 @@ const BookManagement = () => {
   const handleViewIssues = useCallback(async (bookId) => {
     setLoadingIssues(true);
     setShowIssuesModal(true);
-    setBookIssues([]);
+    setBookIssues({ copyright: [], grammar: [] });
     
     try {
       const issues = await getBookIssues(bookId);
-      setBookIssues(issues || []);
+      setBookIssues(issues || { copyright: [], grammar: [] });
     } catch (err) {
       console.error('Failed to fetch book issues:', err);
       showError('Failed to fetch book issues');
@@ -689,30 +700,49 @@ const BookManagement = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">{selectedBook.title}</h3>
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{selectedBook.title}</h3>
+                      {selectedBook.subTitle && (
+                        <p className="text-lg text-gray-600 dark:text-gray-400 mb-3">{selectedBook.subTitle}</p>
+                      )}
                       <div className="flex flex-wrap items-center gap-2 mb-4">
-                        {selectedBook.categories && selectedBook.categories.length > 0 && selectedBook.categories.map((category, index) => (
-                          <span key={index} className="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                            {category}
-                          </span>
-                        ))}
+                        {selectedBook.categories && selectedBook.categories.length > 0 && selectedBook.categories.map((category, index) => {
+                          const colors = [
+                            'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                            'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+                            'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+                            'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+                            'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300',
+                            'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+                          ];
+                          const colorClass = colors[index % colors.length];
+                          return (
+                            <span key={index} className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold ${colorClass}`}>
+                              {category}
+                            </span>
+                          );
+                        })}
                       </div>
                       {selectedBook.bookDescription && (
                         <p className="text-sm font-normal text-gray-600 dark:text-gray-400 leading-relaxed mb-5">{selectedBook.bookDescription}</p>
                       )}
                       
-                      {/* Price, Royalty, Language, ISBN */}
-                      <div className="grid grid-cols-4 gap-4">
+                      {/* Price, Royalty, Language, ISBN, CP ID */}
+                      <div className="grid grid-cols-5 gap-3">
                         <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
                           <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">Price</p>
                           <p className="text-base font-semibold text-gray-900 dark:text-white">
                             ${selectedBook.price?.toFixed(2) || '0.00'}
                           </p>
+                          {selectedBook.discountedPrice && (
+                            <p className="text-xs text-green-600 dark:text-green-400 line-through">
+                              ${selectedBook.discountedPrice.toFixed(2)}
+                            </p>
+                          )}
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
-                          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">Royalty</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">Royalty %</p>
                           <p className="text-base font-semibold text-green-600 dark:text-green-400">
-                            ${selectedBook.royalityPercentage?.toFixed(2) || '0.00'}
+                            {selectedBook.royalityPercentage?.toFixed(0) || '0'}%
                           </p>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
@@ -723,8 +753,14 @@ const BookManagement = () => {
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
                           <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">ISBN</p>
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          <p className="text-xs font-semibold text-gray-900 dark:text-white">
                             {selectedBook.isbn || 'Not assigned'}
+                          </p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold mb-1">CP ID</p>
+                          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                            {selectedBook.cpId || 'N/A'}
                           </p>
                         </div>
                       </div>
@@ -743,15 +779,41 @@ const BookManagement = () => {
                     </h4>
                     <div className="space-y-0">
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Publisher</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.publisherName || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Author</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.authorFirstName && selectedBook.authorLastName 
+                            ? `${selectedBook.authorFirstName} ${selectedBook.authorLastName}` 
+                            : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Total Pages</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.totalPages || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Created</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                           {selectedBook.createdAt ? new Date(selectedBook.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                         </span>
                       </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
-                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Published</span>
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Release Date</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {selectedBook.bookStatusCode === 'published' ? 'Published' : 'Not published'}
+                          {selectedBook.releaseDate ? new Date(selectedBook.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Published Date</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.publishedDate ? new Date(selectedBook.publishedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Not published'}
                         </span>
                       </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
@@ -773,14 +835,39 @@ const BookManagement = () => {
                     </h4>
                     <div className="space-y-0">
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
-                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">DRM Protection</span>
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white">Disabled</span>
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">All Territory</span>
+                        <span className={`text-sm font-semibold ${selectedBook.isAllTerritory ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+                          {selectedBook.isAllTerritory ? 'Yes' : 'No'}
+                        </span>
                       </div>
-                     
-                      <div className="flex justify-between items-center py-3">
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Book Enrollment</span>
+                        <span className={`text-sm font-semibold ${selectedBook.isBookEnroll ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+                          {selectedBook.isBookEnroll ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Adult Content</span>
+                        <span className={`text-sm font-semibold ${selectedBook.isAdultContent ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                          {selectedBook.isAdultContent ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">AI Generated</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                           {selectedBook.isAiGenerated ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Released</span>
+                        <span className={`text-sm font-semibold ${selectedBook.isRelease ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+                          {selectedBook.isRelease ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Publisher Approved</span>
+                        <span className={`text-sm font-semibold ${selectedBook.isPublisherApproved ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                          {selectedBook.isPublisherApproved ? 'Yes' : 'Pending'}
                         </span>
                       </div>
                     </div>
@@ -1034,14 +1121,14 @@ const BookManagement = () => {
                   <div>
                     <h2 className="text-xl font-bold text-white tracking-tight">Book Issues</h2>
                     <p className="text-sm text-orange-100 mt-0.5">
-                      {loadingIssues ? 'Loading issues...' : `${bookIssues.length} issue${bookIssues.length !== 1 ? 's' : ''} found`}
+                      {loadingIssues ? 'Loading issues...' : `${(bookIssues.copyright?.length || 0) + (bookIssues.grammar?.length || 0)} issue${((bookIssues.copyright?.length || 0) + (bookIssues.grammar?.length || 0)) !== 1 ? 's' : ''} found`}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
                     setShowIssuesModal(false);
-                    setBookIssues([]);
+                    setBookIssues({ copyright: [], grammar: [] });
                   }}
                   className="p-2 hover:bg-white/20 rounded-xl transition-all duration-200 hover:scale-110"
                 >
@@ -1057,7 +1144,7 @@ const BookManagement = () => {
                   <RefreshCw className="w-10 h-10 text-orange-500 animate-spin mb-4" />
                   <p className="text-gray-600 dark:text-gray-400">Loading book issues...</p>
                 </div>
-              ) : bookIssues.length === 0 ? (
+              ) : (bookIssues.copyright?.length === 0 && bookIssues.grammar?.length === 0) ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-200 dark:from-green-900/40 dark:to-emerald-800/40 rounded-full flex items-center justify-center shadow-inner mb-4">
                     <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
@@ -1066,60 +1153,60 @@ const BookManagement = () => {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">This book has no reported issues</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {bookIssues.map((issue) => (
-                    <div
-                      key={issue.id}
-                      className={`bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border-l-4 ${
-                        issue.severity === 'high'
-                          ? 'border-red-500'
-                          : issue.severity === 'medium'
-                          ? 'border-orange-500'
-                          : 'border-yellow-500'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-4 mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-3">
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                              {issue.title}
-                            </h3>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
-                                issue.severity === 'high'
-                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                  : issue.severity === 'medium'
-                                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                  : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                              }`}
-                            >
-                              {issue.severity}
-                            </span>
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${
-                                issue.status === 'open'
-                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                  : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              }`}
-                            >
-                              {issue.status}
-                            </span>
-                          </div>
-                          <div className="mt-3">
-                            {formatIssueDescription(issue.description)}
-                          </div>
+                <div className="space-y-6">
+                  {/* Copyright Issues */}
+                  {bookIssues.copyright && bookIssues.copyright.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg">
+                          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Copyright Issues</h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{bookIssues.copyright.length} issue{bookIssues.copyright.length !== 1 ? 's' : ''}</p>
                         </div>
                       </div>
-                      
-                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <span>Created: {new Date(issue.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                       
-                        {issue.resolvedAt && (
-                          <span>Resolved: {new Date(issue.resolvedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                        )}
+                      <div className="space-y-3">
+                        {bookIssues.copyright.map((issue, index) => (
+                          <div
+                            key={index}
+                            className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border-l-4 border-red-500"
+                          >
+                            <div className="text-sm text-gray-700 dark:text-gray-300">
+                              {formatIssueDescription(issue)}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* grammar Issues */}
+                  {bookIssues.grammar && bookIssues.grammar.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded-lg">
+                          <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">grammar Issues</h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{bookIssues.grammar.length} issue{bookIssues.grammar.length !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        {bookIssues.grammar.map((issue, index) => (
+                          <div
+                            key={index}
+                            className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border-l-4 border-yellow-500"
+                          >
+                            <div className="text-sm text-gray-700 dark:text-gray-300">
+                              {formatIssueDescription(issue)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
