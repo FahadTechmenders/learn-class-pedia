@@ -1,36 +1,27 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   X, ChevronLeft, ChevronRight, BookOpen, Monitor,
   FileText, AlertCircle, CheckCircle2,
   AlertTriangle, ShieldCheck, Tablet, Smartphone, Loader2
 } from 'lucide-react';
-import { ReactReader } from 'react-reader';
-import appSettings, { isProduction } from '../config/appSettings';
-
-// Simple utility to merge classnames
-const cn = (...classes) => classes.filter(Boolean).join(' ');
-
-// EPUB proxy URL builder
-const getBaseUrl = () =>
-  isProduction() ? appSettings.api.baseUrl : appSettings.api.baseUrlLocal;
-
-const buildEpubProxyUrl = (originalUrl) => {
-  if (!originalUrl) return null;
-  const proxyUrl = `${getBaseUrl()}/Book/epub?url=${encodeURIComponent(originalUrl)}`;
-  console.log('EPUB Proxy URL:', proxyUrl);
-  return proxyUrl;
-};
+import { cn } from '../lib/utils';
+import { checkManuscriptGrammar } from '../services/grammar.service';
+import { analyzeManuscriptFormatting } from '../services/formatting.service';
 
 // ─── Sound engine (Web Audio API — no external deps) ─────────────────────────
 function playPageFlipSound() {
+  if (typeof window === 'undefined') return;
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
     const duration = 0.18;
     const buf = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) {
       const t = i / ctx.sampleRate;
       const env = Math.exp(-t * 28);
+      // layered noise + low thump for paper rustle
       data[i] = (Math.random() * 2 - 1) * env * 0.55
         + Math.sin(2 * Math.PI * 120 * t) * Math.exp(-t * 60) * 0.3;
     }
@@ -76,7 +67,6 @@ function CoverPage({ book }) {
           </div>
         </div>
       )}
-      <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-black/50 to-transparent pointer-events-none" />
     </div>
   );
 }
@@ -89,6 +79,100 @@ function RightBlankPage() {
         backgroundPositionY: '40px',
         opacity: 0.4
       }} />
+    </div>
+  );
+}
+
+// Custom title page with book details (shown first)
+function CustomTitlePage({ book }) {
+  const currentYear = new Date().getFullYear();
+  return (
+    <div className="w-full h-full bg-[#faf9f5] flex flex-col items-center justify-center px-12 py-16 relative">
+      <div className="absolute inset-0 opacity-[0.03]"
+        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")' }} />
+      
+      {/* Top branding */}
+      <div className="absolute top-8 left-0 right-0 text-center">
+        <p className="text-[9px] text-slate-300 uppercase tracking-[0.3em] font-medium">Classpedia · Digital Edition</p>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col items-center justify-center text-center max-w-md">
+        <h1 className="text-3xl font-serif font-bold text-slate-800 leading-tight mb-4">
+          {book.title || 'Untitled Book'}
+        </h1>
+        
+        {book.description && (
+          <p className="text-xs font-serif text-slate-400 italic leading-relaxed mb-8">
+            {book.description.substring(0, 150)}{book.description.length > 150 ? '...' : ''}
+          </p>
+        )}
+
+        {/* Decorative divider */}
+        <div className="flex items-center gap-3 justify-center my-8">
+          <div className="w-12 h-px bg-slate-200" />
+          <div className="flex gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+          </div>
+          <div className="w-12 h-px bg-slate-200" />
+        </div>
+
+        <p className="text-base text-slate-700 font-semibold tracking-wide mb-2">
+          {book.author_name || 'Author Name'}
+        </p>
+        
+        <p className="text-[10px] text-slate-400 uppercase tracking-wider mt-6">1st Edition</p>
+        <p className="text-[9px] text-slate-300 italic mt-1">Legends of Eldoria</p>
+      </div>
+
+      {/* Bottom copyright */}
+      <div className="absolute bottom-8 left-0 right-0 text-center">
+        <p className="text-[8px] text-slate-300">
+          © {currentYear} {book.author_name || 'Author'} · All rights reserved
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Table of contents page
+function TableOfContentsPage({ book, chapters, onNavigateToSpread }) {
+  return (
+    <div className="w-full h-full bg-[#faf9f5] px-10 py-12 flex flex-col relative">
+      <div className="mb-8">
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Table of Contents</p>
+        <div className="w-16 h-0.5 bg-slate-300" />
+      </div>
+      
+      <div className="flex-1 space-y-2 overflow-y-auto">
+        {chapters.map((chapter, idx) => (
+          <button
+            key={idx}
+            onClick={() => onNavigateToSpread && onNavigateToSpread(chapter.spreadIndex)}
+            className="flex items-baseline gap-3 py-2 w-full hover:bg-slate-100/50 active:bg-slate-100 transition-colors rounded px-2 -mx-2 cursor-pointer group text-left"
+          >
+            <span className="text-[11px] text-slate-400 w-8 text-right shrink-0 font-mono tabular-nums">
+              {chapter.number != null ? `${chapter.number}.` : ''}
+            </span>
+            <span className="text-xs text-slate-700 font-medium flex-1 group-hover:text-indigo-600">
+            Chapter: {chapter.title}
+            </span>
+            <span className="flex-shrink-0 border-b border-dotted border-slate-300 w-12 mb-1" />
+            <span className="text-[11px] text-slate-500 tabular-nums font-mono shrink-0 group-hover:text-indigo-600 w-8 text-right">
+              {chapter.pageNumber || idx + 1}
+            </span>
+          </button>
+        ))}
+        {chapters.length > 12 && (
+          <p className="text-[10px] text-slate-400 italic pt-3 text-center">
+            ... and {chapters.length - 12} more
+          </p>
+        )}
+      </div>
+      
+      <p className="text-[8px] text-slate-300 mt-8 text-center truncate">{book.title}</p>
     </div>
   );
 }
@@ -117,8 +201,8 @@ function TitlePage({ book }) {
         {(book.contributors || []).slice(0, 2).map((c, i) => (
           <p key={i} className="text-[11px] text-slate-400 mt-1.5">{c.role}: {c.name}</p>
         ))}
-        {book.edition && (
-          <p className="text-[10px] text-slate-400 mt-4 uppercase tracking-widest">{book.edition} Edition</p>
+        {book.edition_number && (
+          <p className="text-[10px] text-slate-400 mt-4 uppercase tracking-widest">{book.edition_number} Edition</p>
         )}
         {book.seriesName && (
           <p className="text-[10px] text-slate-400 mt-1 italic">{book.seriesName}</p>
@@ -141,6 +225,7 @@ function TocPage({ book, entries: providedEntries, onNavigate }) {
     { number: null, displayLabel: 'Conclusion', pg: 74 },
   ];
   const entries = (providedEntries && providedEntries.length > 0) ? providedEntries : fallback;
+  // Cap visible TOC items so we don't overflow the page; rest fold into a "… + N more" line
   const MAX_VISIBLE = 14;
   const visible = entries.slice(0, MAX_VISIBLE);
   const remaining = Math.max(0, entries.length - MAX_VISIBLE);
@@ -176,10 +261,25 @@ function TocPage({ book, entries: providedEntries, onNavigate }) {
   );
 }
 
-// Render a single element from the structured manuscript
+// Render a single element from the structured manuscript.
+// (Desktop font-size zoom is applied by scaling the whole page frame, so sizes
+// here stay fixed — this keeps layout identical across single/dual/tablet/mobile.)
 function renderElement(el, key) {
-  if (!el || !el.content) return null;
+  if (!el) return null;
+  if (el.type !== 'image' && !el.content) return null;
   switch (el.type) {
+    case 'image':
+      // Fit the full image inside the page frame (handles full-page scanned
+      // images in image-based / fixed-layout EPUBs without clipping).
+      return el.src ? (
+        <img
+          key={key}
+          src={el.src}
+          alt={el.alt || ''}
+          className="max-w-full max-h-full w-auto object-contain block mx-auto"
+          loading="lazy"
+        />
+      ) : null;
     case 'h1':
       return <h1 key={key} className="text-base font-serif font-bold text-slate-800 mb-2 leading-snug">{el.content}</h1>;
     case 'h2':
@@ -200,13 +300,16 @@ function renderElement(el, key) {
   }
 }
 
-// Character budget per page
+// Character budget per page — used by paginateChapter to split content fairly
+// regardless of paragraph length.
 const CHARS_PER_PAGE = 1400;
-const FIRST_PAGE_BUDGET = 1000;
+const FIRST_PAGE_BUDGET = 1000; // first page of a chapter loses room to the chapter intro block
 
+// Estimate visual cost of an element (rough char-equivalent of vertical space).
 function elementCost(el) {
   const len = (el?.content || '').length;
   switch (el?.type) {
+    case 'image': return CHARS_PER_PAGE;
     case 'h1': return Math.max(len * 2.2, 220);
     case 'h2': return Math.max(len * 1.8, 160);
     case 'h3': return Math.max(len * 1.5, 120);
@@ -220,6 +323,8 @@ function elementCost(el) {
   }
 }
 
+// Split paragraphs / blockquotes that on their own exceed a page so they can flow
+// across multiple pages instead of being silently clipped by overflow-hidden.
 function splitLongElement(el) {
   const content = el?.content || '';
   if ((el?.type !== 'p' && el?.type !== 'blockquote') || content.length <= CHARS_PER_PAGE - 200) {
@@ -241,6 +346,7 @@ function splitLongElement(el) {
   return chunks.length > 0 ? chunks : [el];
 }
 
+// Paginate a chapter's elements into pages using the char budget.
 function paginateChapterElements(elements) {
   const expanded = (elements || []).flatMap(splitLongElement);
   const pages = [];
@@ -263,7 +369,11 @@ function paginateChapterElements(elements) {
   return pages;
 }
 
-function ContentPage({ book, displayTitle, chapterNumber, kind, elements, pageNumber }) {
+function ContentPage({ book, displayTitle, chapterNumber, kind, elements }) {
+  // Top-left header per spec:
+  //   real chapter → "<index>: Chapter: <title>" (falls back to book title
+  //                  when the parsed chapter title is missing/empty)
+  //   front matter → "<label>" (no chapter number)
   let headerLeft;
   if (kind === 'chapter' && chapterNumber) {
     const titleText = displayTitle || book?.title || '';
@@ -275,11 +385,11 @@ function ContentPage({ book, displayTitle, chapterNumber, kind, elements, pageNu
   }
   return (
     <div className="w-full h-full bg-[#faf9f5] px-9 py-10 flex flex-col relative">
+      {/* Top bar — chapter index + title */}
       <div className="flex items-baseline justify-between gap-3 mb-2">
         <p className="text-[9px] text-slate-500 uppercase tracking-widest truncate font-semibold">
           {headerLeft}
         </p>
-        <p className="text-[9px] text-slate-400 font-mono shrink-0 tabular-nums">{pageNumber}</p>
       </div>
       <div className="w-full h-px bg-slate-200 mb-4" />
       <div className="flex-1 space-y-3 overflow-hidden">
@@ -293,287 +403,9 @@ function ContentPage({ book, displayTitle, chapterNumber, kind, elements, pageNu
   );
 }
 
-// UPDATED: Split the EPUB into left and right pages for a two-page spread
-function EpubLeftPage({ book, rendition }) {
-  const [location, setLocation] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const containerRef = useRef(null);
-
-  // Get the left page location (odd pages)
-  useEffect(() => {
-    if (rendition) {
-      // Try to get the current location
-      const currentLocation = rendition.currentLocation();
-      if (currentLocation) {
-        setLocation(currentLocation.start.cfi);
-        setIsLoading(false);
-      }
-    }
-  }, [rendition]);
-
-  return (
-    <div className="w-full h-full bg-white flex flex-col">
-      <div className="flex-1 w-full relative" style={{ minHeight: '250px' }}>
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-            <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
-          </div>
-        )}
-        <div className="w-full h-full overflow-hidden">
-          {/* The left page will be rendered here */}
-          <div className="p-4 text-sm text-slate-600">
-            <p className="font-serif">Left page content</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EpubRightPage({ book, rendition }) {
-  const [location, setLocation] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const containerRef = useRef(null);
-
-  // Get the right page location (even pages)
-  useEffect(() => {
-    if (rendition) {
-      const currentLocation = rendition.currentLocation();
-      if (currentLocation) {
-        setLocation(currentLocation.start.cfi);
-        setIsLoading(false);
-      }
-    }
-  }, [rendition]);
-
-  return (
-    <div className="w-full h-full bg-white flex flex-col">
-      <div className="flex-1 w-full relative" style={{ minHeight: '250px' }}>
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-            <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
-          </div>
-        )}
-        <div className="w-full h-full overflow-hidden">
-          <div className="p-4 text-sm text-slate-600">
-            <p className="font-serif">Right page content</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// UPDATED: FullWidthManuscriptPage that shows EPUB as a two-page spread
-function FullWidthManuscriptPage({ book }) {
-  const [location, setLocation] = useState(null);
-  const [epubError, setEpubError] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [rendition, setRendition] = useState(null);
-  const containerRef = useRef(null);
-  
-  const ext = (book.manuscript_filename || '').split('.').pop().toLowerCase();
-  const isEpub = ext === 'epub';
-  const proxyUrl = buildEpubProxyUrl(book.manuscript_url);
-
-  useEffect(() => {
-    setIsLoading(true);
-    setEpubError(null);
-  }, [proxyUrl]);
-
-  if (isEpub && book.manuscript_url && proxyUrl) {
-    return (
-      <div className="w-full h-full bg-white flex flex-col">
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
-          <FileText className="w-3 h-3 text-slate-400" />
-          <p className="text-[9px] text-slate-500 truncate font-medium">{book.manuscript_filename}</p>
-          <span className="ml-auto text-[8px] px-1.5 py-0.5 bg-slate-100 rounded text-slate-400 uppercase font-bold">{ext}</span>
-        </div>
-        <div 
-          ref={containerRef}
-          className="flex-1 w-full relative" 
-          style={{ minHeight: '500px', height: '100%' }}
-        >
-          {epubError ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-              <AlertCircle className="w-12 h-12 text-red-400" />
-              <p className="text-sm font-semibold text-red-600">Failed to load EPUB</p>
-              <p className="text-xs text-slate-500 max-w-md">{epubError}</p>
-              <button 
-                onClick={() => {
-                  setEpubError(null);
-                  setIsLoading(true);
-                  setLocation(null);
-                }}
-                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          ) : (
-            <>
-              {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-                  <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-                    <p className="text-sm text-slate-500">Loading EPUB...</p>
-                  </div>
-                </div>
-              )}
-              <div className="flex w-full h-full">
-                {/* Left Page - Shows EPUB content */}
-                <div className="flex-1 relative overflow-hidden border-r border-slate-200">
-                  <ReactReader
-                    url={proxyUrl}
-                    location={location}
-                    locationChanged={(epubcfi) => {
-                      setLocation(epubcfi);
-                      setIsLoading(false);
-                    }}
-                    title={book.title}
-                    showToc={false}
-                    tocOpen={false}
-                    epubOptions={{
-                      flow: 'paginated',
-                      manager: 'default',
-                    }}
-                    getRendition={(rend) => {
-                      try {
-                        setRendition(rend);
-                        rend.themes.default({
-                          '::selection': {
-                            background: 'rgba(99, 102, 241, 0.3)',
-                          },
-                          body: {
-                            padding: '30px 25px !important',
-                            fontFamily: 'Georgia, "Times New Roman", serif !important',
-                            fontSize: '14px !important',
-                            lineHeight: '1.8 !important',
-                            color: '#1a1a1a !important',
-                          },
-                          p: {
-                            marginBottom: '1em !important',
-                            textAlign: 'justify !important',
-                          },
-                          h1: {
-                            fontSize: '1.8em !important',
-                            fontWeight: 'bold !important',
-                            marginBottom: '0.5em !important',
-                          },
-                          h2: {
-                            fontSize: '1.4em !important',
-                            fontWeight: 'bold !important',
-                            marginBottom: '0.5em !important',
-                          },
-                          h3: {
-                            fontSize: '1.2em !important',
-                            fontWeight: 'bold !important',
-                            marginBottom: '0.4em !important',
-                          },
-                        });
-                        
-                        rend.on('rendered', () => {
-                          setIsLoading(false);
-                        });
-                        
-                        rend.on('error', (err) => {
-                          console.error('EPUB rendering error:', err);
-                          setEpubError(err.message || 'Failed to render EPUB');
-                          setIsLoading(false);
-                        });
-                      } catch (err) {
-                        console.error('EPUB setup error:', err);
-                        setEpubError(err.message || 'Failed to initialize EPUB reader');
-                        setIsLoading(false);
-                      }
-                    }}
-                  />
-                </div>
-                {/* Center spine */}
-                <div className="w-px shrink-0 relative z-10"
-                  style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.3) 100%)', boxShadow: '-4px 0 12px rgba(0,0,0,0.25), 4px 0 12px rgba(0,0,0,0.25)' }} />
-                {/* Right Page - Shows same content but with different styling */}
-                <div className="flex-1 relative overflow-hidden">
-                  <ReactReader
-                    url={proxyUrl}
-                    location={location}
-                    locationChanged={(epubcfi) => {
-                      setLocation(epubcfi);
-                      setIsLoading(false);
-                    }}
-                    title={book.title}
-                    showToc={false}
-                    tocOpen={false}
-                    epubOptions={{
-                      flow: 'paginated',
-                      manager: 'default',
-                    }}
-                    getRendition={(rend) => {
-                      try {
-                        rend.themes.default({
-                          '::selection': {
-                            background: 'rgba(99, 102, 241, 0.3)',
-                          },
-                          body: {
-                            padding: '30px 25px !important',
-                            fontFamily: 'Georgia, "Times New Roman", serif !important',
-                            fontSize: '14px !important',
-                            lineHeight: '1.8 !important',
-                            color: '#1a1a1a !important',
-                          },
-                          p: {
-                            marginBottom: '1em !important',
-                            textAlign: 'justify !important',
-                          },
-                          h1: {
-                            fontSize: '1.8em !important',
-                            fontWeight: 'bold !important',
-                            marginBottom: '0.5em !important',
-                          },
-                          h2: {
-                            fontSize: '1.4em !important',
-                            fontWeight: 'bold !important',
-                            marginBottom: '0.5em !important',
-                          },
-                          h3: {
-                            fontSize: '1.2em !important',
-                            fontWeight: 'bold !important',
-                            marginBottom: '0.4em !important',
-                          },
-                        });
-                        
-                        rend.on('rendered', () => {
-                          setIsLoading(false);
-                        });
-                        
-                        rend.on('error', (err) => {
-                          console.error('EPUB rendering error:', err);
-                          setEpubError(err.message || 'Failed to render EPUB');
-                          setIsLoading(false);
-                        });
-                      } catch (err) {
-                        console.error('EPUB setup error:', err);
-                        setEpubError(err.message || 'Failed to initialize EPUB reader');
-                        setIsLoading(false);
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
-
 function ManuscriptPage({ book }) {
   const ext = (book.manuscript_filename || '').split('.').pop().toLowerCase();
   const isPdf = ext === 'pdf';
-
   return (
     <div className="w-full h-full bg-white flex flex-col">
       <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
@@ -593,7 +425,7 @@ function ManuscriptPage({ book }) {
             <FileText className="w-7 h-7 text-indigo-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-700">{book.manuscript_filename}</p>
+            <p className="text-sm font-semibold text-slate-700">{book.manuscript_url}</p>
             <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed max-w-[200px]">
               {['epub', 'mobi', 'kpf'].includes(ext)
                 ? 'Rendered in the full Classpedia reader after publishing.'
@@ -626,9 +458,9 @@ function BackCoverPage({ book }) {
         )}
         <div className="w-10 h-px bg-white/20" />
         <p className="text-sm text-white/70 leading-relaxed font-serif italic max-w-[220px]">
-          “{book.description
+          &ldquo;{book.description
             ? book.description.slice(0, 200) + (book.description.length > 200 ? '…' : '')
-            : 'Your book description will appear here on the back cover.'}”
+            : 'Your book description will appear here on the back cover.'}&rdquo;
         </p>
         <div className="w-10 h-px bg-white/20" />
         <p className="text-xs text-white/50 font-semibold tracking-wide">{book.author_name || 'Author Name'}</p>
@@ -639,12 +471,16 @@ function BackCoverPage({ book }) {
         </div>
         <span className="text-[9px] text-white/30 uppercase tracking-[0.2em]">Classpedia Publishing</span>
       </div>
+      {/* Spine shadow on left edge */}
       <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/50 to-transparent pointer-events-none" />
     </div>
   );
 }
 
 // ─── Structural blocking checks ───────────────────────────────────────────────
+// Formatting warnings are derived from the parsed EPUB (formatting.service) and
+// grammar warnings from LanguageTool (grammar.service); only the hard structural
+// requirements that block publishing live here.
 function buildIssues(book) {
   const issues = [];
   if (!book.manuscript_url) issues.push({ id: 'no_manuscript', severity: 'error', category: 'formatting', word: null, title: 'No manuscript uploaded', desc: 'Upload your manuscript file (EPUB, PDF, or DOCX) in the Content step.' });
@@ -653,9 +489,15 @@ function buildIssues(book) {
 }
 
 // ─── Two-page spread config ───────────────────────────────────────────────────
+// We display pages in spreads: [cover | blank], [title | toc], [ch1L | ch1R], …
+// Each "spread" has a left and right component
+
+// "Chapter N" / roman / numeric bare label patterns used when stripping
+// duplicate headings from chapter bodies and when extracting display titles.
 const BARE_CHAPTER_LABEL_RE = /^(chapter\s+[ivxlcdm0-9]+|part\s+[ivxlcdm0-9]+|prologue|epilogue|[ivxlcdm]+|[0-9]+)\.?\s*$/i;
 const isBareChapterLabel = (s) => BARE_CHAPTER_LABEL_RE.test((s || '').trim());
 
+// Front-matter title patterns → friendly label.
 const FRONT_MATTER_PATTERNS = [
   { re: /^cover$/i, label: 'Cover' },
   { re: /cover\s*page/i, label: 'Cover' },
@@ -678,6 +520,13 @@ const FRONT_MATTER_PATTERNS = [
   { re: /^notes?$/i, label: 'Notes' },
 ];
 
+// Detect whether a parsed section is a real chapter or front matter.
+//
+// Strategy: be PERMISSIVE — any section with substantive body content is a
+// chapter unless it clearly matches a front-matter pattern (cover / title
+// page / copyright / dedication / etc.) or is too small to be a real chapter.
+// This mirrors how a reader perceives the book even when the EPUB doesn't
+// embed explicit "Chapter N" markers.
 function classifyChapter(chapter, bookTitleLc) {
   const title = (chapter?.title || '').trim();
   const titleLc = title.toLowerCase();
@@ -685,32 +534,46 @@ function classifyChapter(chapter, bookTitleLc) {
   const totalChars = elements.reduce((s, el) => s + (el?.content?.length || 0), 0);
   const paragraphCount = elements.filter((el) => el?.type === 'p').length;
 
+  // 1. Title matches a known front-matter pattern → front.
   for (const fm of FRONT_MATTER_PATTERNS) {
     if (fm.re.test(title)) return { kind: 'front', label: fm.label };
   }
 
+  // 2. Title equals the book title AND content is small → title page.
   if (titleLc && titleLc === bookTitleLc && totalChars < 600) {
     return { kind: 'front', label: 'Title Page' };
   }
 
+  // 3. Project Gutenberg boilerplate page (title + license / metadata).
   if (/project\s+gutenberg/i.test(title) && totalChars < 2000) {
     return { kind: 'front', label: 'Title Page' };
   }
 
-  if (totalChars < 250 || paragraphCount < 1) {
+  // 4. Very short sections (likely cover, separator, etc.).
+  //    Exception: sections containing images are real content pages, not front matter.
+  const imageCount = elements.filter((el) => el?.type === 'image').length;
+  if ((totalChars < 250 || paragraphCount < 1) && imageCount === 0) {
     return { kind: 'front', label: title || 'Front Matter' };
   }
 
+  // 5. Otherwise treat as a real chapter.
   return { kind: 'chapter' };
 }
 
+// Extract a display title from a chapter:
+//   1. If chapter.title contains an embedded title after a marker
+//      (e.g. "Chapter I. Down the Rabbit-Hole"), strip the marker.
+//   2. Otherwise scan the first ~12 elements for a heading or short paragraph
+//      that isn't the book title and isn't a bare "Chapter N" label.
 function computeDisplayTitle(chapter, bookTitleLc) {
   const elements = Array.isArray(chapter?.elements) ? chapter.elements : [];
   const ct = (chapter?.title || '').trim();
   const ctLc = ct.toLowerCase();
 
+  // 1. chapter.title path
   if (ct && ctLc !== bookTitleLc) {
     if (!isBareChapterLabel(ct)) {
+      // Strip a leading "Chapter X" / "Part X" / roman / numeric prefix if present.
       const stripped = ct
         .replace(/^(chapter\s+[ivxlcdm0-9]+|part\s+[ivxlcdm0-9]+|[ivxlcdm]+|[0-9]+)[\s.\u2014\u2013:\-_]+/i, '')
         .trim();
@@ -718,6 +581,8 @@ function computeDisplayTitle(chapter, bookTitleLc) {
     }
   }
 
+  // 2. Scan elements: prefer non-marker, non-book-title heading;
+  //    fall back to a short paragraph that looks like a subtitle.
   let sawMarker = false;
   for (let i = 0; i < Math.min(elements.length, 12); i++) {
     const el = elements[i];
@@ -729,17 +594,26 @@ function computeDisplayTitle(chapter, bookTitleLc) {
     if (!t) continue;
     if (t.toLowerCase() === bookTitleLc) continue;
     if (isBareChapterLabel(t)) { sawMarker = true; continue; }
+    // Headings are always candidates.
     if (isH) return t;
+    // Accept short paragraphs as titles only if we already saw a chapter marker
+    // (so we don't accidentally pick up body text as the title).
     if (isP && sawMarker && t.length <= 80) return t;
   }
   return '';
 }
 
 function buildSpreads(book, onNavigateToSpread) {
-  const structure = book.manuscript_structure;
+  const structure = book.manuscript_structure || book.structure;
   const chapters = structure?.chapters || [];
   const bookTitleLc = (book?.title || '').trim().toLowerCase();
 
+  // Pre-process each section:
+  //  - classify as real chapter vs. front matter
+  //  - compute display-only chapter title
+  //  - strip leading duplicate headings (book title, bare "Chapter N" labels,
+  //    or the display title itself) so the page header doesn't repeat them
+  //  - paginate elements within the per-page char budget
   let chapterCounter = 0;
   const processedChapters = chapters.map((chapter) => {
     const cls = classifyChapter(chapter, bookTitleLc);
@@ -777,6 +651,13 @@ function buildSpreads(book, onNavigateToSpread) {
     return { chapter, kind: cls.kind, chapterNumber, displayTitle, pages };
   });
 
+  // Flatten into a sequential list of content pages and build a clean TOC.
+  //  - All leading front matter (title page, copyright, preface, etc.) is
+  //    collapsed into a single "Introduction" entry pointing at page 1.
+  //  - Each real chapter gets its own entry; missing chapter titles fall back
+  //    to the book title so the row is never blank.
+  //  - Trailing back matter (bookmarks, indexes, etc.) is omitted from the TOC
+  //    but still rendered in the reading flow.
   const contentPages = [];
   const tocEntries = [];
   let pageCounter = 1;
@@ -796,6 +677,7 @@ function buildSpreads(book, onNavigateToSpread) {
         contentPageIndex: contentPageStartIndex,
       });
     } else if (hasLeadingFrontMatter && idx === 0) {
+      // Single consolidated Introduction entry for all leading front matter.
       tocEntries.push({
         number: null,
         displayLabel: 'Introduction',
@@ -803,6 +685,8 @@ function buildSpreads(book, onNavigateToSpread) {
         contentPageIndex: contentPageStartIndex,
       });
     }
+    // Front matter sections after the first chapter (back matter) are not
+    // added to the TOC, but their pages still appear in the reading flow.
 
     pages.forEach((els, p) => {
       contentPages.push({
@@ -817,106 +701,85 @@ function buildSpreads(book, onNavigateToSpread) {
     });
   });
 
-  const spreads = [
-    { left: (b) => <CoverPage book={b} />, right: () => <RightBlankPage />, leftLabel: 'Cover', rightLabel: '' },
-    { left: (b) => <TitlePage book={b} />, right: (b) => <TocPage book={b} entries={[]} onNavigate={onNavigateToSpread} />, leftLabel: 'Title Page', rightLabel: 'Contents' },
+  const labelOf = (p) => {
+    if (!p) return '';
+    if (p.kind === 'chapter' && p.chapterNumber) {
+      return p.displayTitle
+        ? `Chapter ${p.chapterNumber}: ${p.displayTitle}`
+        : `Chapter ${p.chapterNumber}`;
+    }
+    return p.displayTitle || '';
+  };
+
+  // Build chapter list for table of contents
+  const chapterList = processedChapters
+    .filter(ch => ch.kind === 'chapter')
+    .map((ch, idx) => ({
+      number: ch.chapterNumber,
+      title: ch.displayTitle || `Chapter ${ch.chapterNumber}`,
+      pageNumber: contentPages.find(p => p.chapter === ch.chapter)?.pageNumber || idx + 1,
+      spreadIndex: idx + 3 // Offset by custom title, TOC, and cover pages
+    }));
+
+  // Page list: Cover first, then custom title page, TOC, and manuscript content
+  const pageList = [
+    { render: (b) => <CoverPage book={b} />, label: 'Cover', pageNum: null },
+    { render: (b) => <CustomTitlePage book={b} />, label: 'Title', pageNum: null },
+    { render: (b) => <TableOfContentsPage book={b} chapters={chapterList} onNavigateToSpread={onNavigateToSpread} />, label: 'Contents', pageNum: null },
   ];
 
   if (contentPages.length > 0) {
-    for (let i = 0; i < contentPages.length; i += 2) {
-      const leftPage = contentPages[i];
-      const rightPage = contentPages[i + 1];
-
-      const labelOf = (p) => {
-        if (!p) return '';
-        if (p.kind === 'chapter' && p.chapterNumber) {
-          return p.displayTitle
-            ? `Chapter ${p.chapterNumber}: ${p.displayTitle}`
-            : `Chapter ${p.chapterNumber}`;
-        }
-        return p.displayTitle || '';
-      };
-
-      spreads.push({
-        left: (b) => (
+    // For all parsed formats (EPUB, PDF, DOCX), show paginated content
+    contentPages.forEach((p) => {
+      pageList.push({
+        render: (b) => (
           <ContentPage
             book={b}
-            kind={leftPage.kind}
-            chapterNumber={leftPage.chapterNumber}
-            displayTitle={leftPage.displayTitle}
-            elements={leftPage.elements}
-            pageNumber={leftPage.pageNumber}
+            kind={p.kind}
+            chapterNumber={p.chapterNumber}
+            displayTitle={p.displayTitle}
+            elements={p.elements}
+            pageNumber={p.pageNumber}
           />
         ),
-        right: rightPage
-          ? (b) => (
-              <ContentPage
-                book={b}
-                kind={rightPage.kind}
-                chapterNumber={rightPage.chapterNumber}
-                displayTitle={rightPage.displayTitle}
-                elements={rightPage.elements}
-                pageNumber={rightPage.pageNumber}
-              />
-            )
-          : () => <RightBlankPage />,
-        leftLabel: labelOf(leftPage),
-        rightLabel: labelOf(rightPage),
-        leftPageNum: leftPage.pageNumber,
-        rightPageNum: rightPage?.pageNumber ?? null,
+        label: labelOf(p),
+        pageNum: p.pageNumber,
       });
-    }
+    });
   } else if (book.manuscript_url) {
-    const ext = (book.manuscript_filename || '').split('.').pop().toLowerCase();
-    const isEpub = ext === 'epub';
-    
-    if (isEpub) {
-      // For EPUB files, use full-width component that displays as a two-page spread
-      spreads.push({
-        left: (b) => <FullWidthManuscriptPage book={b} />,
-        right: () => null,
-        leftLabel: 'Manuscript',
-        rightLabel: '',
-        fullWidth: true,
-      });
-    } else {
-      spreads.push({
-        left: (b) => <ManuscriptPage book={b} />,
-        right: () => <RightBlankPage />,
-        leftLabel: 'Manuscript',
-        rightLabel: '',
-      });
-    }
+    // Fallback: show manuscript info if no parsed structure
+    pageList.push({ render: (b) => <ManuscriptPage book={b} />, label: 'Manuscript', pageNum: null });
   }
 
-  spreads.push({
-    left: () => <RightBlankPage />,
-    right: (b) => <BackCoverPage book={b} />,
-    leftLabel: '',
-    rightLabel: 'Back Cover',
-  });
+  // Pair the flat page list into left/right spreads. The last page may stay
+  // unpaired (right = null) — no synthetic blank facing page is added.
+  const spreads = [];
+  for (let i = 0; i < pageList.length; i += 2) {
+    const l = pageList[i];
+    const r = pageList[i + 1] || null;
+    spreads.push({
+      left: l.render,
+      right: r ? r.render : null,
+      leftLabel: l.label,
+      rightLabel: r ? r.label : '',
+      leftPageNum: l.pageNum ?? null,
+      rightPageNum: r ? (r.pageNum ?? null) : null,
+    });
+  }
 
-  const tocEntriesWithSpreadIndex = tocEntries.map(entry => ({
-    ...entry,
-    spreadIndex: 2 + Math.floor(entry.contentPageIndex / 2),
-  }));
-
-  spreads[1] = {
-    left: (b) => <TitlePage book={b} />,
-    right: (b) => <TocPage book={b} entries={tocEntriesWithSpreadIndex} onNavigate={onNavigateToSpread} />,
-    leftLabel: 'Title Page',
-    rightLabel: 'Contents',
-  };
-
+  // Location index for the Quality Check sidebar: map each content page to the
+  // spread that displays it, so an issue can jump to the exact page. The cover
+  // occupies flat index 0, so content page i sits at flat index i+1 →
+  // spread Math.floor((i + 1) / 2).
   const chapterSpreadIndex = {};
   const contentPageLocator = contentPages.map((p, i) => {
-    const spreadIndex = 2 + Math.floor(i / 2);
+    const spreadIndex = Math.floor((i + 1) / 2);
     const ci = p.chapter?.chapterIndex;
     if (ci != null && chapterSpreadIndex[ci] === undefined) chapterSpreadIndex[ci] = spreadIndex;
     const text = (p.elements || []).map((e) => e?.content || '').join(' ');
     return { spreadIndex, chapterIndex: ci ?? null, text };
   });
-  
+  /** @type {any} */
   const result = spreads;
   result.chapterSpreadIndex = chapterSpreadIndex;
   result.contentPageLocator = contentPageLocator;
@@ -924,11 +787,16 @@ function buildSpreads(book, onNavigateToSpread) {
 }
 
 // ─── Flip Page animation ──────────────────────────────────────────────────────
+// Uses CSS 3D: the "flipping leaf" rotates around the center spine.
+// Technique: two halves (front/back of the turning page) share a rotateY.
+
 function FlipLeaf({ direction, fromContent, toContent, pageH, pageW }) {
-  const [phase, setPhase] = useState('start');
+  // The leaf covers the full width during animation then disappears
+  const [phase, setPhase] = useState('start'); // start → mid → end
   const leafRef = useRef(null);
 
   useEffect(() => {
+    // Force reflow then animate
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setPhase('end');
@@ -947,6 +815,7 @@ function FlipLeaf({ direction, fromContent, toContent, pageH, pageW }) {
       className="absolute inset-0 pointer-events-none"
       style={{ zIndex: 20, perspective: '2000px', perspectiveOrigin: '50% 50%' }}
     >
+      {/* The turning leaf — pivots around its left (next) or right (prev) edge */}
       <div
         ref={leafRef}
         style={{
@@ -963,6 +832,7 @@ function FlipLeaf({ direction, fromContent, toContent, pageH, pageW }) {
           transition: 'transform 0.55s cubic-bezier(0.645, 0.045, 0.355, 1.000)',
         }}
       >
+        {/* Front face */}
         <div style={{
           position: 'absolute', inset: 0, backfaceVisibility: 'hidden',
           background: 'linear-gradient(to right, rgba(0,0,0,0.12) 0%, transparent 8%)',
@@ -978,6 +848,7 @@ function FlipLeaf({ direction, fromContent, toContent, pageH, pageW }) {
             {fromContent}
           </div>
         </div>
+        {/* Back face */}
         <div style={{
           position: 'absolute', inset: 0,
           backfaceVisibility: 'hidden',
@@ -995,6 +866,7 @@ function FlipLeaf({ direction, fromContent, toContent, pageH, pageW }) {
           </div>
         </div>
       </div>
+      {/* Fold shadow that sweeps across */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -1019,7 +891,6 @@ function BleedGuide() {
     </div>
   );
 }
-
 function MarginGuide({ side }) {
   const gutterExtra = side === 'left' ? 8 : 0;
   const innerGutter = side === 'right' ? 8 : 0;
@@ -1030,7 +901,8 @@ function MarginGuide({ side }) {
   );
 }
 
-// ─── Sample-chapter view ──────────────────────────────────────────────────────
+// ─── Sample-chapter view (functionality ported from BookPreviewer2) ───────────
+// Renders a paragraph with certain words underlined (wavy red) for grammar issues.
 function ParagraphWithHighlights({ text, highlightWords, indent }) {
   if (!highlightWords || highlightWords.length === 0) {
     return (
@@ -1102,6 +974,7 @@ function SampleContentPage({ book, num, side, highlightWords, spreadOffset = 0 }
   );
 }
 
+// Chapter-wise spreads for the sample view — each spread is one chapter (left + right page).
 function buildSampleSpreads(book, highlightWords) {
   const chapters = [
     { num: 1, label: 'Chapter 1: Large Language Model' },
@@ -1116,6 +989,47 @@ function buildSampleSpreads(book, highlightWords) {
   }));
 }
 
+// Build sample spreads from the REAL paginated manuscript, limited to the
+// sample page range configured in the Content step (samplePageStart /
+// samplePageEnd). Works uniformly for EPUB, PDF and DOCX because all three are
+// parsed into the same manuscript_structure and paginated by buildSpreads.
+// Falls back to the generic sample spreads when no manuscript content or no
+// sample range is available.
+function buildManuscriptSampleSpreads(fullSpreads, book, highlightWords) {
+  const start = parseInt(book?.samplePageStart, 10) || 1;
+  const end = parseInt(book?.samplePageEnd, 10) || 0;
+
+  // Flatten the content pages out of the full-book spreads. Only content
+  // spreads carry page numbers (leftPageNum / rightPageNum).
+  const pages = [];
+  (fullSpreads || []).forEach((s) => {
+    if (s.leftPageNum != null) pages.push({ render: s.left, label: s.leftLabel, pageNum: s.leftPageNum });
+    if (s.rightPageNum != null) pages.push({ render: s.right, label: s.rightLabel, pageNum: s.rightPageNum });
+  });
+
+  const inRange = end > 0
+    ? pages.filter((p) => p.pageNum >= start && p.pageNum <= end)
+    : pages;
+
+  // No parsed manuscript pages (or nothing in range) → generic sample preview.
+  if (inRange.length === 0) return buildSampleSpreads(book, highlightWords);
+
+  const spreads = [];
+  for (let i = 0; i < inRange.length; i += 2) {
+    const l = inRange[i];
+    const r = inRange[i + 1];
+    spreads.push({
+      left: l.render,
+      right: r ? r.render : () => <RightBlankPage />,
+      leftLabel: l.label,
+      rightLabel: r ? r.label : '',
+      leftPageNum: l.pageNum,
+      rightPageNum: r ? r.pageNum : null,
+    });
+  }
+  return spreads;
+}
+
 // ─── Main Previewer ───────────────────────────────────────────────────────────
 
 export default function BookPreviewer({ book, onClose, onApprove }) {
@@ -1123,10 +1037,36 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   const [flipping, setFlipping] = useState(null);
   const [canvasScale, setCanvasScale] = useState(1);
   const [viewSample, setViewSample] = useState(false);
-  const [showMargins, setShowMargins] = useState(true);
-  const [showBleed, setShowBleed] = useState(true);
   const [viewMode, setViewMode] = useState('desktop');
-  const [activeTab, setActiveTab] = useState('formatting');
+  const [activeTab, setActiveTab] = useState('grammar');
+  // Desktop KPF reader: single vs dual (two-page) layout.
+  const [pageMode, setPageMode] = useState('single');
+  // Desktop KPF reader font-size zoom (strict increase / decrease).
+  // The whole page frame is zoomed (not just text), so content never clips and
+  // image-based / fixed-layout EPUB pages also scale correctly.
+  const [fontScale, setFontScale] = useState(1);
+  const FONT_MIN = 0.8;
+  const FONT_MAX = 2;
+  
+  // Use sample structure when viewing sample, otherwise use full manuscript
+  const activeBook = viewSample && book.sample_structure ? {
+    ...book,
+    manuscript_structure: book.sample_structure,
+    structure: book.sample_structure
+  } : book;
+  
+  // Reset to first page when toggling between sample and full view
+  useEffect(() => {
+    setSpreadIndex(0);
+   
+  }, [viewSample]);
+  
+  const FONT_STEP = 0.1;
+  const decreaseFont = () => setFontScale((s) => Math.max(FONT_MIN, Math.round((s - FONT_STEP) * 10) / 10));
+  const increaseFont = () => setFontScale((s) => Math.min(FONT_MAX, Math.round((s + FONT_STEP) * 10) / 10));
+  // Native (unscaled) desktop page dimensions.
+  const DESK_PAGE_W = 440;
+  const DESK_PAGE_H = 640;
   const [selectedIssueIndex, setSelectedIssueIndex] = useState(0);
   const [approved, setApproved] = useState(false);
   const canvasRef = useRef(null);
@@ -1138,10 +1078,38 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
     setSpreadIndex(targetSpreadIndex);
   }, [spreadIndex, flipping]);
 
+  // Structural blocking checks (sync). Real formatting/grammar warnings are
+  // computed from the parsed EPUB and LanguageTool below.
   const structuralIssues = buildIssues(book);
   const [analyzedFormatting, setAnalyzedFormatting] = useState([]);
   const [grammarIssues, setGrammarIssues] = useState([]);
   const [grammarLoading, setGrammarLoading] = useState(true);
+
+  useEffect(() => {
+    const structure = book.manuscript_structure || book.structure;
+    // Formatting analysis is synchronous (reads the parsed EPUB structure).
+    setAnalyzedFormatting(analyzeManuscriptFormatting(structure));
+
+    // Grammar analysis hits the LanguageTool API — run async and abortable.
+    let cancelled = false;
+    const controller = new AbortController();
+    setGrammarIssues([]);
+    setGrammarLoading(true);
+    (async () => {
+      try {
+        const result = await checkManuscriptGrammar(structure, { signal: controller.signal });
+        if (!cancelled) setGrammarIssues(result);
+      } catch (err) {
+        if (!cancelled && err?.name !== 'AbortError') {
+          console.error('Grammar check failed:', err);
+          setGrammarIssues([]);
+        }
+      } finally {
+        if (!cancelled) setGrammarLoading(false);
+      }
+    })();
+    return () => { cancelled = true; controller.abort(); };
+  }, [book.manuscript_structure, book.structure]);
 
   const formattingIssues = [...structuralIssues, ...analyzedFormatting];
   const tabIssues = activeTab === 'formatting' ? formattingIssues : grammarIssues;
@@ -1149,15 +1117,25 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   const hasBlockingErrors = structuralIssues.filter(i => i.id === 'no_manuscript' || i.id === 'no_cover').length > 0;
 
   const highlightWords = (viewSample && selectedIssue?.word) ? [selectedIssue.word] : [];
-  const fullSpreads = buildSpreads(book, handleNavigateToSpread);
-  const SPREADS = viewSample ? buildSampleSpreads(book, highlightWords) : fullSpreads;
+  // Build spreads based on active view (sample or full manuscript)
+  // Rebuild whenever activeBook structure changes
+  const fullSpreads = useMemo(() => {
+    return buildSpreads(activeBook, handleNavigateToSpread);
+  }, [activeBook.manuscript_structure, activeBook.structure, viewSample, handleNavigateToSpread]);
+  
+  const SPREADS = fullSpreads;
   const total = SPREADS.length;
 
+  // Jump the previewer to the page where a Quality Check issue occurs.
+  // Works for both formatting and grammar issues — grammar issues carry the
+  // LanguageTool context sentence (locatorText) and the flagged word, which we
+  // use to resolve the exact content page within the chapter.
   const goToIssue = (issue) => {
     if (!issue || issue.chapterIndex == null) return;
     const map = fullSpreads.chapterSpreadIndex || {};
     const locator = fullSpreads.contentPageLocator || [];
 
+    // Find the spread whose page text (within the same chapter) contains needle.
     const findByNeedle = (needle) => {
       const n = (needle || '').toLowerCase().trim();
       if (n.length < 3) return null;
@@ -1169,13 +1147,18 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
 
     let target = null;
     if (issue.locatorText) {
+      // 1. Full context sentence (most unique anchor).
       target = findByNeedle(issue.locatorText.slice(0, 50));
+      // 2. LanguageTool often truncates context with partial words at the
+      //    boundaries — strip them and retry so the match still lands.
       if (target == null) {
         const trimmed = issue.locatorText.replace(/^\S*\s+/, '').replace(/\s+\S*$/, '');
         target = findByNeedle(trimmed.slice(0, 50));
       }
     }
+    // 3. Fall back to the flagged word.
     if (target == null) target = findByNeedle(issue.word);
+    // 4. Fall back to the chapter's first spread.
     if (target == null) target = map[issue.chapterIndex] ?? null;
     if (target == null) return;
     if (viewSample) setViewSample(false);
@@ -1228,10 +1211,13 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   const nextSpread = flipping ? SPREADS[flipping.toSpread] : null;
   const totalPages = SPREADS.reduce((max, s) => Math.max(max, s.rightPageNum ?? s.leftPageNum ?? 0), 0) || total;
   const currentPageDisplay = currentSpread.leftPageNum ?? (spreadIndex + 1);
-  const allPages = SPREADS.flatMap(spread => [
-    { render: (b) => spread.left(b), label: spread.leftLabel },
-    { render: (b) => spread.right(b), label: spread.rightLabel },
-  ]);
+  const allPages = SPREADS.flatMap(spread => {
+    const pages = [{ render: (b) => spread.left(b), label: spread.leftLabel }];
+    // Only include the right page when one actually exists — the faithful
+    // preview leaves the final page unpaired instead of adding a blank verso.
+    if (spread.right) pages.push({ render: (b) => spread.right(b), label: spread.rightLabel });
+    return pages;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
@@ -1245,36 +1231,48 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <BookOpen className="w-4 h-4 text-slate-500" />
             <span className="text-sm font-semibold text-slate-800">eBook Preview</span>
-            {approved ? (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Approved
-              </span>
-            ) : hasBlockingErrors ? (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">
-                <AlertCircle className="w-3.5 h-3.5" />
-                {formattingIssues.length} critical issue{formattingIssues.length !== 1 ? 's' : ''} must be fixed
-              </span>
-            ) : formattingIssues.length > 0 ? (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">
-                <AlertCircle className="w-3.5 h-3.5" />
-                {formattingIssues.length} formatting issue{formattingIssues.length !== 1 ? 's' : ''}
-              </span>
-            ) : grammarIssues.length > 0 ? (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                {grammarIssues.length} grammar warning{grammarIssues.length !== 1 ? 's' : ''} — optional to fix
-              </span>
-            ) : grammarLoading ? (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking grammar…
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
-                <CheckCircle2 className="w-3.5 h-3.5" /> All clear
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Font-size spinner (desktop KPF reader only) */}
+            {viewMode === 'desktop' && (
+              <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-1 py-1">
+                <button
+                  onClick={decreaseFont}
+                  disabled={fontScale <= FONT_MIN}
+                  title="Decrease font size"
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent">
+                  <span className="text-xs font-bold leading-none">A−</span>
+                </button>
+                <span className="text-[11px] font-medium text-slate-500 tabular-nums w-9 text-center select-none">
+                  {Math.round(fontScale * 100)}%
+                </span>
+                <button
+                  onClick={increaseFont}
+                  disabled={fontScale >= FONT_MAX}
+                  title="Increase font size"
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent">
+                  <span className="text-sm font-bold leading-none">A+</span>
+                </button>
+              </div>
+            )}
+            {/* Single / Dual page layout tabs (desktop KPF reader only) */}
+            {viewMode === 'desktop' && (
+              <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1">
+                <button
+                  onClick={() => setPageMode('single')}
+                  className={cn('px-2.5 py-1 rounded-md text-xs font-semibold transition-colors',
+                    pageMode === 'single' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100')}>
+                  Single
+                </button>
+                <button
+                  onClick={() => setPageMode('dual')}
+                  className={cn('px-2.5 py-1 rounded-md text-xs font-semibold transition-colors',
+                    pageMode === 'dual' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100')}>
+                  Dual
+                </button>
+              </div>
+            )}
+            {/* View Sample Chapter toggle */}
             <button
               onClick={() => { setViewSample(v => !v); setSpreadIndex(0); }}
               className={cn('flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-all',
@@ -1286,7 +1284,8 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
               <span className="hidden sm:inline">{viewSample ? 'View Full Book' : 'View Sample Chapter'}</span>
               <span className="sm:hidden">{viewSample ? 'Full' : 'Sample'}</span>
             </button>
-            <button
+            {/* Approve button */}
+            {/* <button
               onClick={() => {
                 setApproved(true);
                 if (onApprove) onApprove();
@@ -1296,7 +1295,7 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
             >
               <ShieldCheck className="w-4 h-4 shrink-0" />
               Approve
-            </button>
+            </button> */}
             <button onClick={onClose}
               className="w-8 h-8 shrink-0 rounded-lg bg-white hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors border border-slate-200">
               <X className="w-4 h-4" />
@@ -1304,139 +1303,14 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
           </div>
         </div>
 
-        {/* ── Body: sidebar + canvas ── */}
+        {/* ── Body: canvas ── */}
         <div className="flex flex-1 overflow-hidden">
-
-          {/* ── Quality Check Sidebar ── */}
-          <div className="w-[200px] lg:w-[260px] shrink-0 flex flex-col overflow-hidden bg-slate-50 border-r border-slate-200">
-            <div className="px-4 pt-4 pb-3 border-b border-slate-200 bg-white">
-              <div className="flex items-center justify-between mb-0.5">
-                <p className="text-slate-800 font-semibold text-sm">Quality Check</p>
-                {(formattingIssues.length + grammarIssues.length) > 0 ? (
-                  <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-                    {formattingIssues.length + grammarIssues.length} issues
-                  </span>
-                ) : grammarLoading ? (
-                  <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <Loader2 className="w-2.5 h-2.5 animate-spin" /> Checking…
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-semibold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <CheckCircle2 className="w-2.5 h-2.5" /> All clear
-                  </span>
-                )}
-              </div>
-              <p className="text-slate-400 text-[11px]">Pre-submission analysis</p>
-            </div>
-
-            <div className="flex border-b border-slate-200 bg-white">
-              <button
-                onClick={() => { setActiveTab('formatting'); setSelectedIssueIndex(0); }}
-                className={cn('flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors border-b-2',
-                  activeTab === 'formatting' ? 'border-red-500 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-                )}>
-                <AlertCircle className="w-3 h-3" /> Formatting
-                {formattingIssues.length > 0 && (
-                  <span className={cn('text-[10px] font-bold min-w-[16px] h-4 px-1 rounded flex items-center justify-center',
-                    activeTab === 'formatting' ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600')}>
-                    {formattingIssues.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => { setActiveTab('grammar'); setSelectedIssueIndex(0); }}
-                className={cn('flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors border-b-2',
-                  activeTab === 'grammar' ? 'border-amber-500 text-amber-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-                )}>
-                <AlertTriangle className="w-3 h-3" /> Grammar
-                {grammarLoading ? (
-                  <Loader2 className="w-3 h-3 animate-spin text-amber-500" />
-                ) : grammarIssues.length > 0 && (
-                  <span className={cn('text-[10px] font-bold min-w-[16px] h-4 px-1 rounded flex items-center justify-center',
-                    activeTab === 'grammar' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600')}>
-                    {grammarIssues.length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-100">
-              {activeTab === 'formatting' ? (
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <div className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                  <span className="font-medium text-red-600">Critical</span>
-                  <span className="text-slate-400">— must fix to proceed</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                  <span className="font-medium text-amber-600">Warning</span>
-                  <span className="text-slate-400">— optional to fix</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {activeTab === 'grammar' && grammarLoading ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
-                  <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-                  <p className="text-xs text-slate-500 font-medium">Checking grammar…</p>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Analyzing your manuscript content. This may take a moment.
-                  </p>
-                </div>
-              ) : tabIssues.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
-                  <CheckCircle2 className="w-8 h-8 text-green-400" />
-                  <p className="text-xs text-slate-400 font-medium">No {activeTab} issues found.</p>
-                </div>
-              ) : (
-                <div className="p-3 space-y-1.5">
-                  {tabIssues.map((issue, idx) => (
-                    <button
-                      key={issue.id}
-                      onClick={() => { setSelectedIssueIndex(idx); goToIssue(issue); }}
-                      className={cn(
-                        'w-full text-left flex items-start gap-2.5 rounded-lg px-3 py-2.5 transition-all border',
-                        selectedIssueIndex === idx
-                          ? activeTab === 'formatting' ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-amber-50 border-amber-200 shadow-sm'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
-                      )}>
-                      <div className={cn('w-1.5 h-1.5 rounded-full mt-[5px] shrink-0',
-                        activeTab === 'formatting' ? 'bg-red-500' : 'bg-amber-400')} />
-                      <p className={cn('text-[11px] font-medium leading-snug',
-                        selectedIssueIndex === idx
-                          ? activeTab === 'formatting' ? 'text-red-700' : 'text-amber-700'
-                          : 'text-slate-700')}>
-                        {issue.title}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {selectedIssue && (
-              <div className="border-t border-slate-200 bg-white px-4 py-3 space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Details</p>
-                <p className="text-[11px] leading-relaxed text-slate-600">{selectedIssue.desc}</p>
-                {selectedIssue.word && (
-                  <div className="bg-slate-100 border border-slate-200 rounded-md px-3 py-1.5">
-                    <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Flagged word</p>
-                    <code className="text-[11px] font-mono text-slate-700 font-semibold"
-                      style={{ textDecoration: 'underline wavy #e53e3e', textDecorationSkipInk: 'none' }}>
-                      {selectedIssue.word}
-                    </code>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
           {/* ── Center canvas ── */}
           <div ref={canvasRef} className="flex-1 flex flex-col items-center justify-center gap-3 relative overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200">
 
             {viewMode !== 'desktop' ? (
+              /* ── Tablet / Mobile: device mockup ── */
               <div className="w-full h-full flex items-center justify-center overflow-hidden">
                 <div style={{ transform: `scale(${canvasScale})`, transformOrigin: 'center center', transition: 'transform 0.2s ease' }}>
                   {viewMode === 'tablet' ? (
@@ -1477,6 +1351,7 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
                       <div className="mt-2 w-20 h-1 bg-slate-600 rounded-full opacity-60" />
                     </div>
                   ) : (
+                    /* Mobile */
                     <div className="relative flex flex-col items-center" style={{ filter: 'drop-shadow(0 24px 48px rgba(0,0,0,0.35))' }}>
                       <div className="relative bg-slate-900 rounded-[44px] p-2.5"
                         style={{ width: 280, border: '3px solid #0f172a', boxShadow: 'inset 0 0 0 2px #1e293b' }}>
@@ -1524,102 +1399,55 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
                 </div>
               </div>
             ) : (
-              /* ── Desktop: two-page spread with flip animation ── */
-              <>
-                <div className="flex items-center z-10 w-full justify-center px-4 h-[74vh]">
-                  <button onClick={() => navigate('prev')} disabled={spreadIndex === 0 || !!flipping}
-                    className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-white transition-all disabled:opacity-20 bg-white/70 shadow-sm border border-slate-200">
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="relative"
-                      style={{
-                        width: BOOK_W, height: BOOK_H,
-                        transform: `scale(${canvasScale})`, transformOrigin: 'center center',
-                        transition: 'transform 0.2s ease',
-                        filter: 'drop-shadow(0 12px 32px rgba(0,0,0,0.24))',
-                      }}>
-                      <div className="absolute inset-0 rounded-sm overflow-hidden border border-slate-300 bg-white">
-                        {displaySpread.fullWidth ? (
-                          <div className="w-full h-full">
-                            {displaySpread.left(book)}
+              /* ── Desktop: KPF-style vertical scroll (Amazon Kindle-like) ──
+                 The whole page frame is zoomed by fontScale so nothing clips
+                 and image-based pages scale too. Supports single & dual layout. */
+              <div className="w-full h-full overflow-auto flex flex-col gap-6 py-8 px-4">
+                {pageMode === 'single'
+                  ? allPages.map((page, i) => (
+                      <div key={i} className="shrink-0 mx-auto flex flex-col items-center gap-1.5">
+                        <div
+                          className="bg-white rounded-sm overflow-hidden border border-slate-300"
+                          style={{ width: DESK_PAGE_W * fontScale, height: DESK_PAGE_H * fontScale, boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }}
+                        >
+                          <div style={{ width: DESK_PAGE_W, height: DESK_PAGE_H, transform: `scale(${fontScale})`, transformOrigin: 'top left' }}>
+                            {page.render(book)}
                           </div>
-                        ) : (
-                          <div className="flex w-full h-full">
-                            <div className="flex-1 relative overflow-hidden">
-                              {displaySpread.left(book)}
-                              {showBleed && spreadIndex > 0 && <BleedGuide side="left" />}
-                              {showMargins && spreadIndex > 0 && <MarginGuide side="left" />}
-                            </div>
-                            <div className="w-px shrink-0 relative z-10"
-                              style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.3) 100%)', boxShadow: '-4px 0 12px rgba(0,0,0,0.25), 4px 0 12px rgba(0,0,0,0.25)' }} />
-                            <div className="flex-1 relative overflow-hidden">
-                              {displaySpread.right(book)}
-                              {showBleed && spreadIndex > 0 && <BleedGuide side="right" />}
-                              {showMargins && spreadIndex > 0 && <MarginGuide side="right" />}
-                            </div>
-                          </div>
-                        )}
-                        {flipping && nextSpread && (
-                          <FlipLeaf
-                            direction={flipping.direction}
-                            fromContent={
-                              <div className="flex w-full h-full" style={{ width: BOOK_W, height: BOOK_H }}>
-                                <div className="flex-1">{displaySpread.left(book)}</div>
-                                <div className="flex-1">{displaySpread.right(book)}</div>
-                              </div>
-                            }
-                            toContent={
-                              <div className="flex w-full h-full" style={{ width: BOOK_W, height: BOOK_H }}>
-                                <div className="flex-1">{nextSpread.left(book)}</div>
-                                <div className="flex-1">{nextSpread.right(book)}</div>
-                              </div>
-                            }
-                            pageW={BOOK_W / 2}
-                            pageH={BOOK_H}
-                          />
-                        )}
+                        </div>
+                        <span className="text-[10px] text-slate-400 tabular-nums text-center truncate" style={{ maxWidth: DESK_PAGE_W * fontScale }}>
+                          {page.label ? `${page.label} · ` : ''}Page {i + 1} of {allPages.length}
+                        </span>
                       </div>
-                    </div>
-                  </div>
-
-                  <button onClick={() => navigate('next')} disabled={spreadIndex === total - 1 || !!flipping}
-                    className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-white transition-all disabled:opacity-20 bg-white/70 shadow-sm border border-slate-200">
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Dots nav */}
-                <div className="flex flex-col items-center gap-1.5 z-10">
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => dotsRef.current?.scrollBy({ left: -150, behavior: 'smooth' })}
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 bg-white/80 border border-slate-200">
-                      <ChevronLeft className="w-3 h-3" />
-                    </button>
-                    <div ref={dotsRef} className="flex items-center gap-1.5 overflow-x-hidden px-1 max-w-[300px]"
-                      style={{ scrollbarWidth: 'none' }}>
-                      {SPREADS.map((_, i) => (
-                        <button key={i}
-                          onClick={() => { if (i !== spreadIndex && !flipping) { playPageFlipSound(); setSpreadIndex(i); } }}
-                          className={cn('rounded-full transition-all duration-300 shrink-0',
-                            i === spreadIndex ? 'w-5 h-1.5 bg-indigo-500' : 'w-1.5 h-1.5 bg-slate-400 hover:bg-slate-600'
+                    ))
+                  : Array.from({ length: Math.ceil(allPages.length / 2) }).map((_, r) => {
+                      const leftPage = allPages[r * 2];
+                      const rightPage = allPages[r * 2 + 1];
+                      const pageFrame = (page) => (
+                        <div
+                          className="bg-white overflow-hidden border border-slate-300"
+                          style={{ width: DESK_PAGE_W * fontScale, height: DESK_PAGE_H * fontScale }}
+                        >
+                          {page && (
+                            <div style={{ width: DESK_PAGE_W, height: DESK_PAGE_H, transform: `scale(${fontScale})`, transformOrigin: 'top left' }}>
+                              {page.render(book)}
+                            </div>
                           )}
-                        />
-                      ))}
-                    </div>
-                    <button onClick={() => dotsRef.current?.scrollBy({ left: 150, behavior: 'smooth' })}
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 bg-white/80 border border-slate-200">
-                      <ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <p className="text-slate-500 text-[10px] font-medium text-center truncate max-w-[280px]">
-                    {[currentSpread.leftLabel, currentSpread.rightLabel].filter(Boolean).join(' · ') || `Spread ${spreadIndex + 1}`}
-                    <span className="text-slate-300 mx-1.5">·</span>
-                    <span className="text-slate-400">← → keys · Esc to close</span>
-                  </p>
-                </div>
-              </>
+                        </div>
+                      );
+                      return (
+                        <div key={r} className="shrink-0 mx-auto flex flex-col items-center gap-1.5">
+                          <div className="flex" style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.18)' }}>
+                            {pageFrame(leftPage)}
+                            <div className="w-px shrink-0 bg-slate-300" />
+                            {pageFrame(rightPage)}
+                          </div>
+                          <span className="text-[10px] text-slate-400 tabular-nums text-center truncate" style={{ maxWidth: DESK_PAGE_W * 2 * fontScale }}>
+                            Pages {r * 2 + 1}{rightPage ? `–${r * 2 + 2}` : ''} of {allPages.length}
+                          </span>
+                        </div>
+                      );
+                    })}
+              </div>
             )}
           </div>
         </div>
@@ -1627,23 +1455,7 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
         {/* ── Bottom toolbar ── */}
         <div className="shrink-0 flex flex-wrap items-center justify-between px-3 sm:px-5 py-2.5 sm:py-3 gap-y-2 gap-x-4 bg-white border-t border-slate-100">
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => setShowBleed(v => !v)}
-              className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border transition-colors',
-                showBleed ? 'bg-red-50 border-red-300 text-red-600 hover:bg-red-100' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
-              )}>
-              <span style={{ fontSize: 9, border: showBleed ? '1.5px dashed rgba(239,68,68,0.8)' : '1.5px dashed #aaa', borderRadius: 2, padding: '1px 3px' }}>B</span>
-              {showBleed ? 'Hide Bleed' : 'Show Bleed'}
-            </button>
-            <button
-              onClick={() => setShowMargins(v => !v)}
-              className={cn('flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border transition-colors',
-                showMargins ? 'bg-blue-50 border-blue-300 text-blue-600 hover:bg-blue-100' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
-              )}>
-              <span style={{ fontSize: 9, border: showMargins ? '1.5px dashed rgba(59,130,246,0.8)' : '1.5px dashed #aaa', borderRadius: 2, padding: '1px 3px' }}>M</span>
-              {showMargins ? 'Hide Margin' : 'Show Margin'}
-            </button>
-            <span className="text-xs text-slate-400 tabular-nums">{currentPageDisplay} / {totalPages}</span>
+            <span className="text-xs text-slate-400 tabular-nums">{totalPages} pages</span>
           </div>
           <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
             <button onClick={() => setViewMode('desktop')}

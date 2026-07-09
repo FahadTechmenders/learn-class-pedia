@@ -24,6 +24,7 @@ import {
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
 import BookPreviewer from '../../../../components/EpubReaderComponent';
+import { parseManuscript } from '../../../../services/manuscript.parser';
 
 const BookManagement = () => {
   const { showSuccess, showError } = useToast();
@@ -50,6 +51,7 @@ const BookManagement = () => {
   const [showBookModal, setShowBookModal] = useState(false);
   const [epubReaderBook, setEpubReaderBook] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [parsingManuscript, setParsingManuscript] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [showReasonModal, setShowReasonModal] = useState(false);
@@ -596,22 +598,79 @@ const BookManagement = () => {
                         </button>
                       )}
                       <button
-                        onClick={() => {
+                        onClick={async () => {
+                         
+                          
                           const fullUrl = getFullManuscriptUrl(book.manuscriptFilePath);
-                          setEpubReaderBook({ 
-                            url: fullUrl, 
-                            title: book.title,
-                            author_name: book.authorName || `${book.authorFirstName} ${book.authorLastName}`,
-                            cover_url: book.frontCover,
-                            description: book.description,
-                            filename: book.manuscriptFileName || 'manuscript.epub',
-                            structure: book.manuscriptStructure || null,
-                            manuscript_url: fullUrl,
-                            manuscript_filename: book.manuscriptFileName || 'manuscript.epub'
-                          });
+                          const sampleUrl = book.sampleFilePath ? getFullManuscriptUrl(book.sampleFilePath) : null;
+                          
+                          // Extract actual filenames from the file paths
+                          const manuscriptFilename = book.manuscriptFilePath ? book.manuscriptFilePath.split('/').pop() : 'manuscript.epub';
+                          const sampleFilename = book.sampleFilePath ? book.sampleFilePath.split('/').pop() : null;
+  
+                          
+                          setParsingManuscript(true);
+                          
+                          try {
+                            let structure = book.manuscriptStructure;
+                            let sampleStructure = null;
+                            console.log('Existing structure:', structure);
+                            
+                            // Parse manuscript if not already parsed
+                            if (!structure && fullUrl) {
+                              console.log('Parsing full manuscript...');
+                              try {
+                                structure = await parseManuscript(fullUrl, manuscriptFilename);
+                              } catch (parseError) {
+                                console.error('Failed to parse manuscript:', parseError);
+                                showError(`Failed to parse manuscript: ${parseError.message}`);
+                              }
+                            } else if (structure) {
+                              console.log('Using existing structure with', structure?.chapters?.length || 0, 'chapters');
+                            }
+                            if (sampleUrl && sampleFilename) {
+                              console.log('=== Starting Sample Parse ===');
+                              
+                              try {
+                                sampleStructure = await parseManuscript(sampleUrl, sampleFilename);
+                              } catch (parseError) {
+                                console.error('❌ Failed to parse sample:', parseError);
+                                console.error('Error details:', parseError.message);
+                                console.error('Stack:', parseError.stack);
+                                // Don't show error to user, just log it
+                              }
+                            } else {
+                              console.warn('⚠️ No sample file path available');
+                            }
+                            
+                            const bookData = { 
+                              url: fullUrl, 
+                              title: book.title,
+                              subtitle: book.subTitle,
+                              author_name: `${book.authorFirstName} ${book.authorLastName}`,
+                              cover_url: book.frontCover,
+                              description: book.bookDescription,
+                              filename: manuscriptFilename,
+                              structure: structure,
+                              manuscript_url: fullUrl,
+                              manuscript_filename: manuscriptFilename,
+                              manuscript_structure: structure,
+                              sample_url: sampleUrl,
+                              sample_filename: sampleFilename,
+                              sample_structure: sampleStructure,
+                              samplePageStart: book.samplePageStart,
+                              samplePageEnd: book.samplePageEnd,
+                              totalPages: book.totalPages
+                            };
+                            
+                         
+                            setEpubReaderBook(bookData);
+                          } finally {
+                            setParsingManuscript(false);
+                          }
                         }}
-                        disabled={!book.manuscriptFilePath}
-                        title={book.manuscriptFilePath ? "Read book" : "Manuscript not available"}
+                       
+                        title={book.manuscriptFilePath ? (parsingManuscript ? "Parsing manuscript..." : "Read book") : "Manuscript not available"}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
                       >
                         <BookOpen className="w-3.5 h-3.5" />
