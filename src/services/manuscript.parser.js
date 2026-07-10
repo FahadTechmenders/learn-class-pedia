@@ -1,4 +1,5 @@
 import ePub from 'epubjs';
+import { API_CONFIG, ENDPOINTS } from '../config/api';
 
 /**
  * Parse EPUB file and extract structured content
@@ -6,7 +7,42 @@ import ePub from 'epubjs';
 export async function parseEpub(url) {
   
   try {
-    const book = ePub(url, { openAs: 'epub' });
+    // Use backend API to fetch EPUB file (bypasses CORS)
+    // The backend /api/Book/epub endpoint proxies the request
+    let blobUrl;
+    try {
+      // Construct the API endpoint URL
+      const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_EPUB(url)}`;
+      
+      console.log('Fetching EPUB from backend API:', apiUrl);
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      blobUrl = URL.createObjectURL(blob);
+      console.log('EPUB blob created successfully');
+    } catch (fetchError) {
+      console.error('Backend API fetch error:', fetchError);
+      // Fallback: try fetching directly from CDN (might fail due to CORS)
+      console.log('Attempting direct fetch from CDN as fallback...');
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const blob = await response.blob();
+        blobUrl = URL.createObjectURL(blob);
+      } catch (directFetchError) {
+        console.error('Direct fetch also failed:', directFetchError);
+        // Last resort: try using the URL directly (will likely fail)
+        blobUrl = url;
+      }
+    }
+    
+    const book = ePub(blobUrl, { openAs: 'epub' });
     await book.ready;
     
 
@@ -77,6 +113,11 @@ export async function parseEpub(url) {
       }
     }
 
+    // Clean up blob URL if we created one
+    if (blobUrl !== url) {
+      URL.revokeObjectURL(blobUrl);
+    }
+    
     return {
       chapters: chapters,
       metadata: {
@@ -87,6 +128,10 @@ export async function parseEpub(url) {
     };
   } catch (error) {
     console.error('EPUB parsing error:', error);
+    // Provide more helpful error message
+    if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
+      throw new Error('Unable to load EPUB file. Please check your internet connection or contact support.');
+    }
     throw new Error(`Failed to parse EPUB: ${error.message}`);
   }
 }
@@ -102,8 +147,40 @@ export async function parsePdf(url) {
     // Use unpkg CDN for worker with matching version
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@6.1.200/legacy/build/pdf.worker.min.mjs';
     
-    // getDocument expects an object with url property
-    const loadingTask = pdfjsLib.getDocument({ url: url });
+    // Fetch the PDF file as array buffer using backend API to bypass CORS restrictions
+    let pdfData;
+    try {
+      // Use backend API to fetch PDF
+      const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_PDF(url)}`;
+      console.log('Fetching PDF from backend API:', apiUrl);
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      pdfData = { data: arrayBuffer };
+      console.log('PDF fetched successfully from backend API');
+    } catch (fetchError) {
+      console.error('Backend API fetch error:', fetchError);
+      // Fallback: try fetching directly from CDN (might fail due to CORS)
+      console.log('Attempting direct fetch from CDN as fallback...');
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        pdfData = { data: arrayBuffer };
+      } catch (directFetchError) {
+        console.error('Direct fetch also failed:', directFetchError);
+        // Last resort: try using the URL directly (will likely fail)
+        pdfData = { url: url };
+      }
+    }
+    
+    // getDocument expects an object with url or data property
+    const loadingTask = pdfjsLib.getDocument(pdfData);
     const pdf = await loadingTask.promise;
     
     const chapters = [];
@@ -203,6 +280,10 @@ export async function parsePdf(url) {
     };
   } catch (error) {
     console.error('PDF parsing error:', error);
+    // Provide more helpful error message
+    if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
+      throw new Error('Unable to load PDF file. Please check your internet connection or contact support.');
+    }
     throw new Error(`Failed to parse PDF: ${error.message}`);
   }
 }
@@ -215,9 +296,29 @@ export async function parseDocx(url) {
   try {
     const mammoth = await import('mammoth');
     
-    // Fetch the DOCX file as array buffer
-    const response = await fetch(url);
-    const arrayBuffer = await response.arrayBuffer();
+    // Fetch the DOCX file as array buffer using backend API to bypass CORS restrictions
+    let arrayBuffer;
+    try {
+      // Use backend API to fetch DOCX
+      const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_DOCX(url)}`;
+      console.log('Fetching DOCX from backend API:', apiUrl);
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      arrayBuffer = await response.arrayBuffer();
+      console.log('DOCX fetched successfully from backend API');
+    } catch (fetchError) {
+      console.error('Backend API fetch error:', fetchError);
+      // Fallback: try fetching directly from CDN (might fail due to CORS)
+      console.log('Attempting direct fetch from CDN as fallback...');
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      arrayBuffer = await response.arrayBuffer();
+    }
     
     
     // Convert DOCX to HTML
@@ -308,6 +409,10 @@ export async function parseDocx(url) {
     };
   } catch (error) {
     console.error('DOCX parsing error:', error);
+    // Provide more helpful error message
+    if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
+      throw new Error('Unable to load DOCX file. Please check your internet connection or contact support.');
+    }
     throw new Error(`Failed to parse DOCX: ${error.message}`);
   }
 }

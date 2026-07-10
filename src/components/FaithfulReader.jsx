@@ -3,6 +3,7 @@ import ePub from 'epubjs';
 import { renderAsync } from 'docx-preview';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2, FileText, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { API_CONFIG, ENDPOINTS } from '../config/api';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
@@ -38,8 +39,41 @@ async function getArrayBuffer(book) {
   if (file && typeof file.arrayBuffer === 'function') {
     return await file.arrayBuffer();
   }
+  
   const url = book?.manuscript_url || book?.manuscriptUrl;
   if (url) {
+    // Determine file extension
+    const filename = book?.manuscript_filename || book?.manuscriptFilename || '';
+    const ext = (filename.split('.').pop() || '').toLowerCase();
+    
+    // Use backend API for all supported file types to bypass CORS
+    let apiEndpoint = null;
+    if (ext === 'epub') {
+      apiEndpoint = ENDPOINTS.BOOK_EPUB(url);
+    } else if (ext === 'pdf') {
+      apiEndpoint = ENDPOINTS.BOOK_PDF(url);
+    } else if (ext === 'docx' || ext === 'doc') {
+      apiEndpoint = ENDPOINTS.BOOK_DOCX(url);
+    }
+    
+    if (apiEndpoint) {
+      try {
+        const apiUrl = `${API_CONFIG.BASE_URL}${apiEndpoint}`;
+        console.log(`[FaithfulReader] Fetching ${ext.toUpperCase()} via backend API:`, apiUrl);
+        const res = await fetch(apiUrl);
+        if (!res.ok) throw new Error(`Backend API error: ${res.status}`);
+        console.log(`[FaithfulReader] ${ext.toUpperCase()} fetched successfully from backend API`);
+        return await res.arrayBuffer();
+      } catch (apiError) {
+        console.warn('[FaithfulReader] Backend API failed, trying direct fetch:', apiError);
+        // Fallback to direct fetch (may fail due to CORS)
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Failed to fetch manuscript (${res.status})`);
+        return await res.arrayBuffer();
+      }
+    }
+    
+    // For unsupported file types, fetch directly
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to fetch manuscript (${res.status})`);
     return await res.arrayBuffer();

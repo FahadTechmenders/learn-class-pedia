@@ -216,6 +216,9 @@ export const ENDPOINTS = {
   BOOK_STATUS: '/Book/BookStatus',
   BOOK_UPDATE_STATUS: (id) => `/Book/${id}/status`,
   BOOK_ISSUES: (id) => `/Book/${id}/issues`,
+  BOOK_EPUB: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,
+  BOOK_PDF: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,
+  BOOK_DOCX: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,
 
   // Book Category Management endpoints
   BOOK_CATEGORY_ALL: '/BookCategory',
