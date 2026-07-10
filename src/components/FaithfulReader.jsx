@@ -251,20 +251,13 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd, p
   const scrollRef = useRef(null);
   const dual = pageMode === 'dual';
   const [status, setStatus] = useState('loading');
-  const prevPageWidthRef = useRef(pageWidth);
-  const scrollTimeoutRef = useRef(null);
+  const basePageWidth = 720; // Fixed base width
+  const scale = pageWidth / basePageWidth;
 
   useEffect(() => {
     if (!pagesRef.current || !arrayBuffer) return;
     let cancelled = false;
     const container = pagesRef.current;
-    
-    // Save scroll position before re-rendering
-    const scrollContainer = scrollRef.current;
-    const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
-    const savedScrollHeight = scrollContainer ? scrollContainer.scrollHeight : 0;
-    const isZoomChange = prevPageWidthRef.current !== pageWidth && prevPageWidthRef.current !== undefined;
-    
     container.innerHTML = '';
     (async () => {
       try {
@@ -278,39 +271,28 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd, p
           const canvas = document.createElement('canvas');
           canvas.width = viewport.width;
           canvas.height = viewport.height;
-          canvas.style.width = typeof pageWidth === 'number' ? `${pageWidth}px` : pageWidth;
+          canvas.style.width = `${basePageWidth}px`;
           canvas.style.maxWidth = '100%';
           canvas.style.height = 'auto';
           canvas.className = 'bg-white shadow-xl rounded-sm';
           container.appendChild(canvas);
           await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-          
-          // Restore scroll position immediately after each page renders (for zoom changes)
-          if (isZoomChange && scrollContainer && savedScrollHeight > 0 && n === from) {
-            const ratio = savedScrollTop / savedScrollHeight;
-            const newScrollTop = ratio * scrollContainer.scrollHeight;
-            scrollContainer.scrollTop = newScrollTop;
-          }
-          
           if (n === 1 && !cancelled) setStatus('ready');
         }
-        if (!cancelled) {
-          setStatus('ready');
-          prevPageWidthRef.current = pageWidth;
-        }
+        if (!cancelled) setStatus('ready');
       } catch (e) {
         console.error('[PDF] render error', e);
         if (!cancelled) setStatus('error');
       }
     })();
     return () => { cancelled = true; };
-  }, [arrayBuffer, sampleStart, sampleEnd, pageWidth]);
+  }, [arrayBuffer, sampleStart, sampleEnd]);
 
   return (
     <div ref={scrollRef} className="w-full h-full overflow-auto bg-slate-200">
-      <div className="flex flex-col items-center gap-5 py-6 px-3">
+      <div className="flex flex-col items-center gap-5 py-6 px-3" style={{ transform: `scale(${scale})`, transformOrigin: 'top center', transition: 'transform 0.15s ease-out' }}>
         {coverUrl && !(sampleStart > 1) && (
-          <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: '100%' }} />
+          <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: basePageWidth, maxWidth: '100%' }} />
         )}
         {status === 'loading' && <CenterMessage icon={Loader2} spin title="Rendering PDF…" />}
         {status === 'error' && <CenterMessage icon={AlertCircle} title="Could not render this PDF" />}
@@ -335,10 +317,6 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
     const sc = scrollRef.current;
     if (!el || !sc) return;
     
-    // Save absolute scroll position before zoom
-    const savedScrollTop = sc.scrollTop;
-    const savedScrollHeight = sc.scrollHeight;
-    
     const natural = naturalWRef.current;
     let z = fontScale || 1;
     if (natural > 0) {
@@ -347,15 +325,10 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
       z = fit * (fontScale || 1);
     }
     
-    // Apply zoom
-    el.style.setProperty('zoom', String(z));
-    
-    // Restore scroll position immediately based on ratio
-    if (savedScrollHeight > 0) {
-      const ratio = savedScrollTop / savedScrollHeight;
-      const newScrollTop = ratio * sc.scrollHeight;
-      sc.scrollTop = newScrollTop;
-    }
+    // Use CSS transform instead of zoom for smoother scaling
+    el.style.setProperty('transform', `scale(${z})`);
+    el.style.setProperty('transform-origin', 'top center');
+    el.style.setProperty('transition', 'transform 0.15s ease-out');
   }, [fontScale, frameWidth]);
 
   const applyCrop = useCallback(() => {
