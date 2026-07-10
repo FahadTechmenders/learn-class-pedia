@@ -597,10 +597,11 @@ const BookManagement = () => {
                           <AlertTriangle className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      <button
+                     
+                       <button
+                       disabled={book.bookStatusId === 1 || !book.manuscriptFilePath }
                         onClick={async () => {
-                         
-                          
+                            
                           const fullUrl = getFullManuscriptUrl(book.manuscriptFilePath);
                           const sampleUrl = book.sampleFilePath ? getFullManuscriptUrl(book.sampleFilePath) : null;
                           
@@ -671,6 +672,7 @@ const BookManagement = () => {
                       >
                         <BookOpen className="w-3.5 h-3.5" />
                       </button>
+                     
                     </div>
                   </td>
                 </tr>
