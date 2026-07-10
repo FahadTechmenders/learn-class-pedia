@@ -4,13 +4,11 @@ import ePub from 'epubjs';
  * Parse EPUB file and extract structured content
  */
 export async function parseEpub(url) {
-  console.log('Starting EPUB parsing for:', url);
   
   try {
     const book = ePub(url, { openAs: 'epub' });
     await book.ready;
     
-    console.log('EPUB book loaded, metadata:', book.packaging?.metadata);
 
     const chapters = [];
     let chapterIndex = 0;
@@ -19,12 +17,9 @@ export async function parseEpub(url) {
     const navigation = book.navigation;
     const spine = book.spine;
     
-    console.log('Spine items count:', spine.items?.length || 0);
-    
     // Iterate through spine items
     for (const item of spine.items) {
       try {
-        console.log(`Loading chapter ${chapterIndex}:`, item.href);
         
         // Load the section content
         const section = book.spine.get(item.href);
@@ -44,8 +39,6 @@ export async function parseEpub(url) {
         const elements = [];
         const body = doc.body || doc.querySelector('body') || doc;
         const contentNodes = body.querySelectorAll('p, h1, h2, h3, h4, h5, h6, blockquote, li, img');
-        
-        console.log(`Found ${contentNodes.length} content nodes in chapter ${chapterIndex}`);
         
         contentNodes.forEach((node) => {
           const tagName = node.tagName.toLowerCase();
@@ -74,7 +67,6 @@ export async function parseEpub(url) {
             title: title,
             elements: elements
           });
-          console.log(`Chapter ${chapterIndex} parsed: "${title}" with ${elements.length} elements`);
           chapterIndex++;
         }
         
@@ -84,8 +76,6 @@ export async function parseEpub(url) {
         console.error(`Failed to parse chapter ${chapterIndex}:`, err);
       }
     }
-
-    console.log(`EPUB parsing complete. Total chapters: ${chapters.length}`);
 
     return {
       chapters: chapters,
@@ -105,7 +95,6 @@ export async function parseEpub(url) {
  * Parse PDF file using pdfjs-dist
  */
 export async function parsePdf(url) {
-  console.log('Starting PDF parsing for:', url);
   
   try {
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf');
@@ -116,8 +105,6 @@ export async function parsePdf(url) {
     // getDocument expects an object with url property
     const loadingTask = pdfjsLib.getDocument({ url: url });
     const pdf = await loadingTask.promise;
-    
-    console.log('PDF loaded, pages:', pdf.numPages);
     
     const chapters = [];
     let currentChapter = {
@@ -202,8 +189,6 @@ export async function parsePdf(url) {
       chapters.push(currentChapter);
     }
     
-    console.log(`PDF parsing complete. Total chapters: ${chapters.length}`);
-    
     return {
       chapters: chapters.length > 0 ? chapters : [{
         chapterIndex: 0,
@@ -226,7 +211,6 @@ export async function parsePdf(url) {
  * Parse DOCX file using mammoth
  */
 export async function parseDocx(url) {
-  console.log('Starting DOCX parsing for:', url);
   
   try {
     const mammoth = await import('mammoth');
@@ -235,13 +219,11 @@ export async function parseDocx(url) {
     const response = await fetch(url);
     const arrayBuffer = await response.arrayBuffer();
     
-    console.log('DOCX file loaded, size:', arrayBuffer.byteLength);
     
     // Convert DOCX to HTML
     const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
     const html = result.value;
     
-    console.log('DOCX converted to HTML, length:', html.length);
     
     // Parse HTML into structured content
     const parser = new DOMParser();
@@ -311,8 +293,6 @@ export async function parseDocx(url) {
     if (currentChapter.elements.length > 0) {
       chapters.push(currentChapter);
     }
-    
-    console.log(`DOCX parsing complete. Total chapters: ${chapters.length}`);
     
     return {
       chapters: chapters.length > 0 ? chapters : [{
