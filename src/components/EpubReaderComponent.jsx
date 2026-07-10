@@ -1052,7 +1052,9 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   const activeBook = viewSample && book.sample_structure ? {
     ...book,
     manuscript_structure: book.sample_structure,
-    structure: book.sample_structure
+    structure: book.sample_structure,
+    manuscript_url: book.sample_url || book.manuscript_url,
+    manuscript_filename: book.sample_filename || book.manuscript_filename
   } : book;
   
   // Reset to first page when toggling between sample and full view

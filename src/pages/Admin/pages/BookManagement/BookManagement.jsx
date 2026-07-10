@@ -1076,6 +1076,12 @@ const BookManagement = () => {
             contributors: epubReaderBook.contributors || [],
             edition: epubReaderBook.edition || '',
             seriesName: epubReaderBook.seriesName || '',
+            sample_url: epubReaderBook.sample_url || null,
+            sample_filename: epubReaderBook.sample_filename || null,
+            sample_structure: epubReaderBook.sample_structure || null,
+            samplePageStart: epubReaderBook.samplePageStart,
+            samplePageEnd: epubReaderBook.samplePageEnd,
+            totalPages: epubReaderBook.totalPages,
           }}
           onClose={() => setEpubReaderBook(null)}
           onApprove={() => {
