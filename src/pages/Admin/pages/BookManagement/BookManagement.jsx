@@ -614,22 +614,18 @@ const BookManagement = () => {
                           try {
                             let structure = book.manuscriptStructure;
                             let sampleStructure = null;
-                            console.log('Existing structure:', structure);
                             
                             // Parse manuscript if not already parsed
                             if (!structure && fullUrl) {
-                              console.log('Parsing full manuscript...');
                               try {
                                 structure = await parseManuscript(fullUrl, manuscriptFilename);
                               } catch (parseError) {
                                 console.error('Failed to parse manuscript:', parseError);
                                 showError(`Failed to parse manuscript: ${parseError.message}`);
                               }
-                            } else if (structure) {
-                              console.log('Using existing structure with', structure?.chapters?.length || 0, 'chapters');
-                            }
+                            } 
                             if (sampleUrl && sampleFilename) {
-                              console.log('=== Starting Sample Parse ===');
+                        
                               
                               try {
                                 sampleStructure = await parseManuscript(sampleUrl, sampleFilename);
