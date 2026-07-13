@@ -19,7 +19,8 @@ import {
   Shield,
   Tag,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  ShieldAlert
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
@@ -547,7 +548,23 @@ const BookManagement = () => {
                         )}
                       </div>
                       <div>
-                        <div className="font-semibold text-gray-900 dark:text-white text-sm">{book.title}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold text-gray-900 dark:text-white text-sm">{book.title}</div>
+                          {book.criticalIssue && (
+                            <button
+                              onClick={() => handleViewIssues(book.id)}
+                              title="⚠️ Copyright Issue Detected - Click to view details"
+                              className="relative inline-flex items-center justify-center group"
+                            >
+                              {/* Animated pulse ring */}
+                              <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping group-hover:opacity-0"></span>
+                              {/* Icon badge */}
+                              <span className="relative inline-flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 shadow-lg shadow-red-500/50 dark:shadow-red-900/50 hover:shadow-xl hover:shadow-red-500/60 transition-all duration-300 hover:scale-110 border-2 border-white dark:border-gray-800">
+                                <ShieldAlert className="w-3.5 h-3.5 text-white drop-shadow-sm" />
+                              </span>
+                            </button>
+                          )}
+                        </div>
                         {book.subTitle && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{book.subTitle}</div>
                         )}
@@ -600,74 +617,77 @@ const BookManagement = () => {
                      
                        <button
                        disabled={book.bookStatusId === 1 || !book.manuscriptFilePath }
-                        onClick={async () => {
-                            
+                        onClick={() => {
                           const fullUrl = getFullManuscriptUrl(book.manuscriptFilePath);
                           const sampleUrl = book.sampleFilePath ? getFullManuscriptUrl(book.sampleFilePath) : null;
                           
                           // Extract actual filenames from the file paths
                           const manuscriptFilename = book.manuscriptFilePath ? book.manuscriptFilePath.split('/').pop() : 'manuscript.epub';
                           const sampleFilename = book.sampleFilePath ? book.sampleFilePath.split('/').pop() : null;
-  
                           
-                          setParsingManuscript(true);
+                          // Open modal immediately with loading state
+                          const bookData = { 
+                            url: fullUrl, 
+                            title: book.title,
+                            subtitle: book.subTitle,
+                            author_name: `${book.authorFirstName} ${book.authorLastName}`,
+                            cover_url: book.frontCover,
+                            description: book.bookDescription,
+                            filename: manuscriptFilename,
+                            structure: null,
+                            manuscript_url: fullUrl,
+                            manuscript_filename: manuscriptFilename,
+                            manuscript_structure: null,
+                            sample_url: sampleUrl,
+                            sample_filename: sampleFilename,
+                            sample_structure: null,
+                            samplePageStart: book.samplePageStart,
+                            samplePageEnd: book.samplePageEnd,
+                            totalPages: book.totalPages,
+                            isLoading: true
+                          };
                           
-                          try {
-                            let structure = book.manuscriptStructure;
-                            let sampleStructure = null;
-                            
-                            // Parse manuscript if not already parsed
-                            if (!structure && fullUrl) {
-                              try {
-                                structure = await parseManuscript(fullUrl, manuscriptFilename);
-                              } catch (parseError) {
-                                console.error('Failed to parse manuscript:', parseError);
-                                showError(`Failed to parse manuscript: ${parseError.message}`);
-                              }
-                            } 
-                            if (sampleUrl && sampleFilename) {
-                        
+                          setEpubReaderBook(bookData);
+                          
+                          // Parse manuscript asynchronously in background
+                          (async () => {
+                            try {
+                              let structure = book.manuscriptStructure;
+                              let sampleStructure = null;
                               
-                              try {
-                                sampleStructure = await parseManuscript(sampleUrl, sampleFilename);
-                              } catch (parseError) {
-                                console.error('❌ Failed to parse sample:', parseError);
-                                console.error('Error details:', parseError.message);
-                                console.error('Stack:', parseError.stack);
-                                // Don't show error to user, just log it
+                              if (!structure && fullUrl) {
+                                try {
+                                  structure = await parseManuscript(fullUrl, manuscriptFilename);
+                                } catch (parseError) {
+                                  console.error('Failed to parse manuscript:', parseError);
+                                  showError(`Failed to parse manuscript: ${parseError.message}`);
+                                }
                               }
-                            } else {
-                              console.warn('⚠️ No sample file path available');
+                              
+                              if (sampleUrl && sampleFilename) {
+                                try {
+                                  sampleStructure = await parseManuscript(sampleUrl, sampleFilename);
+                                } catch (parseError) {
+                                  console.error('Failed to parse sample:', parseError);
+                                }
+                              }
+                              
+                              // Update with parsed data
+                              setEpubReaderBook(prev => prev ? {
+                                ...prev,
+                                structure,
+                                manuscript_structure: structure,
+                                sample_structure: sampleStructure,
+                                isLoading: false
+                              } : null);
+                            } catch (error) {
+                              console.error('Error during parsing:', error);
+                              setEpubReaderBook(prev => prev ? { ...prev, isLoading: false } : null);
                             }
-                            
-                            const bookData = { 
-                              url: fullUrl, 
-                              title: book.title,
-                              subtitle: book.subTitle,
-                              author_name: `${book.authorFirstName} ${book.authorLastName}`,
-                              cover_url: book.frontCover,
-                              description: book.bookDescription,
-                              filename: manuscriptFilename,
-                              structure: structure,
-                              manuscript_url: fullUrl,
-                              manuscript_filename: manuscriptFilename,
-                              manuscript_structure: structure,
-                              sample_url: sampleUrl,
-                              sample_filename: sampleFilename,
-                              sample_structure: sampleStructure,
-                              samplePageStart: book.samplePageStart,
-                              samplePageEnd: book.samplePageEnd,
-                              totalPages: book.totalPages
-                            };
-                            
-                         
-                            setEpubReaderBook(bookData);
-                          } finally {
-                            setParsingManuscript(false);
-                          }
+                          })();
                         }}
                        
-                        title={book.manuscriptFilePath ? (parsingManuscript ? "Parsing manuscript..." : "Read book") : "Manuscript not available"}
+                        title={book.manuscriptFilePath ? "Read book" : "Manuscript not available"}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
                       >
                         <BookOpen className="w-3.5 h-3.5" />

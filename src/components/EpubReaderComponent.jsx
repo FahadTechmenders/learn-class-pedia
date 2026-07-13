@@ -1190,13 +1190,40 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
 
           {/* ── Center canvas: FaithfulReader shows original manuscript format ── */}
           <div ref={canvasRef} className="flex-1 relative overflow-hidden">
-            <FaithfulReader 
-              book={book} 
-              fontScale={fontScale} 
-              viewMode={viewMode} 
-              sampleMode={viewSample}
-              pageMode={pageMode}
-            />
+            {book.isLoading ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 z-50">
+                <div className="flex flex-col items-center gap-6 max-w-md px-8">
+                  <div className="relative">
+                    <Loader2 className="w-16 h-16 text-indigo-600 animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <BookOpen className="w-8 h-8 text-indigo-400" />
+                    </div>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <h3 className="text-xl font-bold text-slate-800">Loading Manuscript</h3>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      Parsing and preparing your book for preview...
+                    </p>
+                    <p className="text-xs text-slate-400 italic">
+                      This may take a few moments for large files
+                    </p>
+                  </div>
+                  <div className="w-full max-w-xs">
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-pulse" style={{ width: '60%' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <FaithfulReader 
+                book={book} 
+                fontScale={fontScale} 
+                viewMode={viewMode} 
+                sampleMode={viewSample}
+                pageMode={pageMode}
+              />
+            )}
           </div>
         </div>
 

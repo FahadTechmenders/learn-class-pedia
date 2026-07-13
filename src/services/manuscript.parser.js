@@ -2,124 +2,98 @@ import ePub from 'epubjs';
 import { API_CONFIG, ENDPOINTS } from '../config/api';
 
 /**
- * Parse EPUB file and extract structured content
+ * Parse EPUB file and extract structured content (optimized)
  */
-export async function parseEpub(url) {
+export async function parseEpub(url, options = {}) {
+  const { maxChapters = null, batchSize = 5 } = options;
   
   try {
-    // Use backend API to fetch EPUB file (bypasses CORS)
-    // The backend /api/Book/epub endpoint proxies the request
     let blobUrl;
     try {
-      // Construct the API endpoint URL
       const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_EPUB(url)}`;
-      
-      console.log('Fetching EPUB from backend API:', apiUrl);
       const response = await fetch(apiUrl);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const blob = await response.blob();
       blobUrl = URL.createObjectURL(blob);
-      console.log('EPUB blob created successfully');
     } catch (fetchError) {
-      console.error('Backend API fetch error:', fetchError);
-      // Fallback: try fetching directly from CDN (might fail due to CORS)
-      console.log('Attempting direct fetch from CDN as fallback...');
+      console.warn('Backend API failed, trying direct fetch:', fetchError);
       try {
         const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const blob = await response.blob();
         blobUrl = URL.createObjectURL(blob);
       } catch (directFetchError) {
-        console.error('Direct fetch also failed:', directFetchError);
-        // Last resort: try using the URL directly (will likely fail)
         blobUrl = url;
       }
     }
     
     const book = ePub(blobUrl, { openAs: 'epub' });
     await book.ready;
-    
 
     const chapters = [];
-    let chapterIndex = 0;
-
-    // Get navigation/spine
-    const navigation = book.navigation;
     const spine = book.spine;
+    const items = spine.items.slice(0, maxChapters || spine.items.length);
     
-    // Iterate through spine items
-    for (const item of spine.items) {
-      try {
-        
-        // Load the section content
-        const section = book.spine.get(item.href);
-        await section.load(book.load.bind(book));
-        
-        const doc = section.document;
-        if (!doc) {
-          console.warn(`No document for chapter ${chapterIndex}`);
-          continue;
-        }
-        
-        // Extract title
-        const titleEl = doc.querySelector('h1, h2, h3, title');
-        const title = titleEl ? titleEl.textContent.trim() : `Chapter ${chapterIndex + 1}`;
-        
-        // Extract content elements
-        const elements = [];
-        const body = doc.body || doc.querySelector('body') || doc;
-        const contentNodes = body.querySelectorAll('p, h1, h2, h3, h4, h5, h6, blockquote, li, img');
-        
-        contentNodes.forEach((node) => {
-          const tagName = node.tagName.toLowerCase();
+    // Process in batches for better performance
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const batchPromises = batch.map(async (item, idx) => {
+        try {
+          const section = book.spine.get(item.href);
+          await section.load(book.load.bind(book));
           
-          if (tagName === 'img') {
-            const src = node.getAttribute('src');
-            const alt = node.getAttribute('alt') || '';
-            if (src) {
-              elements.push({
-                type: 'image',
-                src: src.startsWith('http') ? src : `${url}/${src}`,
-                alt: alt
-              });
-            }
-          } else {
-            const content = node.textContent.trim();
-            if (content && content.length > 0) {
-              elements.push({ type: tagName, content: content });
+          const doc = section.document;
+          if (!doc) return null;
+          
+          const titleEl = doc.querySelector('h1, h2, h3, title');
+          const title = titleEl?.textContent?.trim() || `Chapter ${i + idx + 1}`;
+          
+          const body = doc.body || doc.querySelector('body') || doc;
+          const contentNodes = body.querySelectorAll('p, h1, h2, h3, h4, h5, h6, blockquote, li, img');
+          
+          const elements = [];
+          for (let j = 0; j < contentNodes.length; j++) {
+            const node = contentNodes[j];
+            const tagName = node.tagName.toLowerCase();
+            
+            if (tagName === 'img') {
+              const src = node.getAttribute('src');
+              if (src) {
+                elements.push({
+                  type: 'image',
+                  src: src.startsWith('http') ? src : `${url}/${src}`,
+                  alt: node.getAttribute('alt') || ''
+                });
+              }
+            } else {
+              const content = node.textContent?.trim();
+              if (content) {
+                elements.push({ type: tagName, content });
+              }
             }
           }
-        });
-
-        if (elements.length > 0) {
-          chapters.push({
-            chapterIndex: chapterIndex,
-            title: title,
-            elements: elements
-          });
-          chapterIndex++;
+          
+          section.unload();
+          
+          return elements.length > 0 ? {
+            chapterIndex: i + idx,
+            title,
+            elements
+          } : null;
+        } catch (err) {
+          console.warn(`Failed to parse chapter ${i + idx}:`, err);
+          return null;
         }
-        
-        // Unload to free memory
-        section.unload();
-      } catch (err) {
-        console.error(`Failed to parse chapter ${chapterIndex}:`, err);
-      }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      chapters.push(...batchResults.filter(Boolean));
     }
 
-    // Clean up blob URL if we created one
-    if (blobUrl !== url) {
-      URL.revokeObjectURL(blobUrl);
-    }
+    if (blobUrl !== url) URL.revokeObjectURL(blobUrl);
     
     return {
-      chapters: chapters,
+      chapters,
       metadata: {
         title: book.packaging?.metadata?.title || '',
         author: book.packaging?.metadata?.creator || '',
@@ -128,7 +102,6 @@ export async function parseEpub(url) {
     };
   } catch (error) {
     console.error('EPUB parsing error:', error);
-    // Provide more helpful error message
     if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
       throw new Error('Unable to load EPUB file. Please check your internet connection or contact support.');
     }
@@ -137,134 +110,97 @@ export async function parseEpub(url) {
 }
 
 /**
- * Parse PDF file using pdfjs-dist
+ * Parse PDF file using pdfjs-dist (optimized)
  */
-export async function parsePdf(url) {
+export async function parsePdf(url, options = {}) {
+  const { maxPages = null, batchSize = 3 } = options;
   
   try {
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf');
-    
-    // Use unpkg CDN for worker with matching version
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@6.1.200/legacy/build/pdf.worker.min.mjs';
     
-    // Fetch the PDF file as array buffer using backend API to bypass CORS restrictions
     let pdfData;
     try {
-      // Use backend API to fetch PDF
       const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_PDF(url)}`;
-      console.log('Fetching PDF from backend API:', apiUrl);
       const response = await fetch(apiUrl);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      pdfData = { data: arrayBuffer };
-      console.log('PDF fetched successfully from backend API');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      pdfData = { data: await response.arrayBuffer() };
     } catch (fetchError) {
-      console.error('Backend API fetch error:', fetchError);
-      // Fallback: try fetching directly from CDN (might fail due to CORS)
-      console.log('Attempting direct fetch from CDN as fallback...');
+      console.warn('Backend API failed, trying direct fetch:', fetchError);
       try {
         const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        pdfData = { data: arrayBuffer };
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        pdfData = { data: await response.arrayBuffer() };
       } catch (directFetchError) {
-        console.error('Direct fetch also failed:', directFetchError);
-        // Last resort: try using the URL directly (will likely fail)
-        pdfData = { url: url };
+        pdfData = { url };
       }
     }
     
-    // getDocument expects an object with url or data property
     const loadingTask = pdfjsLib.getDocument(pdfData);
     const pdf = await loadingTask.promise;
     
     const chapters = [];
-    let currentChapter = {
-      chapterIndex: 0,
-      title: 'Chapter 1',
-      elements: []
-    };
+    let currentChapter = { chapterIndex: 0, title: 'Chapter 1', elements: [] };
     let chapterIndex = 0;
     
-    // Extract text from each page
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
+    const totalPages = maxPages ? Math.min(maxPages, pdf.numPages) : pdf.numPages;
+    
+    // Process pages in batches
+    for (let startPage = 1; startPage <= totalPages; startPage += batchSize) {
+      const endPage = Math.min(startPage + batchSize - 1, totalPages);
+      const pagePromises = [];
       
-      // Combine text items into paragraphs
-      let currentParagraph = '';
+      for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+        pagePromises.push(
+          pdf.getPage(pageNum).then(page => page.getTextContent())
+        );
+      }
       
-      textContent.items.forEach((item, idx) => {
-        const text = item.str.trim();
-        if (!text) return;
+      const textContents = await Promise.all(pagePromises);
+      
+      for (const textContent of textContents) {
+        let currentParagraph = '';
         
-        // Detect headings (larger font size or bold)
-        const isHeading = item.height > 14 || item.fontName?.includes('Bold');
-        
-        if (isHeading && text.length > 0) {
-          // Save current paragraph if exists
-          if (currentParagraph.trim()) {
-            currentChapter.elements.push({
-              type: 'p',
-              content: currentParagraph.trim()
-            });
-            currentParagraph = '';
-          }
+        for (const item of textContent.items) {
+          const text = item.str?.trim();
+          if (!text) continue;
           
-          // Check if this is a chapter heading
-          if (/^(chapter|part)\s+\d+/i.test(text) || /^[IVXLCDM]+\.?\s/i.test(text)) {
-            // Start new chapter
-            if (currentChapter.elements.length > 0) {
-              chapters.push(currentChapter);
-              chapterIndex++;
-            }
-            currentChapter = {
-              chapterIndex: chapterIndex,
-              title: text,
-              elements: []
-            };
-          } else {
-            // Regular heading
-            currentChapter.elements.push({
-              type: 'h2',
-              content: text
-            });
-          }
-        } else {
-          // Regular text - accumulate into paragraph
-          currentParagraph += (currentParagraph ? ' ' : '') + text;
+          const isHeading = item.height > 14 || item.fontName?.includes('Bold');
           
-          // End paragraph on line break or period
-          if (item.hasEOL || text.endsWith('.') || text.endsWith('!') || text.endsWith('?')) {
-            if (currentParagraph.trim().length > 20) {
-              currentChapter.elements.push({
-                type: 'p',
-                content: currentParagraph.trim()
-              });
+          if (isHeading && text.length > 0) {
+            if (currentParagraph.trim()) {
+              currentChapter.elements.push({ type: 'p', content: currentParagraph.trim() });
               currentParagraph = '';
+            }
+            
+            if (/^(chapter|part)\s+\d+/i.test(text) || /^[IVXLCDM]+\.?\s/i.test(text)) {
+              if (currentChapter.elements.length > 0) {
+                chapters.push(currentChapter);
+                chapterIndex++;
+              }
+              currentChapter = { chapterIndex, title: text, elements: [] };
+            } else {
+              currentChapter.elements.push({ type: 'h2', content: text });
+            }
+          } else {
+            currentParagraph += (currentParagraph ? ' ' : '') + text;
+            
+            if (item.hasEOL || /[.!?]$/.test(text)) {
+              if (currentParagraph.trim().length > 20) {
+                currentChapter.elements.push({ type: 'p', content: currentParagraph.trim() });
+                currentParagraph = '';
+              }
             }
           }
         }
-      });
-      
-      // Add remaining paragraph
-      if (currentParagraph.trim()) {
-        currentChapter.elements.push({
-          type: 'p',
-          content: currentParagraph.trim()
-        });
+        
+        if (currentParagraph.trim()) {
+          currentChapter.elements.push({ type: 'p', content: currentParagraph.trim() });
+        }
       }
     }
     
-    // Add last chapter
-    if (currentChapter.elements.length > 0) {
-      chapters.push(currentChapter);
-    }
+    if (currentChapter.elements.length > 0) chapters.push(currentChapter);
     
     return {
       chapters: chapters.length > 0 ? chapters : [{
@@ -272,15 +208,10 @@ export async function parsePdf(url) {
         title: 'PDF Content',
         elements: [{ type: 'p', content: 'PDF content extracted successfully.' }]
       }],
-      metadata: {
-        title: 'PDF Document',
-        author: '',
-        language: 'en'
-      }
+      metadata: { title: 'PDF Document', author: '', language: 'en' }
     };
   } catch (error) {
     console.error('PDF parsing error:', error);
-    // Provide more helpful error message
     if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
       throw new Error('Unable to load PDF file. Please check your internet connection or contact support.');
     }
@@ -289,111 +220,80 @@ export async function parsePdf(url) {
 }
 
 /**
- * Parse DOCX file using mammoth
+ * Parse DOCX file using mammoth (optimized)
  */
-export async function parseDocx(url) {
+export async function parseDocx(url, options = {}) {
+  const { maxElements = null } = options;
   
   try {
     const mammoth = await import('mammoth');
     
-    // Fetch the DOCX file as array buffer using backend API to bypass CORS restrictions
     let arrayBuffer;
     try {
-      // Use backend API to fetch DOCX
       const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_DOCX(url)}`;
-      console.log('Fetching DOCX from backend API:', apiUrl);
       const response = await fetch(apiUrl);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       arrayBuffer = await response.arrayBuffer();
-      console.log('DOCX fetched successfully from backend API');
     } catch (fetchError) {
-      console.error('Backend API fetch error:', fetchError);
-      // Fallback: try fetching directly from CDN (might fail due to CORS)
-      console.log('Attempting direct fetch from CDN as fallback...');
+      console.warn('Backend API failed, trying direct fetch:', fetchError);
       const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       arrayBuffer = await response.arrayBuffer();
     }
     
-    
-    // Convert DOCX to HTML
-    const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-    const html = result.value;
-    
-    
-    // Parse HTML into structured content
+    const result = await mammoth.convertToHtml({ arrayBuffer });
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+    const doc = parser.parseFromString(result.value, 'text/html');
     
     const chapters = [];
-    let currentChapter = {
-      chapterIndex: 0,
-      title: 'Chapter 1',
-      elements: []
-    };
+    let currentChapter = { chapterIndex: 0, title: 'Chapter 1', elements: [] };
     let chapterIndex = 0;
+    let elementCount = 0;
     
-    // Extract content from HTML
     const bodyElements = doc.body.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, img');
     
-    bodyElements.forEach((element) => {
+    for (let i = 0; i < bodyElements.length; i++) {
+      if (maxElements && elementCount >= maxElements) break;
+      
+      const element = bodyElements[i];
       const tagName = element.tagName.toLowerCase();
-      const text = element.textContent.trim();
+      const text = element.textContent?.trim();
       
-      if (!text && tagName !== 'img') return;
+      if (!text && tagName !== 'img') continue;
       
-      // Check for chapter headings
       if ((tagName === 'h1' || tagName === 'h2') && 
           (/^(chapter|part)\s+\d+/i.test(text) || /^[IVXLCDM]+\.?\s/i.test(text))) {
-        // Start new chapter
         if (currentChapter.elements.length > 0) {
           chapters.push(currentChapter);
           chapterIndex++;
         }
-        currentChapter = {
-          chapterIndex: chapterIndex,
-          title: text,
-          elements: []
-        };
+        currentChapter = { chapterIndex, title: text, elements: [] };
       } else if (tagName === 'img') {
         const src = element.getAttribute('src');
-        const alt = element.getAttribute('alt') || '';
         if (src) {
           currentChapter.elements.push({
             type: 'image',
-            src: src,
-            alt: alt
+            src,
+            alt: element.getAttribute('alt') || ''
           });
+          elementCount++;
         }
       } else if (tagName === 'ul' || tagName === 'ol') {
-        // Extract list items
         const items = element.querySelectorAll('li');
-        items.forEach((li) => {
-          const liText = li.textContent.trim();
+        for (const li of items) {
+          const liText = li.textContent?.trim();
           if (liText) {
-            currentChapter.elements.push({
-              type: 'li',
-              content: liText
-            });
+            currentChapter.elements.push({ type: 'li', content: liText });
+            elementCount++;
           }
-        });
-      } else if (text.length > 0) {
-        currentChapter.elements.push({
-          type: tagName,
-          content: text
-        });
+        }
+      } else if (text) {
+        currentChapter.elements.push({ type: tagName, content: text });
+        elementCount++;
       }
-    });
-    
-    // Add last chapter
-    if (currentChapter.elements.length > 0) {
-      chapters.push(currentChapter);
     }
+    
+    if (currentChapter.elements.length > 0) chapters.push(currentChapter);
     
     return {
       chapters: chapters.length > 0 ? chapters : [{
@@ -401,15 +301,10 @@ export async function parseDocx(url) {
         title: 'Document Content',
         elements: [{ type: 'p', content: 'DOCX content extracted successfully.' }]
       }],
-      metadata: {
-        title: 'Word Document',
-        author: '',
-        language: 'en'
-      }
+      metadata: { title: 'Word Document', author: '', language: 'en' }
     };
   } catch (error) {
     console.error('DOCX parsing error:', error);
-    // Provide more helpful error message
     if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
       throw new Error('Unable to load DOCX file. Please check your internet connection or contact support.');
     }
@@ -417,17 +312,53 @@ export async function parseDocx(url) {
   }
 }
 
+// Simple in-memory cache for parsed manuscripts
+const manuscriptCache = new Map();
+const CACHE_MAX_SIZE = 5;
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
 /**
- * Main parser function - detects file type and calls appropriate parser
+ * Main parser function - detects file type and calls appropriate parser (optimized with caching)
  */
-export async function parseManuscript(url, filename) {
+export async function parseManuscript(url, filename, options = {}) {
   if (!url) throw new Error('No manuscript URL provided');
+  
+  const { useCache = true, ...parseOptions } = options;
+  const cacheKey = `${url}_${JSON.stringify(parseOptions)}`;
+  
+  // Check cache
+  if (useCache && manuscriptCache.has(cacheKey)) {
+    const cached = manuscriptCache.get(cacheKey);
+    if (Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log('Using cached manuscript data');
+      return cached.data;
+    }
+    manuscriptCache.delete(cacheKey);
+  }
   
   const ext = (filename || url).split('.').pop().toLowerCase();
   
-  if (ext === 'epub') return await parseEpub(url);
-  if (ext === 'pdf') return await parsePdf(url);
-  if (ext === 'docx' || ext === 'doc') return await parseDocx(url);
+  let result;
+  if (ext === 'epub') result = await parseEpub(url, parseOptions);
+  else if (ext === 'pdf') result = await parsePdf(url, parseOptions);
+  else if (ext === 'docx' || ext === 'doc') result = await parseDocx(url, parseOptions);
+  else throw new Error(`Unsupported file format: ${ext}`);
   
-  throw new Error(`Unsupported file format: ${ext}`);
+  // Cache the result
+  if (useCache) {
+    if (manuscriptCache.size >= CACHE_MAX_SIZE) {
+      const firstKey = manuscriptCache.keys().next().value;
+      manuscriptCache.delete(firstKey);
+    }
+    manuscriptCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  }
+  
+  return result;
+}
+
+/**
+ * Clear manuscript cache
+ */
+export function clearManuscriptCache() {
+  manuscriptCache.clear();
 }

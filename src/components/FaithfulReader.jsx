@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo, memo } from 'react';
 import ePub from 'epubjs';
 import { renderAsync } from 'docx-preview';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -128,10 +128,28 @@ function CoverPage({ book }) {
   );
 }
 
+const EpubPage = memo(({ html, frameWidth, fontPct }) => (
+  <div 
+    className="bg-white shadow-xl rounded-sm overflow-hidden"
+    style={{ 
+      minHeight: '600px',
+      padding: '2rem 2.5rem',
+      fontFamily: 'Georgia, "Times New Roman", serif',
+      fontSize: `${fontPct}%`,
+      lineHeight: '1.75',
+      color: '#1e293b',
+      background: '#ffffff',
+      textAlign: 'justify'
+    }}
+    dangerouslySetInnerHTML={{ __html: html }}
+  />
+));
+
 function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartFrac, sampleEndFrac, coverUrl, book }) {
   const pagesRef = useRef(null);
   const [status, setStatus] = useState('loading');
   const [pages, setPages] = useState([]);
+  const [loadProgress, setLoadProgress] = useState(0);
 
   useEffect(() => {
     if (!arrayBuffer) return;
@@ -153,66 +171,38 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         }
 
         const renderedPages = [];
+        const batchSize = 3;
+        const totalItems = spineItems.length;
         
-        for (let i = 0; i < spineItems.length; i++) {
+        for (let i = 0; i < totalItems; i += batchSize) {
           if (destroyed) return;
-          const item = spineItems[i];
           
-          try {
-            const section = epubBook.spine.get(item.href);
-            await section.load(epubBook.load.bind(epubBook));
-            
-            const tempDiv = document.createElement('div');
-            tempDiv.style.width = `${frameWidth}px`;
-            tempDiv.style.padding = '2rem 2.5rem';
-            tempDiv.style.fontFamily = 'Georgia, "Times New Roman", serif';
-            tempDiv.style.fontSize = `${fontPct}%`;
-            tempDiv.style.lineHeight = '1.75';
-            tempDiv.style.color = '#1e293b';
-            tempDiv.style.background = '#ffffff';
-            tempDiv.style.textAlign = 'justify';
-            
-            const contents = section.document?.body?.innerHTML || '';
-            tempDiv.innerHTML = contents;
-            
-            // Apply styling to elements
-            const paragraphs = tempDiv.querySelectorAll('p');
-            paragraphs.forEach(p => {
-              p.style.marginBottom = '1rem';
-              p.style.textIndent = '1.5rem';
-            });
-            
-            const headings = tempDiv.querySelectorAll('h1, h2, h3, h4, h5, h6');
-            headings.forEach(h => {
-              h.style.fontFamily = 'Georgia, serif';
-              h.style.color = '#0f172a';
-              h.style.marginTop = '1.5rem';
-              h.style.marginBottom = '1rem';
-              h.style.lineHeight = '1.3';
-            });
-            
-            const images = tempDiv.querySelectorAll('img');
-            images.forEach(img => {
-              img.style.maxWidth = '100%';
-              img.style.height = 'auto';
-              img.style.display = 'block';
-              img.style.margin = '1.5rem auto';
-            });
-            
-            renderedPages.push({
-              index: i,
-              html: tempDiv.innerHTML
-            });
-          } catch (err) {
-            console.warn(`Failed to load section ${i}:`, err);
+          const batch = spineItems.slice(i, Math.min(i + batchSize, totalItems));
+          const batchPromises = batch.map(async (item, idx) => {
+            try {
+              const section = epubBook.spine.get(item.href);
+              await section.load(epubBook.load.bind(epubBook));
+              
+              const contents = section.document?.body?.innerHTML || '';
+              section.unload();
+              
+              return { index: i + idx, html: contents };
+            } catch (err) {
+              console.warn(`Failed to load section ${i + idx}:`, err);
+              return null;
+            }
+          });
+          
+          const batchResults = await Promise.all(batchPromises);
+          renderedPages.push(...batchResults.filter(Boolean));
+          
+          if (!destroyed) {
+            setPages([...renderedPages]);
+            setLoadProgress(Math.round((renderedPages.length / totalItems) * 100));
           }
         }
         
-        if (!destroyed) {
-          setPages(renderedPages);
-          setStatus('ready');
-        }
-        
+        if (!destroyed) setStatus('ready');
         epubBook.destroy();
       } catch (e) {
         console.error('[EPUB] render error', e);
@@ -222,31 +212,31 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
     return () => { destroyed = true; };
   }, [arrayBuffer, sampleMode, sampleStartFrac, sampleEndFrac, frameWidth, fontPct]);
 
+  const pageStyle = useMemo(() => ({
+    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontSize: `${fontPct}%`,
+    lineHeight: '1.75',
+    color: '#1e293b'
+  }), [fontPct]);
+
   return (
     <div className="w-full h-full overflow-auto bg-slate-200">
       <div className="flex flex-col items-center gap-5 py-6 px-3">
         {coverUrl && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: frameWidth, maxWidth: '100%' }} />
         )}
-        {status === 'loading' && <CenterMessage icon={Loader2} spin title="Loading book…" />}
+        {status === 'loading' && (
+          <div className="w-full max-w-md">
+            <CenterMessage icon={Loader2} spin title={`Loading book… ${loadProgress}%`} />
+            <div className="mt-4 bg-slate-300 rounded-full h-2 overflow-hidden">
+              <div className="bg-indigo-600 h-full transition-all duration-300" style={{ width: `${loadProgress}%` }} />
+            </div>
+          </div>
+        )}
         {status === 'error' && <CenterMessage icon={AlertCircle} title="Could not render this EPUB" subtitle="The file may be corrupted or use an unsupported feature." />}
         <div ref={pagesRef} className="flex flex-col gap-5 w-full" style={{ maxWidth: frameWidth }}>
-          {pages.map((page, i) => (
-            <div 
-              key={i}
-              className="bg-white shadow-xl rounded-sm overflow-hidden"
-              style={{ 
-                minHeight: '600px',
-                padding: '2rem 2.5rem',
-                fontFamily: 'Georgia, "Times New Roman", serif',
-                fontSize: `${fontPct}%`,
-                lineHeight: '1.75',
-                color: '#1e293b',
-                background: '#ffffff',
-                textAlign: 'justify'
-              }}
-              dangerouslySetInnerHTML={{ __html: page.html }}
-            />
+          {pages.map((page) => (
+            <EpubPage key={page.index} html={page.html} frameWidth={frameWidth} fontPct={fontPct} />
           ))}
         </div>
       </div>
@@ -285,7 +275,8 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd, p
   const scrollRef = useRef(null);
   const dual = pageMode === 'dual';
   const [status, setStatus] = useState('loading');
-  const basePageWidth = 720; // Fixed base width
+  const [loadProgress, setLoadProgress] = useState(0);
+  const basePageWidth = 720;
   const scale = pageWidth / basePageWidth;
 
   useEffect(() => {
@@ -298,20 +289,40 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd, p
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
         const from = sampleStart > 0 ? Math.max(1, sampleStart) : 1;
         const to = sampleEnd > 0 ? Math.min(sampleEnd, pdf.numPages) : pdf.numPages;
-        for (let n = from; n <= to; n++) {
+        const totalPages = to - from + 1;
+        const batchSize = 2;
+        
+        for (let n = from; n <= to; n += batchSize) {
           if (cancelled) return;
-          const page = await pdf.getPage(n);
-          const viewport = page.getViewport({ scale: 1.6 });
-          const canvas = document.createElement('canvas');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.style.width = `${basePageWidth}px`;
-          canvas.style.maxWidth = '100%';
-          canvas.style.height = 'auto';
-          canvas.className = 'bg-white shadow-xl rounded-sm';
-          container.appendChild(canvas);
-          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-          if (n === 1 && !cancelled) setStatus('ready');
+          
+          const batchEnd = Math.min(n + batchSize - 1, to);
+          const pagePromises = [];
+          
+          for (let pageNum = n; pageNum <= batchEnd; pageNum++) {
+            pagePromises.push(
+              pdf.getPage(pageNum).then(async page => {
+                const viewport = page.getViewport({ scale: 1.6 });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                canvas.style.width = `${basePageWidth}px`;
+                canvas.style.maxWidth = '100%';
+                canvas.style.height = 'auto';
+                canvas.className = 'bg-white shadow-xl rounded-sm';
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                return canvas;
+              })
+            );
+          }
+          
+          const canvases = await Promise.all(pagePromises);
+          canvases.forEach(canvas => container.appendChild(canvas));
+          
+          if (!cancelled) {
+            const progress = Math.round(((n - from + batchSize) / totalPages) * 100);
+            setLoadProgress(Math.min(progress, 100));
+            if (n === from) setStatus('ready');
+          }
         }
         if (!cancelled) setStatus('ready');
       } catch (e) {
@@ -328,7 +339,14 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd, p
         {coverUrl && !(sampleStart > 1) && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: basePageWidth, maxWidth: '100%' }} />
         )}
-        {status === 'loading' && <CenterMessage icon={Loader2} spin title="Rendering PDF…" />}
+        {status === 'loading' && (
+          <div className="w-full max-w-md">
+            <CenterMessage icon={Loader2} spin title={`Rendering PDF… ${loadProgress}%`} />
+            <div className="mt-4 bg-slate-300 rounded-full h-2 overflow-hidden">
+              <div className="bg-indigo-600 h-full transition-all duration-300" style={{ width: `${loadProgress}%` }} />
+            </div>
+          </div>
+        )}
         {status === 'error' && <CenterMessage icon={AlertCircle} title="Could not render this PDF" />}
         <div
           ref={pagesRef}

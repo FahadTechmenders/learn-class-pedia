@@ -112,21 +112,21 @@ export const useBookBadgeMapping = () => {
     }
   }, []);
 
-  const assignBookBadgeMapping = useCallback(async (bookId, badgeIds) => {
+  const assignBookBadgeMapping = useCallback(async (badgeId, bookIds) => {
     setLoading(true);
     setError(null);
 
     try {
       const mappingData = {
-        bookId: parseInt(bookId),
-        badgeIds: badgeIds.map(id => parseInt(id))
+        badgeId: parseInt(badgeId),
+        bookIds: bookIds.map(id => parseInt(id))
       };
 
       const response = await ApiService.assignBookBadgeMapping(mappingData);
       
       return response.data || response;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to assign badges to book';
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to assign books to badge';
       setError(errorMessage);
       console.error('assignBookBadgeMapping error:', err);
       throw err;
