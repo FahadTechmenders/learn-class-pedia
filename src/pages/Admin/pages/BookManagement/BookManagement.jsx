@@ -9,7 +9,6 @@ import {
   CheckCircle,
   SlidersHorizontal,
   ChevronDown,
-  RotateCcw,
   XCircle,
   FileText,
   User,
@@ -20,7 +19,8 @@ import {
   Tag,
   AlertCircle,
   AlertTriangle,
-  ShieldAlert
+  ShieldAlert,
+  AlertOctagon
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import { useToast } from '../../../../components/ToastProvider';
@@ -47,12 +47,12 @@ const BookManagement = () => {
   const [filters, setFilters] = useState({
     publisherName: '',
     bookStatusId: '',
+    hasIssues: '',
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showBookModal, setShowBookModal] = useState(false);
   const [epubReaderBook, setEpubReaderBook] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [parsingManuscript, setParsingManuscript] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedStatusId, setSelectedStatusId] = useState(null);
   const [showReasonModal, setShowReasonModal] = useState(false);
@@ -64,6 +64,7 @@ const BookManagement = () => {
   const emptyFiltersRef = useMemo(() => ({
     publisherName: '',
     bookStatusId: '',
+    hasIssues: '',
   }), []);
 
   useEffect(() => {
@@ -190,12 +191,10 @@ const BookManagement = () => {
   const formatIssueDescription = (issue) => {
     if (!issue) return null;
     
-    // Handle string input (new format)
     if (typeof issue === 'string') {
       return <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{issue}</p>;
     }
     
-    // Handle object input (old format with description property)
     const description = issue.description || issue;
     if (typeof description !== 'string') {
       return <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">Invalid issue format</p>;
@@ -286,18 +285,18 @@ const BookManagement = () => {
     return `$${price.toFixed(2)}`;
   };
 
-  const getStatusColor = (statusCode) => {
+  const getStatusBadgeStyle = (statusCode) => {
     switch (statusCode) {
       case 'draft':
-        return 'bg-gray-500';
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
       case 'in_review':
-        return 'bg-yellow-500';
+        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300';
       case 'published':
-        return 'bg-green-500';
+        return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300';
       case 'rejected':
-        return 'bg-red-500';
+        return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300';
       default:
-        return 'bg-gray-500';
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
     }
   };
 
@@ -305,169 +304,160 @@ const BookManagement = () => {
   const hasNextPage = pagination.page < totalPages;
   const hasPreviousPage = pagination.page > 1;
 
-  // Helper to get full manuscript URL with proper base URL
   const getFullManuscriptUrl = (filePath) => {
     if (!filePath) return null;
-    // If it's already a full URL, return it
     if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
       return filePath;
     }
-    // Otherwise, prepend the base URL
     const baseUrl = process.env.REACT_APP_API_URL || '';
     return `${baseUrl}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-              <div className="p-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl shadow-lg">
-                <Book className="w-8 h-8 text-white" />
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white flex items-center gap-3">
+              <div className="p-2.5 bg-blue-600 rounded-xl">
+                <Book className="w-6 h-6 text-white" />
               </div>
               Book Management
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Manage and review all published books
             </p>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+          
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="mb-6 bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-all">
+      <div className="mb-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`w-full px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-all duration-200 ${showFilters ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}
-          aria-expanded={showFilters}
+          className={`w-full px-4 py-3 flex items-center justify-between ${showFilters ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}
         >
-          <div className="flex items-center gap-2.5">
-            <SlidersHorizontal className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-            <span className="font-semibold text-gray-900 dark:text-white">Filters</span>
-            {(filters.publisherName || filters.bookStatusId) && (
-              <span className="ml-1.5 px-2 py-0.5 text-xs font-medium bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-full">
-                {[filters.publisherName, filters.bookStatusId].filter(Boolean).length}
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="w-4 h-4 text-gray-500" />
+            <span className="font-medium text-gray-700 dark:text-gray-300">Filters</span>
+            {(filters.publisherName || filters.bookStatusId || filters.hasIssues) && (
+              <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full">
+                {[filters.publisherName, filters.bookStatusId, filters.hasIssues].filter(Boolean).length}
               </span>
             )}
           </div>
           <ChevronDown
-            className={`w-4.5 h-4.5 text-gray-500 transition-transform duration-300 ${
+            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
               showFilters ? 'rotate-180' : ''
             }`}
           />
         </button>
 
         <div
-          className={`transition-all duration-300 ease-out ${
+          className={`transition-all duration-200 ease-out ${
             showFilters ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
           }`}
         >
-          <div className="p-5 bg-gray-50/80 dark:bg-gray-800/50 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-end gap-4">
+          <div className="p-4 bg-gray-50 dark:bg-gray-800/50 space-y-3">
+            <div className="flex flex-col md:flex-row md:items-end gap-3">
               <div className="flex-1 min-w-0">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                   Publisher Name
                 </label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
                     value={filters.publisherName}
                     onChange={(e) => setFilters({ ...filters, publisherName: e.target.value })}
-                    placeholder="e.g., Penguin Random House"
-                    className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    placeholder="Search publisher..."
+                    className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                   {filters.publisherName && (
                     <button
                       onClick={() => setFilters({ ...filters, publisherName: '' })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
                     >
-                      <X className="w-3.5 h-3.5 text-gray-500" />
+                      <X className="w-3.5 h-3.5 text-gray-400" />
                     </button>
                   )}
                 </div>
               </div>
 
               <div className="flex-1 min-w-0">
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                   Status
                 </label>
-                <div className="relative">
-                  <select
-                    value={filters.bookStatusId}
-                    onChange={(e) => setFilters({ ...filters, bookStatusId: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 appearance-none cursor-pointer transition-all"
-                  >
-                    <option value="">All Statuses</option>
-                    {bookStatuses.map((status) => (
-                      <option key={status.id} value={status.id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
+                <select
+                  value={filters.bookStatusId}
+                  onChange={(e) => setFilters({ ...filters, bookStatusId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none"
+                >
+                  <option value="">All Statuses</option>
+                  {bookStatuses.map((status) => (
+                    <option key={status.id} value={status.id}>
+                      {status.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="flex flex-row gap-2.5 flex-shrink-0">
+
+              <div className="flex flex-row gap-2 flex-shrink-0">
                 <button
                   onClick={handleFilter}
-                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl hover:from-indigo-700 hover:to-indigo-600 focus:ring-2 focus:ring-indigo-500/30 shadow-sm transition-all duration-200 active:scale-95"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 >
-                  <Filter className="w-3.5 h-3.5" />
                   Apply
                 </button>
                 <button
                   onClick={handleResetFilters}
-                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-400 focus:ring-2 focus:ring-gray-400/30 transition-all duration-200 active:scale-95"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
                   Reset
                 </button>
               </div>
             </div>
 
-            {(filters.publisherName || filters.bookStatusId) && (
-              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
+            {(filters.publisherName || filters.bookStatusId || filters.hasIssues) && (
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Active filters:</span>
                 {filters.publisherName && (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
-                    <span>Publisher: {filters.publisherName}</span>
-                    <button
-                      onClick={() => setFilters({ ...filters, publisherName: '' })}
-                      className="hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-full p-0.5 transition-colors"
-                    >
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full">
+                    Publisher: {filters.publisherName}
+                    <button onClick={() => setFilters({ ...filters, publisherName: '' })}>
                       <X className="w-3 h-3" />
                     </button>
-                  </div>
+                  </span>
                 )}
                 {filters.bookStatusId && (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-800">
-                    <span>Status: {bookStatuses.find(s => s.id === filters.bookStatusId)?.name}</span>
-                    <button
-                      onClick={() => setFilters({ ...filters, bookStatusId: '' })}
-                      className="hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-full p-0.5 transition-colors"
-                    >
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full">
+                    Status: {bookStatuses.find(s => s.id === filters.bookStatusId)?.name}
+                    <button onClick={() => setFilters({ ...filters, bookStatusId: '' })}>
                       <X className="w-3 h-3" />
                     </button>
-                  </div>
+                  </span>
                 )}
-                <button
-                  onClick={handleResetFilters}
-                  className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors ml-1 underline-offset-2 hover:underline"
-                >
-                  Clear all
-                </button>
+                {filters.hasIssues && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-full">
+                    {filters.hasIssues === 'true' ? 'With Issues' : 'Without Issues'}
+                    <button onClick={() => setFilters({ ...filters, hasIssues: '' })}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -475,235 +465,246 @@ const BookManagement = () => {
       </div>
 
       {/* Books Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-600">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Book</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Author</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Publisher</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Price</th>
-              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
-              <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
-            {loading ? (
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
               <tr>
-                <td colSpan="6" className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="relative">
-                      <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
-                      <div className="absolute inset-0 w-8 h-8 border-2 border-indigo-200 rounded-full animate-ping"></div>
-                    </div>
-                    <span className="font-medium">Loading books...</span>
-                  </div>
-                </td>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Book
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Author
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Publisher
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Price
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Status & Issues
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan="6" className="px-4 py-16 text-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/40 dark:to-red-800/40 rounded-full flex items-center justify-center shadow-inner">
-                      <XCircle className="w-10 h-10 text-red-500 dark:text-red-400" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-red-600 dark:text-red-400 text-lg">Network Error</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{error}</p>
-                      <button
-                        onClick={handleRefresh}
-                        className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Retry
-                      </button>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ) : books.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="px-4 py-16 text-center text-gray-500 dark:text-gray-400">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center shadow-inner">
-                      <Book className="w-10 h-10 text-gray-400 dark:text-gray-500" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-600 dark:text-gray-400 text-lg">No books found</p>
-                      <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Try adjusting your filters or refresh the data</p>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              books.map((book) => (
-                <tr key={book.id} className="hover:bg-gradient-to-r hover:from-indigo-50/80 hover:via-purple-50/60 hover:to-pink-50/80 dark:hover:from-indigo-900/30 dark:hover:via-purple-900/25 dark:hover:to-pink-900/30 transition-all duration-300 ease-out group">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 rounded-lg flex items-center justify-center overflow-hidden shadow-md">
-                        {book.frontCover ? (
-                          <img src={book.frontCover} alt={book.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <Book className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="font-semibold text-gray-900 dark:text-white text-sm">{book.title}</div>
-                          {book.criticalIssue && (
-                            <button
-                              onClick={() => handleViewIssues(book.id)}
-                              title="⚠️ Copyright Issue Detected - Click to view details"
-                              className="relative inline-flex items-center justify-center group"
-                            >
-                              {/* Animated pulse ring */}
-                              <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping group-hover:opacity-0"></span>
-                              {/* Icon badge */}
-                              <span className="relative inline-flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 shadow-lg shadow-red-500/50 dark:shadow-red-900/50 hover:shadow-xl hover:shadow-red-500/60 transition-all duration-300 hover:scale-110 border-2 border-white dark:border-gray-800">
-                                <ShieldAlert className="w-3.5 h-3.5 text-white drop-shadow-sm" />
-                              </span>
-                            </button>
-                          )}
-                        </div>
-                        {book.subTitle && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{book.subTitle}</div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="text-sm text-gray-700 dark:text-gray-300">
-                      {book.authorFirstName} {book.authorLastName}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="text-sm text-gray-700 dark:text-gray-300">
-                      {book.publisherName || 'N/A'}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {formatPrice(book.price)}
-                    </div>
-                    {book.discountedPrice && (
-                      <div className="text-xs text-green-600 dark:text-green-400">
-                        Sale: {formatPrice(book.discountedPrice)}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide shadow-md ${getStatusColor(book.bookStatusCode)} text-white`}>
-                      {book.bookStatusName}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <div className="inline-flex items-center justify-center gap-1.5 flex-wrap">
-                      <button
-                        onClick={() => handleViewBook(book.id)}
-                        title="View book details"
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-200"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
-                      {(book.bookStatusCode === 'in_review' || book.bookStatusCode === 'published' || book.bookStatusCode ==='rejected') && (
-                        <button
-                          onClick={() => handleViewIssues(book.id)}
-                          title="View book issues"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-200"
-                        >
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                     
-                       <button
-                       disabled={book.bookStatusId === 1 || !book.manuscriptFilePath }
-                        onClick={() => {
-                          const fullUrl = getFullManuscriptUrl(book.manuscriptFilePath);
-                          const sampleUrl = book.sampleFilePath ? getFullManuscriptUrl(book.sampleFilePath) : null;
-                          
-                          // Extract actual filenames from the file paths
-                          const manuscriptFilename = book.manuscriptFilePath ? book.manuscriptFilePath.split('/').pop() : 'manuscript.epub';
-                          const sampleFilename = book.sampleFilePath ? book.sampleFilePath.split('/').pop() : null;
-                          
-                          // Open modal immediately with loading state
-                          const bookData = { 
-                            url: fullUrl, 
-                            title: book.title,
-                            subtitle: book.subTitle,
-                            author_name: `${book.authorFirstName} ${book.authorLastName}`,
-                            cover_url: book.frontCover,
-                            description: book.bookDescription,
-                            filename: manuscriptFilename,
-                            structure: null,
-                            manuscript_url: fullUrl,
-                            manuscript_filename: manuscriptFilename,
-                            manuscript_structure: null,
-                            sample_url: sampleUrl,
-                            sample_filename: sampleFilename,
-                            sample_structure: null,
-                            samplePageStart: book.samplePageStart,
-                            samplePageEnd: book.samplePageEnd,
-                            totalPages: book.totalPages,
-                            isLoading: true
-                          };
-                          
-                          setEpubReaderBook(bookData);
-                          
-                          // Parse manuscript asynchronously in background
-                          (async () => {
-                            try {
-                              let structure = book.manuscriptStructure;
-                              let sampleStructure = null;
-                              
-                              if (!structure && fullUrl) {
-                                try {
-                                  structure = await parseManuscript(fullUrl, manuscriptFilename);
-                                } catch (parseError) {
-                                  console.error('Failed to parse manuscript:', parseError);
-                                  showError(`Failed to parse manuscript: ${parseError.message}`);
-                                }
-                              }
-                              
-                              if (sampleUrl && sampleFilename) {
-                                try {
-                                  sampleStructure = await parseManuscript(sampleUrl, sampleFilename);
-                                } catch (parseError) {
-                                  console.error('Failed to parse sample:', parseError);
-                                }
-                              }
-                              
-                              // Update with parsed data
-                              setEpubReaderBook(prev => prev ? {
-                                ...prev,
-                                structure,
-                                manuscript_structure: structure,
-                                sample_structure: sampleStructure,
-                                isLoading: false
-                              } : null);
-                            } catch (error) {
-                              console.error('Error during parsing:', error);
-                              setEpubReaderBook(prev => prev ? { ...prev, isLoading: false } : null);
-                            }
-                          })();
-                        }}
-                       
-                        title={book.manuscriptFilePath ? "Read book" : "Manuscript not available"}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
-                      >
-                        <BookOpen className="w-3.5 h-3.5" />
-                      </button>
-                     
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <div className="flex flex-col items-center gap-3">
+                      <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+                      <span className="font-medium">Loading books...</span>
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : error ? (
+                <tr>
+                  <td colSpan="6" className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <XCircle className="w-10 h-10 text-red-500" />
+                      <p className="font-medium text-red-600 dark:text-red-400">{error}</p>
+                      <button
+                        onClick={handleRefresh}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : books.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
+                    <div className="flex flex-col items-center gap-3">
+                      <Book className="w-10 h-10 text-gray-300" />
+                      <p className="font-medium">No books found</p>
+                      <p className="text-sm">Try adjusting your filters</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                books.map((book) => (
+                  <tr 
+                    key={book.id} 
+                    id={`book-${book.id}`}
+
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="w-12 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden">
+                            {book.frontCover ? (
+                              <img src={book.frontCover} alt={book.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <Book className="w-5 h-5 text-gray-400" />
+                            )}
+                          </div>
+                          {book.criticalIssue && (
+                            <div className="absolute -top-1 -right-1">
+                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500">
+                                <AlertOctagon className="w-2.5 h-2.5 text-white" />
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white text-sm">
+                            {book.title}
+                           
+                          </div>
+                          {book.subTitle && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{book.subTitle}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm text-gray-700 dark:text-gray-300">
+                        {book.authorFirstName} {book.authorLastName}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm text-gray-700 dark:text-gray-300">
+                        {book.publisherName || 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {formatPrice(book.price)}
+                      </div>
+                      {book.discountedPrice && (
+                        <div className="text-xs text-green-600 dark:text-green-400">
+                          Sale: {formatPrice(book.discountedPrice)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeStyle(book.bookStatusCode)}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            book.bookStatusCode === 'in_review' ? 'bg-yellow-500' : 
+                            book.bookStatusCode === 'published' ? 'bg-green-500' : 
+                            book.bookStatusCode === 'rejected' ? 'bg-red-500' : 
+                            'bg-gray-500'
+                          }`}></span>
+                          {book.bookStatusName}
+                        </span>
+                        {book.criticalIssue && (
+                          <button
+                            onClick={() => handleViewIssues(book.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs font-medium border border-red-200 dark:border-red-800"
+                          >
+                            <ShieldAlert className="w-3 h-3" />
+                            Critical issue
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleViewBook(book.id)}
+                          title="View details"
+                          className="p-1.5 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {(book.bookStatusCode === 'in_review' || book.bookStatusCode === 'published' || book.bookStatusCode === 'rejected') && (
+                          <button
+                            onClick={() => handleViewIssues(book.id)}
+                            title="View issues"
+                            className="p-1.5 text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 rounded"
+                          >
+                            <AlertTriangle className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          disabled={book.bookStatusId === 1 || !book.manuscriptFilePath}
+                          onClick={() => {
+                            const fullUrl = getFullManuscriptUrl(book.manuscriptFilePath);
+                            const sampleUrl = book.sampleFilePath ? getFullManuscriptUrl(book.sampleFilePath) : null;
+                            
+                            const manuscriptFilename = book.manuscriptFilePath ? book.manuscriptFilePath.split('/').pop() : 'manuscript.epub';
+                            const sampleFilename = book.sampleFilePath ? book.sampleFilePath.split('/').pop() : null;
+                            
+                            const bookData = { 
+                              url: fullUrl, 
+                              title: book.title,
+                              subtitle: book.subTitle,
+                              author_name: `${book.authorFirstName} ${book.authorLastName}`,
+                              cover_url: book.frontCover,
+                              description: book.bookDescription,
+                              filename: manuscriptFilename,
+                              structure: null,
+                              manuscript_url: fullUrl,
+                              manuscript_filename: manuscriptFilename,
+                              manuscript_structure: null,
+                              sample_url: sampleUrl,
+                              sample_filename: sampleFilename,
+                              sample_structure: null,
+                              samplePageStart: book.samplePageStart,
+                              samplePageEnd: book.samplePageEnd,
+                              totalPages: book.totalPages,
+                              isLoading: true
+                            };
+                            
+                            setEpubReaderBook(bookData);
+                            
+                            (async () => {
+                              try {
+                                let structure = book.manuscriptStructure;
+                                let sampleStructure = null;
+                                
+                                if (!structure && fullUrl) {
+                                  try {
+                                    structure = await parseManuscript(fullUrl, manuscriptFilename);
+                                  } catch (parseError) {
+                                    console.error('Failed to parse manuscript:', parseError);
+                                    showError(`Failed to parse manuscript: ${parseError.message}`);
+                                  }
+                                }
+                                
+                                if (sampleUrl && sampleFilename) {
+                                  try {
+                                    sampleStructure = await parseManuscript(sampleUrl, sampleFilename);
+                                  } catch (parseError) {
+                                    console.error('Failed to parse sample:', parseError);
+                                  }
+                                }
+                                
+                                setEpubReaderBook(prev => prev ? {
+                                  ...prev,
+                                  structure,
+                                  manuscript_structure: structure,
+                                  sample_structure: sampleStructure,
+                                  isLoading: false
+                                } : null);
+                              } catch (error) {
+                                console.error('Error during parsing:', error);
+                                setEpubReaderBook(prev => prev ? { ...prev, isLoading: false } : null);
+                              }
+                            })();
+                          }}
+                          title={book.manuscriptFilePath ? "Read book" : "Manuscript not available"}
+                          className="p-1.5 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <BookOpen className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex items-center justify-between">
+          <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30 flex items-center justify-between flex-wrap gap-2">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               Showing {((pagination.page - 1) * pagination.pageSize) + 1} to {Math.min(pagination.page * pagination.pageSize, pagination.totalCount)} of {pagination.totalCount}
             </div>
@@ -711,7 +712,7 @@ const BookManagement = () => {
               <button
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={!hasPreviousPage}
-                className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -721,7 +722,7 @@ const BookManagement = () => {
               <button
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={!hasNextPage}
-                className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -759,31 +760,31 @@ const BookManagement = () => {
             {/* Content */}
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50 dark:bg-gray-900">
               <div className="p-6 space-y-5">
-                
+              
                 {/* Header Section with Book Cover and Title */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-start gap-6">
-                    <div className="relative flex-shrink-0">
-                      {selectedBook.frontCover ? (
-                        <img 
-                          src={selectedBook.frontCover} 
-                          alt={selectedBook.title}
+              <div className="flex items-start gap-6">
+                <div className="relative flex-shrink-0">
+                  {selectedBook.frontCover ? (
+                    <img 
+                      src={selectedBook.frontCover} 
+                      alt={selectedBook.title}
                           className="w-28 h-40 rounded-lg object-cover shadow-sm border border-gray-200 dark:border-gray-700"
-                        />
-                      ) : (
+                    />
+                  ) : (
                         <div className="w-28 h-40 bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 rounded-lg flex items-center justify-center shadow-sm">
                           <Book className="w-12 h-12" />
-                        </div>
-                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
                       <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{selectedBook.title}</h3>
-                      {selectedBook.subTitle && (
+                  {selectedBook.subTitle && (
                         <p className="text-lg text-gray-600 dark:text-gray-400 mb-3">{selectedBook.subTitle}</p>
-                      )}
+                  )}
                       <div className="flex flex-wrap items-center gap-2 mb-4">
-                        {selectedBook.categories && selectedBook.categories.length > 0 && selectedBook.categories.map((category, index) => {
-                          const colors = [
+                    {selectedBook.categories && selectedBook.categories.length > 0 && selectedBook.categories.map((category, index) => {
+                      const colors = [
                             'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
                             'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
                             'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
@@ -792,16 +793,16 @@ const BookManagement = () => {
                             'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
                           ];
                           const colorClass = colors[index % colors.length];
-                          return (
+                      return (
                             <span key={index} className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold ${colorClass}`}>
-                              {category}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      {selectedBook.bookDescription && (
+                          {category}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {selectedBook.bookDescription && (
                         <p className="text-sm font-normal text-gray-600 dark:text-gray-400 leading-relaxed mb-5">{selectedBook.bookDescription}</p>
-                      )}
+                  )}
                       
                       {/* Price, Royalty, Language, ISBN, CP ID */}
                       <div className="grid grid-cols-5 gap-3">
@@ -842,11 +843,11 @@ const BookManagement = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
                 </div>
+              </div>
 
                 {/* Two Column Layout for Details */}
-                <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                   
                   {/* Publication Details */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -860,33 +861,33 @@ const BookManagement = () => {
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                           {selectedBook.publisherName || 'N/A'}
                         </span>
-                      </div>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Author</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {selectedBook.authorFirstName && selectedBook.authorLastName 
-                            ? `${selectedBook.authorFirstName} ${selectedBook.authorLastName}` 
-                            : 'N/A'}
-                        </span>
-                      </div>
+                        {selectedBook.authorFirstName && selectedBook.authorLastName 
+                          ? `${selectedBook.authorFirstName} ${selectedBook.authorLastName}` 
+                          : 'N/A'}
+                      </span>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Total Pages</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                           {selectedBook.totalPages || 'N/A'}
                         </span>
-                      </div>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Created</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                           {selectedBook.createdAt ? new Date(selectedBook.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                         </span>
-                      </div>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Release Date</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                           {selectedBook.releaseDate ? new Date(selectedBook.releaseDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
-                        </span>
-                      </div>
+                      </span>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Published Date</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -901,8 +902,8 @@ const BookManagement = () => {
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Series</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">{selectedBook.seriesName || 'N/A'}</span>
                       </div>
-                    </div>
                   </div>
+                </div>
 
                   {/* Rights & Distribution */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -916,39 +917,39 @@ const BookManagement = () => {
                         <span className={`text-sm font-semibold ${selectedBook.isAllTerritory ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                           {selectedBook.isAllTerritory ? 'Yes' : 'No'}
                         </span>
-                      </div>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Book Enrollment</span>
                         <span className={`text-sm font-semibold ${selectedBook.isBookEnroll ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                           {selectedBook.isBookEnroll ? 'Enabled' : 'Disabled'}
                         </span>
-                      </div>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Adult Content</span>
                         <span className={`text-sm font-semibold ${selectedBook.isAdultContent ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                           {selectedBook.isAdultContent ? 'Yes' : 'No'}
                         </span>
-                      </div>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">AI Generated</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
                           {selectedBook.isAiGenerated ? 'Yes' : 'No'}
                         </span>
-                      </div>
+                    </div>
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Released</span>
                         <span className={`text-sm font-semibold ${selectedBook.isRelease ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                           {selectedBook.isRelease ? 'Yes' : 'No'}
                         </span>
-                      </div>
+                    </div>
                       <div className="flex justify-between items-center py-3">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Publisher Approved</span>
                         <span className={`text-sm font-semibold ${selectedBook.isPublisherApproved ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
                           {selectedBook.isPublisherApproved ? 'Yes' : 'Pending'}
                         </span>
-                      </div>
-                    </div>
                   </div>
+                </div>
+              </div>
 
                   {/* Content Files */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -1034,29 +1035,29 @@ const BookManagement = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     
                     {/* Status Update - Only show if not Draft */}
-                    {selectedBook.bookStatusCode !== 'draft' && (
+              {selectedBook.bookStatusCode !== 'draft' && (
                       <div>
                         <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Update Book Status</h4>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={selectedStatusId || selectedBook.bookStatusId}
-                            onChange={(e) => setSelectedStatusId(parseInt(e.target.value))}
-                            disabled={updatingStatus}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedStatusId || selectedBook.bookStatusId}
+                      onChange={(e) => setSelectedStatusId(parseInt(e.target.value))}
+                      disabled={updatingStatus}
                             className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
-                          >
-                            {bookStatuses
-                              .filter((status) => status.code !== 'draft')
-                              .map((status) => (
-                                <option key={status.id} value={status.id}>
-                                  {status.name}
-                                </option>
-                              ))}
-                          </select>
-                          <button
-                            onClick={handleStatusUpdate}
-                            disabled={updatingStatus || selectedStatusId === selectedBook.bookStatusId}
+                    >
+                      {bookStatuses
+                        .filter((status) => status.code !== 'draft')
+                        .map((status) => (
+                          <option key={status.id} value={status.id}>
+                            {status.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      onClick={handleStatusUpdate}
+                      disabled={updatingStatus || selectedStatusId === selectedBook.bookStatusId}
                             className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
+                    >
                             {updatingStatus ? (
                               <>
                                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1068,11 +1069,11 @@ const BookManagement = () => {
                                 Update
                               </>
                             )}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    </button>
                   </div>
+                </div>
+              )}
+                </div>
                 </div>
               </div>
             </div>
