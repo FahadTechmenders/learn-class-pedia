@@ -47,7 +47,7 @@ const BookManagement = () => {
   const [filters, setFilters] = useState({
     publisherName: '',
     bookStatusId: '',
-    hasIssues: '',
+    bookTitle: '',
   });
   const [showFilters, setShowFilters] = useState(false);
   const [showBookModal, setShowBookModal] = useState(false);
@@ -64,7 +64,7 @@ const BookManagement = () => {
   const emptyFiltersRef = useMemo(() => ({
     publisherName: '',
     bookStatusId: '',
-    hasIssues: '',
+    bookTitle: '',
   }), []);
 
   useEffect(() => {
@@ -352,9 +352,9 @@ const BookManagement = () => {
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-gray-500" />
             <span className="font-medium text-gray-700 dark:text-gray-300">Filters</span>
-            {(filters.publisherName || filters.bookStatusId || filters.hasIssues) && (
+            {(filters.publisherName || filters.bookStatusId || filters.bookTitle) && (
               <span className="ml-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full">
-                {[filters.publisherName, filters.bookStatusId, filters.hasIssues].filter(Boolean).length}
+                {[filters.publisherName, filters.bookStatusId, filters.bookTitle].filter(Boolean).length}
               </span>
             )}
           </div>
@@ -372,6 +372,29 @@ const BookManagement = () => {
         >
           <div className="p-4 bg-gray-50 dark:bg-gray-800/50 space-y-3">
             <div className="flex flex-col md:flex-row md:items-end gap-3">
+                  <div className="flex-1 min-w-0">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                  Book Title
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={filters.bookTitle}
+                    onChange={(e) => setFilters({ ...filters, bookTitle: e.target.value })}
+                    placeholder="Search book title..."
+                    className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                  {filters.bookTitle && (
+                    <button
+                      onClick={() => setFilters({ ...filters, bookTitle: '' })}
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
+                    >
+                      <X className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                  )}
+                </div>
+              </div>
               <div className="flex-1 min-w-0">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                   Publisher Name
@@ -396,6 +419,8 @@ const BookManagement = () => {
                 </div>
               </div>
 
+          
+
               <div className="flex-1 min-w-0">
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                   Status
@@ -414,7 +439,6 @@ const BookManagement = () => {
                 </select>
               </div>
 
-
               <div className="flex flex-row gap-2 flex-shrink-0">
                 <button
                   onClick={handleFilter}
@@ -431,7 +455,7 @@ const BookManagement = () => {
               </div>
             </div>
 
-            {(filters.publisherName || filters.bookStatusId || filters.hasIssues) && (
+            {(filters.publisherName || filters.bookStatusId || filters.bookTitle) && (
               <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Active filters:</span>
                 {filters.publisherName && (
@@ -442,18 +466,18 @@ const BookManagement = () => {
                     </button>
                   </span>
                 )}
-                {filters.bookStatusId && (
+                {filters.bookTitle && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full">
-                    Status: {bookStatuses.find(s => s.id === filters.bookStatusId)?.name}
-                    <button onClick={() => setFilters({ ...filters, bookStatusId: '' })}>
+                    Title: {filters.bookTitle}
+                    <button onClick={() => setFilters({ ...filters, bookTitle: '' })}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 )}
-                {filters.hasIssues && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-full">
-                    {filters.hasIssues === 'true' ? 'With Issues' : 'Without Issues'}
-                    <button onClick={() => setFilters({ ...filters, hasIssues: '' })}>
+                {filters.bookStatusId && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full">
+                    Status: {bookStatuses.find(s => s.id === filters.bookStatusId)?.name}
+                    <button onClick={() => setFilters({ ...filters, bookStatusId: '' })}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>

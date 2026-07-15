@@ -29,6 +29,7 @@ export const useBookManagement = () => {
         pageSize: pageSize.toString(),
         ...(filters.publisherName && { publisherName: filters.publisherName }),
         ...(filters.bookStatusId && { bookStatusId: filters.bookStatusId }),
+        ...(filters.bookTitle && { booktitle: filters.bookTitle }),
       });
 
       const response = await ApiService.get(`${ENDPOINTS.BOOK_ALL}?${queryParams}`);
