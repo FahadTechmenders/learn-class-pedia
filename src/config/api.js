@@ -216,6 +216,8 @@ export const ENDPOINTS = {
   BOOK_STATUS: '/Book/BookStatus',
   BOOK_UPDATE_STATUS: (id) => `/Book/${id}/status`,
   BOOK_ISSUES: (id) => `/Book/${id}/issues`,
+  BOOK_UNPUBLISH_REQUESTS: '/Book/unpublish-requests',
+  BOOK_UNPUBLISH_REQUEST_APPROVE: (requestId) => `/Book/unpublish-requests/${requestId}/approve`,
   BOOK_EPUB: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,
   BOOK_PDF: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,
   BOOK_DOCX: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,

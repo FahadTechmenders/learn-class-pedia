@@ -23,6 +23,7 @@ import {
   AlertOctagon
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
+import UnpublishRequestsModal from '../../../../components/UnpublishRequestsModal';
 import { useToast } from '../../../../components/ToastProvider';
 import BookPreviewer from '../../../../components/EpubReaderComponent';
 import { parseManuscript } from '../../../../services/manuscript.parser';
@@ -41,6 +42,8 @@ const BookManagement = () => {
     getBookStatuses,
     updateBookStatus,
     getBookIssues,
+    getUnpublishRequests,
+    approveUnpublishRequest,
     setSelectedBook,
   } = useBookManagement();
 
@@ -60,6 +63,10 @@ const BookManagement = () => {
   const [showIssuesModal, setShowIssuesModal] = useState(false);
   const [bookIssues, setBookIssues] = useState({ copyright: [], grammar: [] });
   const [loadingIssues, setLoadingIssues] = useState(false);
+  const [showUnpublishModal, setShowUnpublishModal] = useState(false);
+  const [unpublishRequests, setUnpublishRequests] = useState([]);
+  const [loadingUnpublishRequests, setLoadingUnpublishRequests] = useState(false);
+  const [processingRequestId, setProcessingRequestId] = useState(null);
 
   const emptyFiltersRef = useMemo(() => ({
     publisherName: '',
@@ -280,6 +287,50 @@ const BookManagement = () => {
     }
   }, [emptyFiltersRef, getAllBooks, pagination.pageSize]);
 
+  const handleApproveRequest = useCallback(async (requestId) => {
+    setProcessingRequestId(requestId);
+    try {
+      await approveUnpublishRequest(requestId, true);
+      showSuccess('Unpublish request approved successfully');
+      setUnpublishRequests(prev => prev.filter(req => req.id !== requestId));
+      await getAllBooks(pagination.page, pagination.pageSize, filters);
+    } catch (err) {
+      console.error('Failed to approve request:', err);
+      showError('Failed to approve unpublish request');
+    } finally {
+      setProcessingRequestId(null);
+    }
+  }, [approveUnpublishRequest, showSuccess, showError, getAllBooks, pagination.page, pagination.pageSize, filters]);
+
+  const handleRejectRequest = useCallback(async (requestId) => {
+    setProcessingRequestId(requestId);
+    try {
+      await approveUnpublishRequest(requestId, false);
+      showSuccess('Unpublish request rejected successfully');
+      setUnpublishRequests(prev => prev.filter(req => req.id !== requestId));
+      await getAllBooks(pagination.page, pagination.pageSize, filters);
+    } catch (err) {
+      console.error('Failed to reject request:', err);
+      showError('Failed to reject unpublish request');
+    } finally {
+      setProcessingRequestId(null);
+    }
+  }, [approveUnpublishRequest, showSuccess, showError, getAllBooks, pagination.page, pagination.pageSize, filters]);
+
+  const handleFetchUnpublishRequests = useCallback(async () => {
+    setShowUnpublishModal(true);
+    setLoadingUnpublishRequests(true);
+    try {
+      const data = await getUnpublishRequests(1, 100);
+      setUnpublishRequests(data.items || []);
+    } catch (err) {
+      console.error('Failed to fetch unpublish requests:', err);
+      showError('Failed to fetch unpublish requests');
+    } finally {
+      setLoadingUnpublishRequests(false);
+    }
+  }, [getUnpublishRequests, showError]);
+
   const formatPrice = (price) => {
     if (!price && price !== 0) return 'N/A';
     return `$${price.toFixed(2)}`;
@@ -324,6 +375,14 @@ const BookManagement = () => {
                 <Book className="w-6 h-6 text-white" />
               </div>
               Book Management
+              {pagination.unpublishRequestCount > 0 && (
+                <button
+                  onClick={handleFetchUnpublishRequests}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30 border border-orange-200 dark:border-orange-800 transition-colors"
+                >
+                  {pagination.unpublishRequestCount} Unpublished
+                </button>
+              )}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Manage and review all published books
@@ -507,7 +566,7 @@ const BookManagement = () => {
                   Price
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Status & Issues
+                  Status 
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
@@ -566,18 +625,15 @@ const BookManagement = () => {
                               <Book className="w-5 h-5 text-gray-400" />
                             )}
                           </div>
-                          {book.criticalIssue && (
-                            <div className="absolute -top-1 -right-1">
-                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500">
-                                <AlertOctagon className="w-2.5 h-2.5 text-white" />
-                              </span>
-                            </div>
-                          )}
                         </div>
                         <div>
                           <div className="font-medium text-gray-900 dark:text-white text-sm">
                             {book.title}
-                           
+                            {book.criticalIssue && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800">
+                                Needs Attention
+                              </span>
+                            )}
                           </div>
                           {book.subTitle && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">{book.subTitle}</div>
@@ -616,15 +672,7 @@ const BookManagement = () => {
                           }`}></span>
                           {book.bookStatusName}
                         </span>
-                        {book.criticalIssue && (
-                          <button
-                            onClick={() => handleViewIssues(book.id)}
-                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs font-medium border border-red-200 dark:border-red-800"
-                          >
-                            <ShieldAlert className="w-3 h-3" />
-                            Critical issue
-                          </button>
-                        )}
+                       
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -1321,6 +1369,20 @@ const BookManagement = () => {
           </div>
         </div>
       )}
+
+      {/* Unpublish Requests Modal */}
+      <UnpublishRequestsModal
+        isOpen={showUnpublishModal}
+        onClose={() => {
+          setShowUnpublishModal(false);
+          setUnpublishRequests([]);
+        }}
+        requests={unpublishRequests}
+        loading={loadingUnpublishRequests}
+        onApprove={handleApproveRequest}
+        onReject={handleRejectRequest}
+        processingRequestId={processingRequestId}
+      />
     </div>
   );
 };

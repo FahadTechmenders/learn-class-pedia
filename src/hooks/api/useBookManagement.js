@@ -13,6 +13,7 @@ export const useBookManagement = () => {
     page: 1,
     pageSize: 20,
     totalCount: 0,
+    unpublishRequestCount: 0,
   });
 
   const clearError = useCallback(() => {
@@ -41,6 +42,7 @@ export const useBookManagement = () => {
           page: responseData.page || pageNumber,
           pageSize: responseData.pageSize || pageSize,
           totalCount: responseData.totalCount || 0,
+          unpublishRequestCount: responseData.unpublishRequestCount || 0,
         });
         return responseData;
       }
@@ -133,6 +135,43 @@ export const useBookManagement = () => {
     }
   }, []);
 
+  const getUnpublishRequests = useCallback(async (page = 1, pageSize = 100) => {
+    try {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        pageSize: pageSize.toString(),
+      });
+      
+      const response = await ApiService.get(`${ENDPOINTS.BOOK_UNPUBLISH_REQUESTS}?${queryParams}`);
+      
+      if (response && (response.items || response.data?.items)) {
+        const responseData = response.data || response;
+        return responseData;
+      }
+      throw new Error('Invalid response format');
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch unpublish requests';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
+  const approveUnpublishRequest = useCallback(async (requestId, isApproved) => {
+    try {
+      const payload = {
+        isRequestApproved: isApproved ? 1 : 0
+      };
+      
+      const response = await ApiService.put(ENDPOINTS.BOOK_UNPUBLISH_REQUEST_APPROVE(requestId), payload);
+      
+      return response.data || response;
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to process unpublish request';
+      setError(errorMessage);
+      throw err;
+    }
+  }, []);
+
   const resetState = useCallback(() => {
     setBooks([]);
     setSelectedBook(null);
@@ -140,6 +179,7 @@ export const useBookManagement = () => {
       page: 1,
       pageSize: 20,
       totalCount: 0,
+      unpublishRequestCount: 0,
     });
     setError(null);
   }, []);
@@ -157,6 +197,8 @@ export const useBookManagement = () => {
     getBookStatuses,
     updateBookStatus,
     getBookIssues,
+    getUnpublishRequests,
+    approveUnpublishRequest,
     clearError,
     setSelectedBook,
     resetState
