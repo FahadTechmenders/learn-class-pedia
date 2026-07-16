@@ -672,7 +672,12 @@ const BookManagement = () => {
                           }`}></span>
                           {book.bookStatusName}
                         </span>
-                       
+                        {book.isRepublished && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Republish Request
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
