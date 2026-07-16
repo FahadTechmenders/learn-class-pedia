@@ -1034,10 +1034,8 @@ function buildManuscriptSampleSpreads(fullSpreads, book, highlightWords) {
 // ─── Main Previewer ───────────────────────────────────────────────────────────
 
 export default function BookPreviewer({ book, onClose, onApprove }) {
-  const [viewSample, setViewSample] = useState(false);
   const [viewMode, setViewMode] = useState('desktop');
   const [activeTab, setActiveTab] = useState('grammar');
-  const [pageMode, setPageMode] = useState('single');
   const [fontScale, setFontScale] = useState(1);
   const FONT_MIN = 0.8;
   const FONT_MAX = 2;
@@ -1048,12 +1046,6 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   const [approved, setApproved] = useState(false);
   const canvasRef = useRef(null);
   
-  // Detect file type
-  const fileExt = (book?.manuscript_filename || book?.manuscriptFilename || book?.manuscriptFile?.name || '')
-    .split('.').pop().toLowerCase();
-  const isEpub = fileExt === 'epub';
-  const isPdf = fileExt === 'pdf';
-
   // Structural blocking checks (sync). Real formatting/grammar warnings are
   // computed from the parsed EPUB and LanguageTool below.
   const structuralIssues = buildIssues(book);
@@ -1137,35 +1129,6 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
                 </button>
               </div>
             )}
-            {/* Single / Dual page layout tabs (PDF only) */}
-            {viewMode === 'desktop' && isPdf && (
-              <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-1">
-                <button
-                  onClick={() => setPageMode('single')}
-                  className={cn('px-2.5 py-1 rounded-md text-xs font-semibold transition-colors',
-                    pageMode === 'single' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100')}>
-                  Single
-                </button>
-                <button
-                  onClick={() => setPageMode('dual')}
-                  className={cn('px-2.5 py-1 rounded-md text-xs font-semibold transition-colors',
-                    pageMode === 'dual' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100')}>
-                  Dual
-                </button>
-              </div>
-            )}
-            {/* View Sample Chapter toggle */}
-            <button
-              onClick={() => setViewSample(v => !v)}
-              className={cn('flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold border transition-all',
-                viewSample
-                  ? 'bg-indigo-600 border-indigo-700 text-white shadow-sm shadow-indigo-200'
-                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
-              )}>
-              <BookOpen className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">{viewSample ? 'View Full Book' : 'View Sample Chapter'}</span>
-              <span className="sm:hidden">{viewSample ? 'Full' : 'Sample'}</span>
-            </button>
             {/* Approve button */}
             {/* <button
               onClick={() => {
@@ -1220,8 +1183,7 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
                 book={book} 
                 fontScale={fontScale} 
                 viewMode={viewMode} 
-                sampleMode={viewSample}
-                pageMode={pageMode}
+                sampleMode={false}
               />
             )}
           </div>

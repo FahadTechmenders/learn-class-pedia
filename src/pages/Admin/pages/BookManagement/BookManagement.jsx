@@ -672,7 +672,7 @@ const BookManagement = () => {
                           }`}></span>
                           {book.bookStatusName}
                         </span>
-                        {book.isRepublished && (
+                        {book.isRepublished && book.bookStatusCode === 'in_review' && (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
                             <RefreshCw className="w-3.5 h-3.5" />
                             Republish Request
@@ -1020,10 +1020,10 @@ const BookManagement = () => {
                         </span>
                     </div>
                       <div className="flex justify-between items-center py-3">
-                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Publisher Approved</span>
+                        {/* <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Publisher Approved</span>
                         <span className={`text-sm font-semibold ${selectedBook.isPublisherApproved ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
                           {selectedBook.isPublisherApproved ? 'Yes' : 'Pending'}
-                        </span>
+                        </span> */}
                   </div>
                 </div>
               </div>

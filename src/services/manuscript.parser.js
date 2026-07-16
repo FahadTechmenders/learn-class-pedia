@@ -117,7 +117,7 @@ export async function parsePdf(url, options = {}) {
   
   try {
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@6.1.200/legacy/build/pdf.worker.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.8.69/legacy/build/pdf.worker.min.mjs';
     
     let pdfData;
     try {
