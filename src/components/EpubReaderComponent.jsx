@@ -1163,7 +1163,7 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
                     </div>
                   </div>
                   <div className="text-center space-y-2">
-                    <h3 className="text-xl font-bold text-slate-800">Loading Manuscript</h3>
+                    <h3 className="text-xl font-bold text-slate-800">Loading Manuscript File is too large</h3>
                     <p className="text-sm text-slate-600 leading-relaxed">
                       Parsing and preparing your book for preview...
                     </p>

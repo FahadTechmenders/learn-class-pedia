@@ -3,7 +3,7 @@ import ePub from 'epubjs';
 import { renderAsync } from 'docx-preview';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2, FileText, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { ENDPOINTS } from '../config/api';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
@@ -58,7 +58,7 @@ async function getArrayBuffer(book) {
     
     if (apiEndpoint) {
       try {
-        const apiUrl = `${API_CONFIG.BASE_URL}${apiEndpoint}`;
+        const apiUrl = apiEndpoint;
         console.log(`[FaithfulReader] Fetching ${ext.toUpperCase()} via backend API:`, apiUrl);
         const res = await fetch(apiUrl);
         if (!res.ok) throw new Error(`Backend API error: ${res.status}`);
@@ -128,6 +128,58 @@ function CoverPage({ book }) {
   );
 }
 
+// Resolve image sources inside an EPUB section to archive blob URLs.
+// epub.js's default string-substitution reliably rewrites <img src> but often
+// misses SVG <image xlink:href> used by EPUB 2.0 "image-based text" books, so
+// those pages render as broken images. This walks the section document (before
+// serialization) and replaces both <img src> and SVG <image href/xlink:href>
+// with blob: URLs created straight from the zip archive.
+async function resolveEpubImages(doc, section, book) {
+  if (!doc || !book || !book.archive || typeof book.archive.createUrl !== 'function') return;
+  const XLINK = 'http://www.w3.org/1999/xlink';
+  const sectionUrl = (section && (section.url || section.href)) || '';
+  const baseHref = 'https://epub.local/' + String(sectionUrl).replace(/^\//, '');
+
+  const toArchivePath = (src) => {
+    try { return new URL(src, baseHref).pathname; } catch (_) { return null; }
+  };
+
+  const tasks = [];
+  const handle = (getSrc, setSrc) => {
+    const src = getSrc();
+    if (!src) return;
+    const low = src.trim().toLowerCase();
+    if (low.startsWith('blob:') || low.startsWith('data:') || low.startsWith('http://') || low.startsWith('https://')) return;
+    const path = toArchivePath(src);
+    if (!path) return;
+    tasks.push(
+      book.archive.createUrl(path, { base64: false })
+        .then((blobUrl) => { if (blobUrl) setSrc(blobUrl); })
+        .catch(() => {})
+    );
+  };
+
+  const imgs = doc.getElementsByTagName ? doc.getElementsByTagName('img') : [];
+  for (let i = 0; i < imgs.length; i++) {
+    const el = imgs[i];
+    handle(() => el.getAttribute('src'), (v) => el.setAttribute('src', v));
+  }
+
+  const images = doc.getElementsByTagName ? doc.getElementsByTagName('image') : [];
+  for (let i = 0; i < images.length; i++) {
+    const el = images[i];
+    handle(
+      () => (el.getAttributeNS && el.getAttributeNS(XLINK, 'href')) || el.getAttribute('xlink:href') || el.getAttribute('href'),
+      (v) => {
+        try { if (el.setAttributeNS) el.setAttributeNS(XLINK, 'href', v); } catch (_) {}
+        try { el.setAttribute('href', v); } catch (_) {}
+      }
+    );
+  }
+
+  await Promise.all(tasks);
+}
+
 // ─── EPUB reader (epub.js — faithful, CONTINUOUS SCROLL, 2.0 / 3.0 + images) ──
 // Renders the real EPUB exactly as authored (its own background, headings, page
 // structure, images) in a smooth vertical scroll. The uploaded cover is injected
@@ -152,6 +204,12 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         bookRef.current = book;
         await book.ready;
         if (destroyed) return;
+
+        // Rewrite <img>/<svg image> sources to archive blob URLs so EPUB 2.0
+        // image-based-text pages actually display (runs before serialization).
+        if (book.archived && book.spine?.hooks?.content) {
+          book.spine.hooks.content.register((doc, section) => resolveEpubImages(doc, section, book));
+        }
 
         const spine = /** @type {any} */ (book.spine);
         let firstIndex = spine?.spineItems?.[0]?.index ?? 0;
@@ -494,7 +552,7 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
     return () => { cancelled = true; };
   }, [book?.manuscriptFile, book?.manuscript_url, book?.manuscriptUrl]);
 
-  if (state === 'loading') return <CenterMessage icon={Loader2} spin title="Loading manuscript…" />;
+  if (state === 'loading') return <CenterMessage icon={Loader2} spin title="Loading manuscript file is too large…" />;
   if (state === 'nofile') return <CenterMessage icon={FileText} title="No manuscript uploaded" subtitle="Upload an EPUB, PDF, or DOCX file to preview your book." />;
   if (state === 'error' || !buffer) return <CenterMessage icon={AlertCircle} title="Could not load the manuscript" subtitle="Please re-upload the file and try again." />;
 

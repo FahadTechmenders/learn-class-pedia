@@ -1,5 +1,9 @@
 import appSettings from './appSettings';
 
+// Dedicated proxy used only for fetching publisher book manuscript files
+// (bypasses CORS). Distinct host/path from the main API_CONFIG.BASE_URL.
+export const PUBLISHER_BOOK_PROXY_BASE = 'https://class.thetechmenders.com/api';
+
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: process.env.REACT_APP_API_URL || appSettings.api.baseUrl,
@@ -218,9 +222,9 @@ export const ENDPOINTS = {
   BOOK_ISSUES: (id) => `/Book/${id}/issues`,
   BOOK_UNPUBLISH_REQUESTS: '/Book/unpublish-requests',
   BOOK_UNPUBLISH_REQUEST_APPROVE: (requestId) => `/Book/unpublish-requests/${requestId}/approve`,
-  BOOK_EPUB: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,
-  BOOK_PDF: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,
-  BOOK_DOCX: (url) => `/Book/epub?url=${encodeURIComponent(url)}`,
+  BOOK_EPUB: (url) => `${PUBLISHER_BOOK_PROXY_BASE}/publisher-book/epub?url=${encodeURIComponent(url)}`,
+  BOOK_PDF: (url) => `${PUBLISHER_BOOK_PROXY_BASE}/publisher-book/epub?url=${encodeURIComponent(url)}`,
+  BOOK_DOCX: (url) => `${PUBLISHER_BOOK_PROXY_BASE}/publisher-book/epub?url=${encodeURIComponent(url)}`,
 
   // Book Category Management endpoints
   BOOK_CATEGORY_ALL: '/BookCategory',

@@ -1,5 +1,5 @@
 import ePub from 'epubjs';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { ENDPOINTS } from '../config/api';
 
 /**
  * Parse EPUB file and extract structured content (optimized)
@@ -10,7 +10,7 @@ export async function parseEpub(url, options = {}) {
   try {
     let blobUrl;
     try {
-      const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_EPUB(url)}`;
+      const apiUrl = ENDPOINTS.BOOK_EPUB(url);
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const blob = await response.blob();
@@ -117,11 +117,11 @@ export async function parsePdf(url, options = {}) {
   
   try {
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.8.69/legacy/build/pdf.worker.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
     
     let pdfData;
     try {
-      const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_PDF(url)}`;
+      const apiUrl = ENDPOINTS.BOOK_PDF(url);
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       pdfData = { data: await response.arrayBuffer() };
@@ -230,7 +230,7 @@ export async function parseDocx(url, options = {}) {
     
     let arrayBuffer;
     try {
-      const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_DOCX(url)}`;
+      const apiUrl = ENDPOINTS.BOOK_DOCX(url);
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       arrayBuffer = await response.arrayBuffer();
