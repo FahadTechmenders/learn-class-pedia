@@ -3,9 +3,13 @@ import ePub from 'epubjs';
 import { renderAsync } from 'docx-preview';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2, FileText, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { ENDPOINTS } from '../config/api';
+import { ENDPOINTS, API_CONFIG } from '../config/api';
+import { getCachedFile, setCachedFile } from '../utils/fileCache';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+// Request deduplication cache to prevent multiple simultaneous fetches
+const requestCache = new Map();
 
 function playPageFlipSound() {
   if (typeof window === 'undefined') return;
@@ -57,20 +61,52 @@ async function getArrayBuffer(book) {
     }
     
     if (apiEndpoint) {
-      try {
-        const apiUrl = apiEndpoint;
-        console.log(`[FaithfulReader] Fetching ${ext.toUpperCase()} via backend API:`, apiUrl);
-        const res = await fetch(apiUrl);
-        if (!res.ok) throw new Error(`Backend API error: ${res.status}`);
-        console.log(`[FaithfulReader] ${ext.toUpperCase()} fetched successfully from backend API`);
-        return await res.arrayBuffer();
-      } catch (apiError) {
-        console.warn('[FaithfulReader] Backend API failed, trying direct fetch:', apiError);
-        // Fallback to direct fetch (may fail due to CORS)
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Failed to fetch manuscript (${res.status})`);
-        return await res.arrayBuffer();
+      const cacheKey = apiEndpoint;
+      
+      // Return existing promise if request is already in flight
+      if (requestCache.has(cacheKey)) {
+        console.log(`[FaithfulReader] Reusing in-flight request for ${ext.toUpperCase()}`);
+        return requestCache.get(cacheKey);
       }
+      
+      // Create new request promise
+      const requestPromise = (async () => {
+        try {
+          // Check IndexedDB cache first
+          const cachedData = await getCachedFile(apiEndpoint);
+          if (cachedData) {
+            console.log(`[FaithfulReader] Using cached ${ext.toUpperCase()} from IndexedDB`);
+            return cachedData;
+          }
+          
+          // Fetch from backend API
+          const apiUrl = `${API_CONFIG.BASE_URL}${apiEndpoint}`;
+          console.log(`[FaithfulReader] Fetching ${ext.toUpperCase()} via backend API:`, apiUrl);
+          const res = await fetch(apiUrl, {
+            cache: 'no-store' // Bypass HTTP cache, use IndexedDB instead
+          });
+          if (!res.ok) throw new Error(`Backend API error: ${res.status}`);
+          
+          const arrayBuffer = await res.arrayBuffer();
+          console.log(`[FaithfulReader] ${ext.toUpperCase()} fetched successfully (${(arrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB)`);
+          
+          // Cache in IndexedDB for next time
+          setCachedFile(apiEndpoint, arrayBuffer).catch(err => {
+            console.warn('[FaithfulReader] Failed to cache file:', err);
+          });
+          
+          return arrayBuffer;
+        } catch (apiError) {
+          console.warn('[FaithfulReader] Backend API failed:', apiError);
+          throw new Error(`Failed to load manuscript: ${apiError.message}`);
+        } finally {
+          // Clean up request cache after completion
+          setTimeout(() => requestCache.delete(cacheKey), 1000);
+        }
+      })();
+      
+      requestCache.set(cacheKey, requestPromise);
+      return requestPromise;
     }
     
     // For unsupported file types, fetch directly
@@ -531,7 +567,13 @@ const VIEW_BASE_WIDTH = { desktop: 720, tablet: 600, mobile: 480 };
 export default function FaithfulReader({ book, fontScale = 1, viewMode = 'desktop', sampleMode = false }) {
   const [buffer, setBuffer] = useState(null);
   const [state, setState] = useState('loading');
+  const [loadProgress, setLoadProgress] = useState(0);
   const ext = fileExtension(book);
+
+  // Extract stable primitive values for dependencies
+  const manuscriptUrl = book?.manuscript_url || book?.manuscriptUrl;
+  const manuscriptFileName = book?.manuscriptFile?.name;
+  const manuscriptFileSize = book?.manuscriptFile?.size;
 
   useEffect(() => {
     let cancelled = false;
@@ -550,9 +592,12 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
       }
     })();
     return () => { cancelled = true; };
-  }, [book?.manuscriptFile, book?.manuscript_url, book?.manuscriptUrl]);
+  }, [manuscriptUrl, manuscriptFileName, manuscriptFileSize]);
 
-  if (state === 'loading') return <CenterMessage icon={Loader2} spin title="Loading manuscript file is too large…" />;
+  if (state === 'loading') {
+    const progressText = loadProgress > 0 ? `Loading... ${loadProgress}%` : 'Loading manuscript file is too large...';
+    return <CenterMessage icon={Loader2} spin title={progressText} />;
+  }
   if (state === 'nofile') return <CenterMessage icon={FileText} title="No manuscript uploaded" subtitle="Upload an EPUB, PDF, or DOCX file to preview your book." />;
   if (state === 'error' || !buffer) return <CenterMessage icon={AlertCircle} title="Could not load the manuscript" subtitle="Please re-upload the file and try again." />;
 

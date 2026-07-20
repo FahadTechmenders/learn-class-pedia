@@ -5,38 +5,8 @@ import {
   AlertTriangle, ShieldCheck, Tablet, Smartphone, Loader2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { checkManuscriptGrammar } from '../services/grammar.service';
-import { analyzeManuscriptFormatting } from '../services/formatting.service';
 import FaithfulReader from './FaithfulReader';
 
-// ─── Sound engine (Web Audio API — no external deps) ─────────────────────────
-function playPageFlipSound() {
-  if (typeof window === 'undefined') return;
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const duration = 0.18;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      const t = i / ctx.sampleRate;
-      const env = Math.exp(-t * 28);
-      // layered noise + low thump for paper rustle
-      data[i] = (Math.random() * 2 - 1) * env * 0.55
-        + Math.sin(2 * Math.PI * 120 * t) * Math.exp(-t * 60) * 0.3;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.9, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-    src.connect(gain);
-    gain.connect(ctx.destination);
-    src.start();
-    src.stop(ctx.currentTime + duration);
-  } catch (_) {}
-}
 
 // ─── Page content components ──────────────────────────────────────────────────
 
@@ -1042,47 +1012,9 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   const FONT_STEP = 0.1;
   const decreaseFont = () => setFontScale((s) => Math.max(FONT_MIN, Math.round((s - FONT_STEP) * 10) / 10));
   const increaseFont = () => setFontScale((s) => Math.min(FONT_MAX, Math.round((s + FONT_STEP) * 10) / 10));
-  const [selectedIssueIndex, setSelectedIssueIndex] = useState(0);
   const [approved, setApproved] = useState(false);
   const canvasRef = useRef(null);
   
-  // Structural blocking checks (sync). Real formatting/grammar warnings are
-  // computed from the parsed EPUB and LanguageTool below.
-  const structuralIssues = buildIssues(book);
-  const [analyzedFormatting, setAnalyzedFormatting] = useState([]);
-  const [grammarIssues, setGrammarIssues] = useState([]);
-  const [grammarLoading, setGrammarLoading] = useState(true);
-
-  useEffect(() => {
-    const structure = book.manuscript_structure || book.structure;
-    // Formatting analysis is synchronous (reads the parsed EPUB structure).
-    setAnalyzedFormatting(analyzeManuscriptFormatting(structure));
-
-    // Grammar analysis hits the LanguageTool API — run async and abortable.
-    let cancelled = false;
-    const controller = new AbortController();
-    setGrammarIssues([]);
-    setGrammarLoading(true);
-    (async () => {
-      try {
-        const result = await checkManuscriptGrammar(structure, { signal: controller.signal });
-        if (!cancelled) setGrammarIssues(result);
-      } catch (err) {
-        if (!cancelled && err?.name !== 'AbortError') {
-          console.error('Grammar check failed:', err);
-          setGrammarIssues([]);
-        }
-      } finally {
-        if (!cancelled) setGrammarLoading(false);
-      }
-    })();
-    return () => { cancelled = true; controller.abort(); };
-  }, [book.manuscript_structure, book.structure]);
-
-  const formattingIssues = [...structuralIssues, ...analyzedFormatting];
-  const tabIssues = activeTab === 'formatting' ? formattingIssues : grammarIssues;
-  const selectedIssue = tabIssues[selectedIssueIndex] || null;
-  const hasBlockingErrors = structuralIssues.filter(i => i.id === 'no_manuscript' || i.id === 'no_cover').length > 0;
 
   // Escape key to close
   useEffect(() => {

@@ -20,7 +20,8 @@ import {
   AlertCircle,
   AlertTriangle,
   ShieldAlert,
-  AlertOctagon
+  AlertOctagon,
+  Globe
 } from 'lucide-react';
 import useBookManagement from '../../../../hooks/api/useBookManagement';
 import UnpublishRequestsModal from '../../../../components/UnpublishRequestsModal';
@@ -989,12 +990,7 @@ const BookManagement = () => {
                       Rights & Distribution
                     </h4>
                     <div className="space-y-0">
-                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
-                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">All Territory</span>
-                        <span className={`text-sm font-semibold ${selectedBook.isAllTerritory ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
-                          {selectedBook.isAllTerritory ? 'Yes' : 'No'}
-                        </span>
-                    </div>
+                     
                       <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Book Enrollment</span>
                         <span className={`text-sm font-semibold ${selectedBook.isBookEnroll ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
@@ -1041,6 +1037,12 @@ const BookManagement = () => {
                           {selectedBook.manuscriptFilePath ? 'Uploaded' : 'Not uploaded'}
                         </span>
                       </div>
+                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Manuscript Filename</span>
+                        <span className="text-xs font-medium text-gray-900 dark:text-white truncate max-w-xs" title={selectedBook.manuscriptFilename || selectedBook.manuscriptFilePath?.split('/').pop() || 'Not found'}>
+                          {selectedBook.manuscriptFilename? selectedBook.manuscriptFilename : 'Not found'}
+                        </span>
+                      </div>
                       <div className="flex justify-between items-center py-3">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Sample</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -1074,6 +1076,30 @@ const BookManagement = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Territory Details - Only show when isAllTerritory is false */}
+                {!selectedBook.isAllTerritory && selectedBook.bookTerittory && selectedBook.bookTerittory.length > 0 && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Territory Details
+                      <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full">
+                        {selectedBook.bookTerittory.length} {selectedBook.bookTerittory.length === 1 ? 'Country' : 'Countries'}
+                      </span>
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedBook.bookTerittory.map((territory, index) => (
+                        <span 
+                          key={territory.countryId || index} 
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                        >
+                          <Globe className="w-3 h-3" />
+                          {territory.territoryName}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Keywords */}
                 {selectedBook.keywords && selectedBook.keywords.length > 0 && (
@@ -1164,7 +1190,7 @@ const BookManagement = () => {
             title: epubReaderBook.title,
             author_name: epubReaderBook.author_name || 'Author',
             manuscript_url: epubReaderBook.url || epubReaderBook.manuscript_url,
-            manuscript_filename: epubReaderBook.filename || epubReaderBook.manuscript_filename || 'manuscript.epub',
+            manuscript_filename: epubReaderBook.filename || epubReaderBook.manuscript_filename || 'null',
             manuscript_structure: epubReaderBook.structure || null,
             cover_url: epubReaderBook.cover_url || null,
             description: epubReaderBook.description || '',
