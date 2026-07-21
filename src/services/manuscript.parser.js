@@ -8,31 +8,68 @@ export async function parseEpub(url, options = {}) {
   const { maxChapters = null, batchSize = 5 } = options;
   
   try {
-    let blobUrl;
+    console.log('[parseEpub] Starting EPUB parsing for:', url);
+    
+    // ⚠️ Direct CDN fetch disabled due to CORS restrictions
+    // TODO: Enable CORS on cdn.classpedia.ai then set isCdnUrl = true
+    const isCdnUrl = false; // url.includes('cdn.classpedia.ai') || url.includes('cloudfront.net');
+    
+    let arrayBuffer;
+    const startTime = performance.now();
+    
     try {
-      const apiUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_EPUB(url)}`;
-      const response = await fetch(apiUrl);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const blob = await response.blob();
-      blobUrl = URL.createObjectURL(blob);
-    } catch (fetchError) {
-      console.warn('Backend API failed, trying direct fetch:', fetchError);
-      try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const blob = await response.blob();
-        blobUrl = URL.createObjectURL(blob);
-      } catch (directFetchError) {
-        blobUrl = url;
+      let fetchUrl;
+      
+      if (isCdnUrl) {
+        // ✅ Direct CDN fetch - much faster, no backend involved!
+        fetchUrl = url;
+        console.log('[parseEpub] 📥 Fetching directly from CDN:', fetchUrl);
+      } else {
+        // Use backend API proxy only for non-CDN URLs (CORS handling)
+        fetchUrl = `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_EPUB(url)}`;
+        console.log('[parseEpub] 📥 Fetching via backend API:', fetchUrl);
       }
+      
+      const response = await fetch(fetchUrl, { 
+        cache: 'no-store',
+        headers: {
+          'Accept': 'application/epub+zip, application/octet-stream, */*'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[parseEpub] ❌ Fetch error:', response.status, errorText);
+        throw new Error(`Fetch error: ${response.status} - ${errorText}`);
+      }
+      
+      console.log('[parseEpub] 📊 Response received, converting to ArrayBuffer...');
+      arrayBuffer = await response.arrayBuffer();
+      
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        throw new Error('Received empty file');
+      }
+      
+    } catch (fetchError) {
+      console.error('[parseEpub] ❌ Fetch failed:', fetchError);
+      throw new Error(`Failed to fetch: ${fetchError.message}`);
     }
     
-    const book = ePub(blobUrl, { openAs: 'epub' });
-    await book.ready;
+    const loadTime = ((performance.now() - startTime) / 1000).toFixed(1);
+    const sizeMB = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
+    console.log(`[parseEpub] ✅ Loaded ${sizeMB} MB in ${loadTime}s, initializing epub.js...`);
+    
+    // Use ArrayBuffer directly - much faster than blob URL for large files
+    // This prevents browser freeze that happens with URL.createObjectURL(blob)
+    try {
+      const book = ePub(arrayBuffer, { openAs: 'epub' });
+      console.log('[parseEpub] 📖 epub.js initialized, waiting for ready...');
+      await book.ready;
+      console.log('[parseEpub] ✅ Book ready, starting chapter extraction...');
 
-    const chapters = [];
-    const spine = book.spine;
-    const items = spine.items.slice(0, maxChapters || spine.items.length);
+      const chapters = [];
+      const spine = book.spine;
+      const items = spine.items.slice(0, maxChapters || spine.items.length);
     
     // Process in batches for better performance
     for (let i = 0; i < items.length; i += batchSize) {
@@ -89,17 +126,19 @@ export async function parseEpub(url, options = {}) {
       const batchResults = await Promise.all(batchPromises);
       chapters.push(...batchResults.filter(Boolean));
     }
-
-    if (blobUrl !== url) URL.revokeObjectURL(blobUrl);
     
-    return {
-      chapters,
-      metadata: {
-        title: book.packaging?.metadata?.title || '',
-        author: book.packaging?.metadata?.creator || '',
-        language: book.packaging?.metadata?.language || 'en'
-      }
-    };
+      return {
+        chapters,
+        metadata: {
+          title: book.packaging?.metadata?.title || '',
+          author: book.packaging?.metadata?.creator || '',
+          language: book.packaging?.metadata?.language || 'en'
+        }
+      };
+    } catch (epubError) {
+      console.error('[parseEpub] ❌ epub.js error:', epubError);
+      throw new Error(`epub.js initialization failed: ${epubError.message}`);
+    }
   } catch (error) {
     console.error('EPUB parsing error:', error);
     if (error.message.includes('CORS') || error.message.includes('NetworkError')) {
@@ -323,20 +362,40 @@ const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 export async function parseManuscript(url, filename, options = {}) {
   if (!url) throw new Error('No manuscript URL provided');
   
-  const { useCache = true, ...parseOptions } = options;
+  const { useCache = true, forceParse = false, ...parseOptions } = options;
   const cacheKey = `${url}_${JSON.stringify(parseOptions)}`;
   
   // Check cache
   if (useCache && manuscriptCache.has(cacheKey)) {
     const cached = manuscriptCache.get(cacheKey);
     if (Date.now() - cached.timestamp < CACHE_TTL) {
-      console.log('Using cached manuscript data');
+      console.log('[parseManuscript] ✅ Using cached manuscript data');
       return cached.data;
     }
     manuscriptCache.delete(cacheKey);
   }
   
+  // Skip parsing by default - FaithfulReader will display files directly
+  // Only parse if explicitly requested via forceParse: true
+  if (!forceParse) {
+    console.log('[parseManuscript] ⚠️ Parsing skipped (use forceParse: true to enable)');
+    console.log('[parseManuscript] File will be displayed directly in FaithfulReader without parsing');
+    
+    // Return minimal structure - FaithfulReader will handle display
+    return {
+      chapters: [],
+      metadata: {
+        title: filename || 'Manuscript',
+        author: '',
+        language: 'en',
+        skipReason: 'Parsing disabled by default for performance'
+      }
+    };
+  }
+  
   const ext = (filename || url).split('.').pop().toLowerCase();
+  
+  console.log(`[parseManuscript] Starting parse for ${ext.toUpperCase()} file...`);
   
   let result;
   if (ext === 'epub') result = await parseEpub(url, parseOptions);

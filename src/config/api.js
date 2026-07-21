@@ -224,7 +224,7 @@ export const ENDPOINTS = {
   BOOK_UNPUBLISH_REQUEST_APPROVE: (requestId) => `/Book/unpublish-requests/${requestId}/approve`,
   BOOK_EPUB: (url) => `/book/epub?url=${encodeURIComponent(url)}`,
   BOOK_PDF: (url) => `/book/epub?url=${encodeURIComponent(url)}`,
-  BOOK_DOCX: (url) => `/book/epub??url=${encodeURIComponent(url)}`,
+  BOOK_DOCX: (url) => `/book/epub?url=${encodeURIComponent(url)}`,
 
 
   // Book Category Management endpoints

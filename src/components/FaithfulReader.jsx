@@ -38,7 +38,7 @@ function playPageFlipSound() {
   } catch (_) {}
 }
 
-async function getArrayBuffer(book) {
+async function getArrayBuffer(book, onProgress = null) {
   const file = book?.manuscriptFile;
   if (file && typeof file.arrayBuffer === 'function') {
     return await file.arrayBuffer();
@@ -50,69 +50,159 @@ async function getArrayBuffer(book) {
     const filename = book?.manuscript_filename || book?.manuscriptFilename || '';
     const ext = (filename.split('.').pop() || '').toLowerCase();
     
-    // Use backend API for all supported file types to bypass CORS
-    let apiEndpoint = null;
-    if (ext === 'epub') {
-      apiEndpoint = ENDPOINTS.BOOK_EPUB(url);
-    } else if (ext === 'pdf') {
-      apiEndpoint = ENDPOINTS.BOOK_PDF(url);
-    } else if (ext === 'docx' || ext === 'doc') {
-      apiEndpoint = ENDPOINTS.BOOK_DOCX(url);
-    }
+    // ⚠️ Direct CDN fetch disabled due to CORS restrictions
+    // TODO: Enable CORS on cdn.classpedia.ai then set isCdnUrl = true
+    const isCdnUrl = false; // url.includes('cdn.classpedia.ai') || url.includes('cloudfront.net');
     
-    if (apiEndpoint) {
-      const cacheKey = apiEndpoint;
-      
-      // Return existing promise if request is already in flight
-      if (requestCache.has(cacheKey)) {
-        console.log(`[FaithfulReader] Reusing in-flight request for ${ext.toUpperCase()}`);
-        return requestCache.get(cacheKey);
+    let fetchUrl = url;
+    let cacheKey = url;
+    
+    // Only use backend proxy for non-CDN URLs (CORS handling)
+    if (!isCdnUrl) {
+      let apiEndpoint = null;
+      if (ext === 'epub') {
+        apiEndpoint = ENDPOINTS.BOOK_EPUB(url);
+      } else if (ext === 'pdf') {
+        apiEndpoint = ENDPOINTS.BOOK_PDF(url);
+      } else if (ext === 'docx' || ext === 'doc') {
+        apiEndpoint = ENDPOINTS.BOOK_DOCX(url);
       }
       
-      // Create new request promise
-      const requestPromise = (async () => {
-        try {
-          // Check IndexedDB cache first
-          const cachedData = await getCachedFile(apiEndpoint);
-          if (cachedData) {
-            console.log(`[FaithfulReader] Using cached ${ext.toUpperCase()} from IndexedDB`);
-            return cachedData;
-          }
-          
-          // Fetch from backend API
-          const apiUrl = `${API_CONFIG.BASE_URL}${apiEndpoint}`;
-          console.log(`[FaithfulReader] Fetching ${ext.toUpperCase()} via backend API:`, apiUrl);
-          const res = await fetch(apiUrl, {
-            cache: 'no-store' // Bypass HTTP cache, use IndexedDB instead
-          });
-          if (!res.ok) throw new Error(`Backend API error: ${res.status}`);
-          
-          const arrayBuffer = await res.arrayBuffer();
-          console.log(`[FaithfulReader] ${ext.toUpperCase()} fetched successfully (${(arrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB)`);
-          
-          // Cache in IndexedDB for next time
-          setCachedFile(apiEndpoint, arrayBuffer).catch(err => {
-            console.warn('[FaithfulReader] Failed to cache file:', err);
-          });
-          
-          return arrayBuffer;
-        } catch (apiError) {
-          console.warn('[FaithfulReader] Backend API failed:', apiError);
-          throw new Error(`Failed to load manuscript: ${apiError.message}`);
-        } finally {
-          // Clean up request cache after completion
-          setTimeout(() => requestCache.delete(cacheKey), 1000);
-        }
-      })();
-      
-      requestCache.set(cacheKey, requestPromise);
-      return requestPromise;
+      if (apiEndpoint) {
+        fetchUrl = `${API_CONFIG.BASE_URL}${apiEndpoint}`;
+        cacheKey = apiEndpoint;
+      }
     }
     
-    // For unsupported file types, fetch directly
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to fetch manuscript (${res.status})`);
-    return await res.arrayBuffer();
+    // Return existing promise if request is already in flight
+    if (requestCache.has(cacheKey)) {
+      console.log(`[FaithfulReader] Reusing in-flight request for ${ext.toUpperCase()}`);
+      return requestCache.get(cacheKey);
+    }
+    
+    // Create new request promise with streaming and progress
+    const requestPromise = (async () => {
+      try {
+        // Check IndexedDB cache first
+        const cachedData = await getCachedFile(cacheKey);
+        if (cachedData) {
+          console.log(`[FaithfulReader] ✅ Using cached ${ext.toUpperCase()} from IndexedDB`);
+          if (onProgress) onProgress(100);
+          return cachedData;
+        }
+        
+        // Fetch with streaming and progress tracking
+        const source = isCdnUrl ? 'CDN' : 'backend API';
+        console.log(`[FaithfulReader] 📥 Fetching ${ext.toUpperCase()} from ${source}:`, fetchUrl);
+        const startTime = performance.now();
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+        
+        try {
+          const res = await fetch(fetchUrl, {
+            cache: 'no-store',
+            signal: controller.signal,
+            // ⚡ Request compression from server for faster transfer
+            headers: {
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Accept': 'application/octet-stream, */*'
+            },
+            // ⚡ Use high priority for manuscript loading
+            priority: 'high'
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          
+          // Get content length for progress tracking
+          const contentLength = res.headers.get('Content-Length');
+          const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+          
+          // Use streaming if available and size is known
+          if (res.body && totalBytes > 0) {
+            console.log(`[FaithfulReader] 📊 Streaming ${(totalBytes / 1024 / 1024).toFixed(2)} MB...`);
+            
+            const reader = res.body.getReader();
+            
+            // ⚡ Pre-allocate buffer for better performance (avoid array resizing)
+            const arrayBuffer = new Uint8Array(totalBytes);
+            let receivedBytes = 0;
+            let lastProgressUpdate = 0;
+            let lastProgressTime = performance.now();
+            
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) break;
+              
+              // ⚡ Direct copy to pre-allocated buffer (faster than pushing to array)
+              arrayBuffer.set(value, receivedBytes);
+              receivedBytes += value.length;
+              
+              // ⚡ Throttle progress updates (every 10% OR 2MB OR 500ms)
+              const progress = Math.round((receivedBytes / totalBytes) * 100);
+              const timeSinceLastUpdate = performance.now() - lastProgressTime;
+              if (onProgress && (
+                progress - lastProgressUpdate >= 10 || 
+                receivedBytes - lastProgressUpdate * totalBytes / 100 >= 2097152 ||
+                timeSinceLastUpdate >= 500
+              )) {
+                onProgress(progress);
+                lastProgressUpdate = progress;
+                lastProgressTime = performance.now();
+              }
+            }
+            
+            const loadTime = ((performance.now() - startTime) / 1000).toFixed(1);
+            const sizeMB = (receivedBytes / 1024 / 1024).toFixed(2);
+            const speedMBps = (receivedBytes / 1024 / 1024 / (loadTime || 1)).toFixed(1);
+            console.log(`[FaithfulReader] ✅ ${ext.toUpperCase()} loaded: ${sizeMB} MB in ${loadTime}s (${speedMBps} MB/s)`);
+            
+            // Cache in IndexedDB asynchronously
+            setCachedFile(cacheKey, arrayBuffer.buffer).catch(err => {
+              console.warn('[FaithfulReader] ⚠️ Failed to cache file:', err);
+            });
+            
+            if (onProgress) onProgress(100);
+            return arrayBuffer.buffer;
+          } else {
+            // Fallback: no streaming support or unknown size
+            console.log(`[FaithfulReader] ⚠️ Streaming not available, using fallback...`);
+            const arrayBuffer = await res.arrayBuffer();
+            const loadTime = ((performance.now() - startTime) / 1000).toFixed(1);
+            const sizeMB = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
+            console.log(`[FaithfulReader] ✅ ${ext.toUpperCase()} loaded: ${sizeMB} MB in ${loadTime}s`);
+            
+            // Cache in IndexedDB
+            setCachedFile(cacheKey, arrayBuffer).catch(err => {
+              console.warn('[FaithfulReader] ⚠️ Failed to cache file:', err);
+            });
+            
+            if (onProgress) onProgress(100);
+            return arrayBuffer;
+          }
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.error('[FaithfulReader] ❌ Request timeout (5 minutes)');
+          throw new Error('Request timeout - file is too large or connection is slow');
+        }
+        console.error('[FaithfulReader] ❌ Fetch failed:', error);
+        throw new Error(`Failed to load manuscript: ${error.message}`);
+      } finally {
+        // Clean up request cache after completion
+        setTimeout(() => requestCache.delete(cacheKey), 1000);
+      }
+    })();
+    
+    requestCache.set(cacheKey, requestPromise);
+    return requestPromise;
   }
   return null;
 }
@@ -122,12 +212,23 @@ function fileExtension(book) {
   return (name.split('.').pop() || '').toLowerCase();
 }
 
-function CenterMessage({ icon: Icon = FileText, title, subtitle = null, spin = false }) {
+function CenterMessage({ icon: Icon = FileText, title, subtitle = null, spin = false, progress = null }) {
   return (
     <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-center px-8 bg-slate-100">
       <Icon className={`w-8 h-8 text-slate-400 ${spin ? 'animate-spin' : ''}`} />
       <p className="text-sm font-semibold text-slate-600">{title}</p>
       {subtitle && <p className="text-xs text-slate-400 max-w-[280px] leading-relaxed">{subtitle}</p>}
+      {progress !== null && progress >= 0 && (
+        <div className="w-full max-w-[280px] mt-2">
+          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 transition-all duration-300 ease-out"
+              style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+            />
+          </div>
+          <p className="text-xs text-slate-500 mt-1.5 font-medium">{Math.round(progress)}%</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -579,13 +680,30 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
     let cancelled = false;
     setState('loading');
     setBuffer(null);
+    setLoadProgress(0);
+    
+    // ⚡ Use requestIdleCallback for non-blocking state updates
+    let progressUpdateScheduled = false;
+    
     (async () => {
       try {
-        const ab = await getArrayBuffer(book);
+        const ab = await getArrayBuffer(book, (progress) => {
+          if (!cancelled && !progressUpdateScheduled) {
+            progressUpdateScheduled = true;
+            // ⚡ Batch progress updates to reduce re-renders
+            requestAnimationFrame(() => {
+              if (!cancelled) {
+                setLoadProgress(progress);
+                progressUpdateScheduled = false;
+              }
+            });
+          }
+        });
         if (cancelled) return;
         if (!ab) { setState('nofile'); return; }
         setBuffer(ab);
         setState('ready');
+        setLoadProgress(100);
       } catch (e) {
         console.error('[FaithfulReader] load error', e);
         if (!cancelled) setState('error');
@@ -595,8 +713,17 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
   }, [manuscriptUrl, manuscriptFileName, manuscriptFileSize]);
 
   if (state === 'loading') {
-    const progressText = loadProgress > 0 ? `Loading... ${loadProgress}%` : 'Loading manuscript file is too large...';
-    return <CenterMessage icon={Loader2} spin title={progressText} />;
+    const progressText = loadProgress > 0 && loadProgress < 100
+      ? 'Loading manuscript...'
+      : loadProgress === 100
+      ? 'Processing...'
+      : 'Loading manuscript file is too large';
+    return <CenterMessage 
+      icon={Loader2} 
+      spin 
+      title={progressText} 
+      progress={loadProgress > 0 ? loadProgress : null}
+    />;
   }
   if (state === 'nofile') return <CenterMessage icon={FileText} title="No manuscript uploaded" subtitle="Upload an EPUB, PDF, or DOCX file to preview your book." />;
   if (state === 'error' || !buffer) return <CenterMessage icon={AlertCircle} title="Could not load the manuscript" subtitle="Please re-upload the file and try again." />;

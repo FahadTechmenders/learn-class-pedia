@@ -745,13 +745,14 @@ const BookManagement = () => {
                                   }
                                 }
                                 
-                                if (sampleUrl && sampleFilename) {
-                                  try {
-                                    sampleStructure = await parseManuscript(sampleUrl, sampleFilename);
-                                  } catch (parseError) {
-                                    console.error('Failed to parse sample:', parseError);
-                                  }
-                                }
+                                // Sample parsing removed - FaithfulReader will handle display directly
+                                // if (sampleUrl && sampleFilename) {
+                                //   try {
+                                //     sampleStructure = await parseManuscript(sampleUrl, sampleFilename);
+                                //   } catch (parseError) {
+                                //     console.error('Failed to parse sample:', parseError);
+                                //   }
+                                // }
                                 
                                 setEpubReaderBook(prev => prev ? {
                                   ...prev,
