@@ -8,8 +8,12 @@ import { getCachedFile, setCachedFile } from '../utils/fileCache';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-// Request deduplication cache to prevent multiple simultaneous fetches
+// Request deduplication cache to prevent multiple simultaneous fetches (DOCX only —
+// EPUB/PDF are streamed directly by epub.js / pdf.js and never buffered here).
 const requestCache = new Map();
+
+// Never persist files larger than this in IndexedDB.
+const MAX_INDEXEDDB_BYTES = 25 * 1024 * 1024;
 
 function playPageFlipSound() {
   if (typeof window === 'undefined') return;
@@ -38,83 +42,151 @@ function playPageFlipSound() {
   } catch (_) {}
 }
 
-async function getArrayBuffer(book) {
+function getRemoteReaderUrl(book) {
+  const originalUrl =
+    book?.manuscript_url ||
+    book?.manuscriptUrl;
+
+  if (!originalUrl) return null;
+
+  const filename =
+    book?.manuscript_filename ||
+    book?.manuscriptFilename ||
+    '';
+
+  const extension =
+    filename.split('.').pop()?.toLowerCase() || '';
+
+  let endpoint = null;
+
+  if (extension === 'epub') {
+    endpoint = ENDPOINTS.BOOK_EPUB(originalUrl);
+  } else if (extension === 'pdf') {
+    endpoint = ENDPOINTS.BOOK_PDF(originalUrl);
+  } else if (extension === 'docx' || extension === 'doc') {
+    endpoint = ENDPOINTS.BOOK_DOCX(originalUrl);
+  }
+
+  return endpoint
+    ? `${API_CONFIG.BASE_URL}${endpoint}`
+    : originalUrl;
+}
+
+// Streams a response body, reporting real download progress via Content-Length,
+// and returns the fully-assembled ArrayBuffer. Only used for DOCX, since
+// docx-preview requires a complete buffer up front. Browser HTTP caching is
+// left enabled (no `cache: 'no-store'`) so repeat loads can hit the disk cache.
+async function fetchArrayBufferWithProgress(url, signal, onProgress) {
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`Backend API error: ${res.status}`);
+
+  const contentLengthHeader = res.headers.get('Content-Length');
+  const total = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0;
+
+  if (!res.body || typeof res.body.getReader !== 'function' || !total) {
+    const buf = await res.arrayBuffer();
+    onProgress?.(100);
+    return buf;
+  }
+
+  const reader = res.body.getReader();
+  const chunks = [];
+  let received = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    onProgress?.(Math.min(99, Math.round((received / total) * 100)));
+  }
+
+  const merged = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  onProgress?.(100);
+  return merged.buffer;
+}
+
+// Fetches the full ArrayBuffer for a manuscript (local File or remote URL via
+// the backend proxy). Used for DOCX (docx-preview always needs a complete
+// buffer) AND for remote EPUB (epub.js/JSZip has no true partial/range
+// loading for a zipped archive — `ePub(url)` still downloads the entire file
+// via a single XHR before it can open the zip, so there's no bandwidth
+// benefit to URL-based loading; downloading it ourselves lets us show real
+// progress and cache it in IndexedDB for instant reopens).
+// Includes request dedup + AbortController-based cancellation, IndexedDB
+// caching (skipped for files > 25MB), and real download progress.
+async function getManuscriptArrayBuffer(book, signal, onProgress) {
   const file = book?.manuscriptFile;
   if (file && typeof file.arrayBuffer === 'function') {
+    onProgress?.(100);
     return await file.arrayBuffer();
   }
-  
+
   const url = book?.manuscript_url || book?.manuscriptUrl;
-  if (url) {
-    // Determine file extension
-    const filename = book?.manuscript_filename || book?.manuscriptFilename || '';
-    const ext = (filename.split('.').pop() || '').toLowerCase();
-    
-    // Use backend API for all supported file types to bypass CORS
-    let apiEndpoint = null;
-    if (ext === 'epub') {
-      apiEndpoint = ENDPOINTS.BOOK_EPUB(url);
-    } else if (ext === 'pdf') {
-      apiEndpoint = ENDPOINTS.BOOK_PDF(url);
-    } else if (ext === 'docx' || ext === 'doc') {
-      apiEndpoint = ENDPOINTS.BOOK_DOCX(url);
-    }
-    
-    if (apiEndpoint) {
-      const cacheKey = apiEndpoint;
-      
-      // Return existing promise if request is already in flight
-      if (requestCache.has(cacheKey)) {
-        console.log(`[FaithfulReader] Reusing in-flight request for ${ext.toUpperCase()}`);
-        return requestCache.get(cacheKey);
-      }
-      
-      // Create new request promise
-      const requestPromise = (async () => {
-        try {
-          // Check IndexedDB cache first
-          const cachedData = await getCachedFile(apiEndpoint);
-          if (cachedData) {
-            console.log(`[FaithfulReader] Using cached ${ext.toUpperCase()} from IndexedDB`);
-            return cachedData;
-          }
-          
-          // Fetch from backend API
-          const apiUrl = `${API_CONFIG.BASE_URL}${apiEndpoint}`;
-          console.log(`[FaithfulReader] Fetching ${ext.toUpperCase()} via backend API:`, apiUrl);
-          const res = await fetch(apiUrl, {
-            cache: 'no-store' // Bypass HTTP cache, use IndexedDB instead
-          });
-          if (!res.ok) throw new Error(`Backend API error: ${res.status}`);
-          
-          const arrayBuffer = await res.arrayBuffer();
-          console.log(`[FaithfulReader] ${ext.toUpperCase()} fetched successfully (${(arrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB)`);
-          
-          // Cache in IndexedDB for next time
-          setCachedFile(apiEndpoint, arrayBuffer).catch(err => {
+  if (!url) return null;
+
+  const apiUrl = getRemoteReaderUrl(book);
+  if (!apiUrl) return null;
+
+  const cacheKey = apiUrl;
+  let entry = requestCache.get(cacheKey);
+
+  if (!entry) {
+    const controller = new AbortController();
+    const listeners = new Set();
+    const promise = (async () => {
+      try {
+        const cached = await getCachedFile(cacheKey);
+        if (cached) {
+          console.log('[FaithfulReader] Using cached manuscript from IndexedDB');
+          listeners.forEach((cb) => cb(100));
+          return cached;
+        }
+
+        console.log('[FaithfulReader] Fetching manuscript via backend API:', apiUrl);
+        const buf = await fetchArrayBufferWithProgress(apiUrl, controller.signal, (pct) => {
+          listeners.forEach((cb) => cb(pct));
+        });
+
+        if (buf && buf.byteLength <= MAX_INDEXEDDB_BYTES) {
+          setCachedFile(cacheKey, buf).catch((err) => {
             console.warn('[FaithfulReader] Failed to cache file:', err);
           });
-          
-          return arrayBuffer;
-        } catch (apiError) {
-          console.warn('[FaithfulReader] Backend API failed:', apiError);
-          throw new Error(`Failed to load manuscript: ${apiError.message}`);
-        } finally {
-          // Clean up request cache after completion
-          setTimeout(() => requestCache.delete(cacheKey), 1000);
         }
-      })();
-      
-      requestCache.set(cacheKey, requestPromise);
-      return requestPromise;
-    }
-    
-    // For unsupported file types, fetch directly
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to fetch manuscript (${res.status})`);
-    return await res.arrayBuffer();
+        return buf;
+      } finally {
+        setTimeout(() => {
+          if (requestCache.get(cacheKey) === entry) requestCache.delete(cacheKey);
+        }, 1000);
+      }
+    })();
+    entry = { promise, controller, subscribers: 0, listeners };
+    requestCache.set(cacheKey, entry);
   }
-  return null;
+
+  entry.subscribers += 1;
+  if (onProgress) entry.listeners.add(onProgress);
+
+  const onAbort = () => {
+    entry.subscribers -= 1;
+    entry.listeners.delete(onProgress);
+    if (entry.subscribers <= 0) {
+      entry.controller.abort();
+      requestCache.delete(cacheKey);
+    }
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    return await entry.promise;
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 }
 
 function fileExtension(book) {
@@ -221,7 +293,7 @@ async function resolveEpubImages(doc, section, book) {
 // structure, images) in a smooth vertical scroll. The uploaded cover is injected
 // as the very first thing in the book flow so it scrolls naturally. Zoom reflows
 // via the reader's own font-size — the original page area is never re-styled.
-function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartFrac, sampleEndFrac, coverUrl }) {
+function EpubReader({ source, frameWidth, fontPct, coverUrl }) {
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const bookRef = useRef(null);
@@ -229,14 +301,17 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
   const [status, setStatus] = useState('loading'); // loading | ready | error
 
   useEffect(() => {
-    if (!viewerRef.current || !arrayBuffer) return;
+    if (!viewerRef.current || !source) return;
     let destroyed = false;
     let rendition;
     let book;
     (async () => {
       try {
-        // Clone the buffer so pdf/docx paths never share a detached buffer.
-        book = ePub(arrayBuffer.slice(0));
+        // `source` is either a remote URL string (epub.js fetches/streams it
+        // itself — no upfront ArrayBuffer download in this component), a
+        // local File/Blob (uploaded file, already in memory), or an
+        // ArrayBuffer. epub.js accepts all three natively.
+        book = ePub(source);
         bookRef.current = book;
         await book.ready;
         if (destroyed) return;
@@ -245,23 +320,6 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         // image-based-text pages actually display (runs before serialization).
         if (book.archived && book.spine?.hooks?.content) {
           book.spine.hooks.content.register((doc, section) => resolveEpubImages(doc, section, book));
-        }
-
-        const spine = /** @type {any} */ (book.spine);
-        let firstIndex = spine?.spineItems?.[0]?.index ?? 0;
-
-        // Sample mode: keep ONLY the spine sections inside the configured sample
-        // page-range fraction, so the reader shows just the excerpt — still the
-        // real, faithfully-rendered EPUB content (never synthetic).
-        if (sampleMode) {
-          const items = spine?.spineItems || [];
-          const n = items.length;
-          if (n > 0) {
-            const s = Math.max(0, Math.floor(n * (sampleStartFrac || 0)));
-            const e = Math.min(n, Math.max(s + 1, Math.ceil(n * (sampleEndFrac || 1))));
-            spine.spineItems = items.slice(s, e);
-            firstIndex = spine.spineItems[0]?.index ?? firstIndex;
-          }
         }
 
         rendition = book.renderTo(viewerRef.current, {
@@ -304,7 +362,7 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
       try { book && book.destroy(); } catch (_) {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arrayBuffer, sampleMode, sampleStartFrac, sampleEndFrac]);
+  }, [source]);
 
   // Zoom: change the reader's own font-size (content reflows, stays original).
   useEffect(() => {
@@ -386,48 +444,141 @@ function DeviceFrame({ type, children }) {
   );
 }
 
-// ─── PDF reader (pdf.js — renders the real pages to canvas) ────────────────────
-function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd }) {
+// ─── PDF reader (pdf.js — renders real pages to canvas, lazily) ───────────────
+// `source` is either { url } for remote files (fetched by pdf.js itself with
+// HTTP Range + streaming enabled — no upfront full-file download) or
+// { arrayBuffer } for local uploaded files already in memory. Pages are NOT
+// all rendered immediately: a lightweight placeholder canvas is created for
+// every page in range, and an IntersectionObserver triggers the actual
+// `page.render()` only as each placeholder scrolls into view.
+function PdfReader({ source, coverUrl, pageWidth }) {
+  const scrollRootRef = useRef(null);
   const pagesRef = useRef(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
 
   useEffect(() => {
-    if (!pagesRef.current || !arrayBuffer) return;
+    if (!pagesRef.current || !source || (!source.url && !source.arrayBuffer)) return;
     let cancelled = false;
+    let pdf;
+    let observer;
     const container = pagesRef.current;
     container.innerHTML = '';
+
     (async () => {
       try {
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
-        // Sample mode → render only the configured page range (real PDF pages).
-        const from = sampleStart > 0 ? Math.max(1, sampleStart) : 1;
-        const to = sampleEnd > 0 ? Math.min(sampleEnd, pdf.numPages) : pdf.numPages;
+        if (source.url) {
+          // Try HTTP Range + streaming first (fastest for large remote PDFs).
+          // Some cross-origin proxy backends don't allow the `Range` header in
+          // their CORS config, which makes the browser block the request at
+          // the preflight (OPTIONS) stage. If that happens, fall back to a
+          // plain streamed fetch (no Range header, so no preflight) — still
+          // no full-file buffering, just without byte-range jumping.
+          try {
+            pdf = await pdfjsLib.getDocument({
+              url: source.url,
+              rangeChunkSize: 1 << 16, // 64KB range chunks
+              disableRange: false,
+              disableStream: false,
+            }).promise;
+          } catch (rangeError) {
+            if (cancelled) return;
+            console.warn('[PDF] Range-enabled load failed, retrying without Range:', rangeError);
+            try {
+              pdf = await pdfjsLib.getDocument({
+                url: source.url,
+                disableRange: true,
+                disableStream: false,
+              }).promise;
+            } catch (streamError) {
+              if (cancelled) return;
+              // Last resort: pdf.js's own network layer can't load this URL at
+              // all (e.g. the backend's CORS config only allows the exact
+              // request shape our app's own fetch() uses). Fetch the bytes
+              // ourselves — same proven code path as the DOCX reader — and
+              // hand pdf.js the buffer directly.
+              console.warn('[PDF] Streamed load failed, falling back to full fetch:', streamError);
+              const res = await fetch(source.url);
+              if (!res.ok) throw new Error(`Failed to fetch PDF (${res.status})`);
+              const buf = await res.arrayBuffer();
+              if (cancelled) return;
+              pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+            }
+          }
+        } else {
+          pdf = await pdfjsLib.getDocument({ data: source.arrayBuffer.slice(0) }).promise;
+        }
+        if (cancelled) return;
+
+        const from = 1;
+        const to = pdf.numPages;
+
+        const firstPage = await pdf.getPage(from);
+        if (cancelled) return;
+        const firstViewport = firstPage.getViewport({ scale: 1.6 });
+        const aspect = firstViewport.height / firstViewport.width; // reserve layout space
+
+        const renderPage = async (n, canvas) => {
+          if (cancelled || canvas.dataset.rendered === '1') return;
+          canvas.dataset.rendered = '1';
+          try {
+            const page = n === from ? firstPage : await pdf.getPage(n);
+            if (cancelled) return;
+            const viewport = page.getViewport({ scale: 1.6 });
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          } catch (e) {
+            console.error('[PDF] page render error', n, e);
+          }
+        };
+
+        observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (!entry.isIntersecting) return;
+              const canvas = entry.target;
+              observer.unobserve(canvas);
+              renderPage(parseInt(canvas.dataset.page, 10), canvas);
+            });
+          },
+          { root: scrollRootRef.current, rootMargin: '600px 0px' }
+        );
+
+        const wStyle = typeof pageWidth === 'number' ? `${pageWidth}px` : pageWidth;
         for (let n = from; n <= to; n++) {
           if (cancelled) return;
-          // eslint-disable-next-line no-await-in-loop
-          const page = await pdf.getPage(n);
-          const viewport = page.getViewport({ scale: 1.6 });
           const canvas = document.createElement('canvas');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.style.width = typeof pageWidth === 'number' ? `${pageWidth}px` : pageWidth;
+          canvas.dataset.page = String(n);
+          canvas.className = 'bg-white shadow-xl rounded-sm';
+          canvas.style.width = wStyle;
           canvas.style.maxWidth = '100%';
           canvas.style.height = 'auto';
-          canvas.className = 'bg-white shadow-xl rounded-sm';
+          canvas.style.aspectRatio = `${1 / aspect}`;
           container.appendChild(canvas);
-          // eslint-disable-next-line no-await-in-loop
-          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-          if (n === 1 && !cancelled) setStatus('ready');
+          observer.observe(canvas);
         }
+
+        // Render the first page eagerly so the reader isn't blank on open.
+        const firstCanvas = container.querySelector(`canvas[data-page="${from}"]`);
+        if (firstCanvas) {
+          observer.unobserve(firstCanvas);
+          await renderPage(from, firstCanvas);
+        }
+
         if (!cancelled) setStatus('ready');
       } catch (e) {
         console.error('[PDF] render error', e);
         if (!cancelled) setStatus('error');
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      try { observer && observer.disconnect(); } catch (_) {}
+      try { pdf && pdf.destroy(); } catch (_) {}
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arrayBuffer, sampleStart, sampleEnd]);
+  }, [source]);
 
   // Apply zoom by resizing existing canvases when pageWidth (fontScale) changes,
   // without re-rendering the whole PDF.
@@ -441,9 +592,9 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd })
   }, [pageWidth]);
 
   return (
-    <div className="w-full h-full overflow-auto bg-slate-200">
+    <div ref={scrollRootRef} className="w-full h-full overflow-auto bg-slate-200">
       <div className="flex flex-col items-center gap-5 py-6 px-3">
-        {coverUrl && !(sampleStart > 1) && (
+        {coverUrl && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: '100%' }} />
         )}
         {status === 'loading' && <CenterMessage icon={Loader2} spin title="Rendering PDF…" />}
@@ -457,7 +608,7 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd })
   );
 }
 
-function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sampleActive = false, sampleStart = 0, sampleStartFrac = 0, sampleEndFrac = 1 }) {
+function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440 }) {
   const scrollRef = useRef(null);
   const hostRef = useRef(null);
   const naturalWRef = useRef(0);
@@ -481,31 +632,6 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
     el.style.setProperty('transform-origin', 'top center');
     el.style.setProperty('transition', 'transform 0.15s ease-out');
   }, [fontScale, frameWidth]);
-
-  const applyCrop = useCallback(() => {
-    const el = hostRef.current;
-    if (!el) return;
-    const wrapper = el.querySelector('.docx-wrapper') || el;
-    if (sampleActive && sampleEndFrac < 1) {
-      const prevZoom = el.style.zoom || '';
-      wrapper.style.marginTop = '0px';
-      el.style.maxHeight = 'none';
-      el.style.zoom = '1';
-      const full = el.scrollHeight;
-      el.style.zoom = prevZoom;
-      if (full > 0) {
-        const startFrac = Math.max(0, Math.min(sampleStartFrac || 0, sampleEndFrac));
-        const h = Math.max(1, Math.round(full * (sampleEndFrac - startFrac)));
-        el.style.maxHeight = `${h}px`;
-        el.style.overflowY = 'hidden';
-        wrapper.style.marginTop = startFrac > 0 ? `-${Math.round(full * startFrac)}px` : '0px';
-      }
-    } else {
-      el.style.maxHeight = 'none';
-      el.style.overflowY = 'visible';
-      wrapper.style.marginTop = '0px';
-    }
-  }, [sampleActive, sampleStartFrac, sampleEndFrac]);
 
   useEffect(() => {
     if (!hostRef.current || !arrayBuffer) return;
@@ -532,26 +658,25 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
         naturalWRef.current = page ? page.offsetWidth : 0;
 
         applyZoom();
-        applyCrop();
         setStatus('ready');
       })
       .catch((e) => { console.error('[DOCX] render error', e); if (!cancelled) setStatus('error'); });
     return () => { cancelled = true; };
-  }, [arrayBuffer, applyZoom, applyCrop]);
+  }, [arrayBuffer, applyZoom]);
 
-  useEffect(() => { applyZoom(); applyCrop(); }, [applyZoom, applyCrop]);
+  useEffect(() => { applyZoom(); }, [applyZoom]);
   useEffect(() => {
     const sc = scrollRef.current;
     if (!sc) return;
-    const obs = new ResizeObserver(() => { applyZoom(); applyCrop(); });
+    const obs = new ResizeObserver(() => { applyZoom(); });
     obs.observe(sc);
     return () => obs.disconnect();
-  }, [applyZoom, applyCrop]);
+  }, [applyZoom]);
 
   return (
     <div ref={scrollRef} className="w-full h-full overflow-auto bg-slate-200">
       <div className="flex flex-col items-center gap-5 py-6 px-3">
-        {coverUrl && !(sampleStart > 1) && (
+        {coverUrl && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: frameWidth, maxWidth: '100%' }} />
         )}
         {status === 'loading' && <CenterMessage icon={Loader2} spin title="Rendering document…" />}
@@ -564,10 +689,16 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
 
 const VIEW_BASE_WIDTH = { desktop: 720, tablet: 600, mobile: 480 };
 
-export default function FaithfulReader({ book, fontScale = 1, viewMode = 'desktop', sampleMode = false }) {
-  const [buffer, setBuffer] = useState(null);
-  const [state, setState] = useState('loading');
+export default function FaithfulReader({ book, fontScale = 1, viewMode = 'desktop' }) {
+  const [state, setState] = useState('loading'); // loading | ready | nofile | error
   const [loadProgress, setLoadProgress] = useState(0);
+  // EPUB/PDF never buffer the whole file in this component — `epubSource` is a
+  // URL string / File / Blob handed straight to epub.js; `pdfSource` is
+  // { url } or { arrayBuffer } handed straight to pdf.js. Only DOCX needs a
+  // full in-memory ArrayBuffer (`docxBuffer`), since docx-preview requires it.
+  const [epubSource, setEpubSource] = useState(null);
+  const [pdfSource, setPdfSource] = useState(null);
+  const [docxBuffer, setDocxBuffer] = useState(null);
   const ext = fileExtension(book);
 
   // Extract stable primitive values for dependencies
@@ -577,50 +708,96 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    let localObjectUrl = null;
+
     setState('loading');
-    setBuffer(null);
+    setLoadProgress(0);
+    setEpubSource(null);
+    setPdfSource(null);
+    setDocxBuffer(null);
+
     (async () => {
       try {
-        const ab = await getArrayBuffer(book);
-        if (cancelled) return;
-        if (!ab) { setState('nofile'); return; }
-        setBuffer(ab);
-        setState('ready');
+        if (!ext) { if (!cancelled) setState('nofile'); return; }
+        const manuscriptFile = book?.manuscriptFile;
+
+        if (ext === 'epub') {
+          if (manuscriptFile) {
+            if (!cancelled) { setEpubSource(manuscriptFile); setState('ready'); }
+          } else if (manuscriptUrl) {
+            const remoteUrl = getRemoteReaderUrl(book);
+            if (!remoteUrl) { if (!cancelled) setState('nofile'); return; }
+            if (!cancelled) { setEpubSource(remoteUrl); setState('ready'); }
+          } else {
+            if (!cancelled) setState('nofile');
+          }
+          return;
+        }
+
+        if (ext === 'pdf') {
+          if (manuscriptFile) {
+            localObjectUrl = URL.createObjectURL(manuscriptFile);
+            if (!cancelled) { setPdfSource({ url: localObjectUrl }); setState('ready'); }
+          } else if (manuscriptUrl) {
+            const remoteUrl = getRemoteReaderUrl(book);
+            if (!remoteUrl) { if (!cancelled) setState('nofile'); return; }
+            if (!cancelled) { setPdfSource({ url: remoteUrl }); setState('ready'); }
+          } else {
+            if (!cancelled) setState('nofile');
+          }
+          return;
+        }
+
+        if (ext === 'docx' || ext === 'doc') {
+          const buf = await getDocxArrayBuffer(book, controller.signal, (pct) => {
+            if (!cancelled) setLoadProgress(pct);
+          });
+          if (cancelled) return;
+          if (!buf) { setState('nofile'); return; }
+          setDocxBuffer(buf);
+          setState('ready');
+          return;
+        }
+
+        if (!cancelled) setState('nofile');
       } catch (e) {
+        if (cancelled || e?.name === 'AbortError') return;
         console.error('[FaithfulReader] load error', e);
-        if (!cancelled) setState('error');
+        setState('error');
       }
     })();
-    return () => { cancelled = true; };
-  }, [manuscriptUrl, manuscriptFileName, manuscriptFileSize]);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (localObjectUrl) URL.revokeObjectURL(localObjectUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ext, manuscriptUrl, manuscriptFileName, manuscriptFileSize]);
 
   if (state === 'loading') {
-    const progressText = loadProgress > 0 ? `Loading... ${loadProgress}%` : 'Loading manuscript file is too large...';
+    const progressText = loadProgress > 0 ? `Loading... ${loadProgress}%` : 'Loading manuscript…';
     return <CenterMessage icon={Loader2} spin title={progressText} />;
   }
   if (state === 'nofile') return <CenterMessage icon={FileText} title="No manuscript uploaded" subtitle="Upload an EPUB, PDF, or DOCX file to preview your book." />;
-  if (state === 'error' || !buffer) return <CenterMessage icon={AlertCircle} title="Could not load the manuscript" subtitle="Please re-upload the file and try again." />;
+  if (state === 'error') return <CenterMessage icon={AlertCircle} title="Could not load the manuscript" subtitle="Please re-upload the file and try again." />;
 
   const coverUrl = book?.cover_url || book?.coverUrl;
   const baseW = VIEW_BASE_WIDTH[viewMode] || VIEW_BASE_WIDTH.desktop;
   const fontPct = Math.round((fontScale || 1) * 100);
   const docWidth = Math.round(baseW * (fontScale || 1));
 
-  const total = parseInt(book?.totalPages, 10) || 0;
-  const sStart = parseInt(book?.samplePageStart, 10) || 1;
-  const sEnd = parseInt(book?.samplePageEnd, 10) || 0;
-  const hasSample = sEnd > 0 && total > 0;
-  const activeSample = sampleMode && hasSample;
-  const sampleStartFrac = hasSample ? Math.max(0, (sStart - 1) / total) : 0;
-  const sampleEndFrac = hasSample ? Math.min(1, sEnd / total) : 1;
-
   let reader;
   if (ext === 'epub') {
-    reader = <EpubReader arrayBuffer={buffer} frameWidth={baseW} fontPct={fontPct} sampleMode={activeSample} sampleStartFrac={sampleStartFrac} sampleEndFrac={sampleEndFrac} coverUrl={coverUrl} />;
+    if (!epubSource) return <CenterMessage icon={AlertCircle} title="Could not load the manuscript" subtitle="Please re-upload the file and try again." />;
+    reader = <EpubReader source={epubSource} frameWidth={baseW} fontPct={fontPct} coverUrl={coverUrl} />;
   } else if (ext === 'pdf') {
-    reader = <PdfReader arrayBuffer={buffer} coverUrl={coverUrl} pageWidth={docWidth} sampleStart={activeSample ? sStart : 0} sampleEnd={activeSample ? sEnd : 0} />;
+    if (!pdfSource) return <CenterMessage icon={AlertCircle} title="Could not load the manuscript" subtitle="Please re-upload the file and try again." />;
+    reader = <PdfReader source={pdfSource} coverUrl={coverUrl} pageWidth={docWidth} />;
   } else if (ext === 'docx' || ext === 'doc') {
-    reader = <DocxReader arrayBuffer={buffer} coverUrl={coverUrl} fontScale={fontScale} frameWidth={baseW} sampleActive={activeSample} sampleStart={activeSample ? sStart : 0} sampleStartFrac={sampleStartFrac} sampleEndFrac={sampleEndFrac} />;
+    if (!docxBuffer) return <CenterMessage icon={AlertCircle} title="Could not load the manuscript" subtitle="Please re-upload the file and try again." />;
+    reader = <DocxReader arrayBuffer={docxBuffer} coverUrl={coverUrl} fontScale={fontScale} frameWidth={baseW} />;
   } else {
     return <CenterMessage icon={FileText} title={`Preview not supported for .${ext || 'this'} files`} subtitle="Supported formats: EPUB, PDF, DOCX." />;
   }
