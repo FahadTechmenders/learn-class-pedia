@@ -15,6 +15,7 @@ import {
   Search,
   Eye,
   BookOpen,
+  BookMarked,
   Shield,
   Tag,
   AlertCircle,
@@ -705,7 +706,7 @@ const BookManagement = () => {
                             const fullUrl = getFullManuscriptUrl(book.manuscriptFilePath);
                             const sampleUrl = book.sampleFilePath ? getFullManuscriptUrl(book.sampleFilePath) : null;
                             
-                            const manuscriptFilename = book.manuscriptFilePath ? book.manuscriptFilePath.split('/').pop() : 'manuscript.epub';
+                            const manuscriptFilename = book.manuscriptFilename || (book.manuscriptFilePath ? book.manuscriptFilePath.split('/').pop() : 'manuscript.epub');
                             const sampleFilename = book.sampleFilePath ? book.sampleFilePath.split('/').pop() : null;
                             
                             const bookData = { 
@@ -771,6 +772,65 @@ const BookManagement = () => {
                           className="p-1.5 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 rounded disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <BookOpen className="w-4 h-4" />
+                        </button>
+                        <button
+                          disabled={book.bookStatusId === 1 || !book.sampleFilePath}
+                          onClick={() => {
+                            const sampleUrl = getFullManuscriptUrl(book.sampleFilePath);
+                            const sampleFilename = book.sampleFilename || (book.sampleFilePath ? book.sampleFilePath.split('/').pop() : 'sample.epub');
+                            
+                            const bookData = { 
+                              url: sampleUrl, 
+                              title: `${book.title} (Sample)`,
+                              subtitle: book.subTitle,
+                              author_name: `${book.authorFirstName} ${book.authorLastName}`,
+                              cover_url: book.frontCover,
+                              description: book.bookDescription,
+                              filename: sampleFilename,
+                              structure: null,
+                              manuscript_url: sampleUrl,
+                              manuscript_filename: sampleFilename,
+                              manuscript_structure: null,
+                              sample_url: null,
+                              sample_filename: null,
+                              sample_structure: null,
+                              samplePageStart: book.samplePageStart,
+                              samplePageEnd: book.samplePageEnd,
+                              totalPages: book.totalPages,
+                              isLoading: true
+                            };
+                            
+                            setEpubReaderBook(bookData);
+                            
+                            (async () => {
+                              try {
+                                let structure = null;
+                                
+                                if (sampleUrl) {
+                                  try {
+                                    structure = await parseManuscript(sampleUrl, sampleFilename);
+                                  } catch (parseError) {
+                                    console.error('Failed to parse sample:', parseError);
+                                    showError(`Failed to parse sample: ${parseError.message}`);
+                                  }
+                                }
+                                
+                                setEpubReaderBook(prev => prev ? {
+                                  ...prev,
+                                  structure,
+                                  manuscript_structure: structure,
+                                  isLoading: false
+                                } : null);
+                              } catch (error) {
+                                console.error('Error during parsing:', error);
+                                setEpubReaderBook(prev => prev ? { ...prev, isLoading: false } : null);
+                              }
+                            })();
+                          }}
+                          title={book.sampleFilePath ? "View sample book" : "Sample not available"}
+                          className="p-1.5 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <BookMarked className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

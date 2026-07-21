@@ -713,11 +713,12 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
   }, [manuscriptUrl, manuscriptFileName, manuscriptFileSize]);
 
   if (state === 'loading') {
+    const isSample = book?.title?.includes('(Sample)') || sampleMode;
     const progressText = loadProgress > 0 && loadProgress < 100
-      ? 'Loading manuscript...'
+      ? (isSample ? 'Loading sample file...' : 'Loading manuscript...')
       : loadProgress === 100
       ? 'Processing...'
-      : 'Loading manuscript file is too large';
+      : (isSample ? 'Loading sample file' : 'Loading manuscript file is too large');
     return <CenterMessage 
       icon={Loader2} 
       spin 
