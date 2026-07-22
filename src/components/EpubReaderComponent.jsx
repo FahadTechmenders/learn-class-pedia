@@ -1006,7 +1006,7 @@ function buildManuscriptSampleSpreads(fullSpreads, book, highlightWords) {
 export default function BookPreviewer({ book, onClose, onApprove }) {
   const [viewMode, setViewMode] = useState('desktop');
   const [activeTab, setActiveTab] = useState('grammar');
-  const [fontScale, setFontScale] = useState(1);
+  const [fontScale, setFontScale] = useState(1.2);
   const FONT_MIN = 0.8;
   const FONT_MAX = 2;
   const FONT_STEP = 0.1;
@@ -1015,6 +1015,10 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   const [approved, setApproved] = useState(false);
   const canvasRef = useRef(null);
   
+  // Reset font scale when book changes
+  useEffect(() => {
+    setFontScale(1.2);
+  }, [book?.id, book?.manuscript_url, book?.manuscriptUrl]);
 
   // Escape key to close
   useEffect(() => {

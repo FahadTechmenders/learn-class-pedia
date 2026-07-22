@@ -478,9 +478,45 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
           try {
             const doc = contents?.document;
             if (!doc) return;
+            
+            console.log('[EPUB] Content loaded, applying styles with fontPct:', fontPct + '%');
             doc.documentElement.style.setProperty('overflow-anchor', 'none', 'important');
-            if (doc.body) doc.body.style.setProperty('overflow-anchor', 'none', 'important');
-          } catch (_) {}
+            
+            // Inject a global CSS style for EPUB 2.0 compatibility
+            const style = doc.createElement('style');
+            style.id = 'epub-base-zoom';
+            style.textContent = `
+              html, body { 
+                font-size: ${fontPct}% !important; 
+                line-height: 1.7 !important;
+              }
+              * { 
+                font-size: inherit !important;
+                max-width: 100% !important;
+              }
+              p, div, span, li, td, th, a, em, i, b, strong {
+                font-size: inherit !important;
+              }
+              h1 { font-size: 2em !important; }
+              h2 { font-size: 1.75em !important; }
+              h3 { font-size: 1.5em !important; }
+              h4 { font-size: 1.25em !important; }
+              h5 { font-size: 1.1em !important; }
+              h6 { font-size: 1em !important; }
+              img { max-width: 100% !important; height: auto !important; }
+            `;
+            doc.head?.appendChild(style);
+            
+            if (doc.body) {
+              doc.body.style.setProperty('overflow-anchor', 'none', 'important');
+              doc.body.style.setProperty('font-size', `${fontPct}%`, 'important');
+              doc.body.style.setProperty('line-height', '1.7', 'important');
+            }
+            
+            console.log('[EPUB] Styles applied to new content');
+          } catch (err) {
+            console.error('[EPUB] Error in content hook:', err);
+          }
         });
 
         try { rendition.themes.fontSize(`${fontPct}%`); } catch (_) {}
@@ -497,11 +533,82 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
       try { book && book.destroy(); } catch (_) {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [arrayBuffer, sampleMode, sampleStartFrac, sampleEndFrac]);
+  }, [arrayBuffer, sampleMode, sampleStartFrac, sampleEndFrac, fontPct]);
 
   // Zoom: change the reader's own font-size (content reflows, stays original).
   useEffect(() => {
-    try { renditionRef.current?.themes?.fontSize(`${fontPct}%`); } catch (_) {}
+    try {
+      const rendition = renditionRef.current;
+      if (!rendition) return;
+      
+      console.log('[EPUB] Applying zoom:', fontPct + '%');
+      
+      // Method 1: Use epub.js themes API
+      rendition.themes.fontSize(`${fontPct}%`);
+      
+      // Method 2: Direct iframe manipulation for EPUB 2.0
+      const applyZoomToIframes = () => {
+        const container = rendition.manager?.container;
+        if (!container) return;
+        
+        const iframes = container.querySelectorAll('iframe');
+        console.log('[EPUB] Found iframes:', iframes.length);
+        
+        iframes.forEach((iframe, idx) => {
+          try {
+            const doc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (!doc) {
+              console.log('[EPUB] Cannot access iframe', idx);
+              return;
+            }
+            
+            // Remove old zoom style if exists
+            const oldStyle = doc.getElementById('epub-zoom-override');
+            if (oldStyle) oldStyle.remove();
+            
+            // Inject new zoom style
+            const style = doc.createElement('style');
+            style.id = 'epub-zoom-override';
+            style.textContent = `
+              html, body { 
+                font-size: ${fontPct}% !important; 
+                line-height: 1.7 !important;
+              }
+              * { 
+                font-size: inherit !important;
+                max-width: 100% !important;
+              }
+              p, div, span, li, td, th, a, em, i, b, strong {
+                font-size: inherit !important;
+              }
+              h1 { font-size: 2em !important; }
+              h2 { font-size: 1.75em !important; }
+              h3 { font-size: 1.5em !important; }
+              h4 { font-size: 1.25em !important; }
+              h5 { font-size: 1.1em !important; }
+              h6 { font-size: 1em !important; }
+            `;
+            
+            if (doc.head) {
+              doc.head.appendChild(style);
+              console.log('[EPUB] Zoom applied to iframe', idx);
+            }
+          } catch (err) {
+            console.log('[EPUB] Error accessing iframe', idx, err.message);
+          }
+        });
+      };
+      
+      // Apply immediately
+      applyZoomToIframes();
+      
+      // Also apply after a short delay (for lazy-loaded content)
+      setTimeout(applyZoomToIframes, 100);
+      setTimeout(applyZoomToIframes, 500);
+      
+    } catch (err) {
+      console.error('[EPUB] Zoom error:', err);
+    }
   }, [fontPct]);
 
   // Keep the rendition sized to its container (view-mode width changes, resize).
@@ -599,7 +706,7 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd })
           if (cancelled) return;
           // eslint-disable-next-line no-await-in-loop
           const page = await pdf.getPage(n);
-          const viewport = page.getViewport({ scale: 1.6 });
+          const viewport = page.getViewport({ scale: 2.0 });
           const canvas = document.createElement('canvas');
           canvas.width = viewport.width;
           canvas.height = viewport.height;
@@ -661,13 +768,9 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
     const sc = scrollRef.current;
     if (!el || !sc) return;
     
-    const natural = naturalWRef.current;
-    let z = fontScale || 1;
-    if (natural > 0) {
-      const avail = Math.min(frameWidth, sc.clientWidth - 28);
-      const fit = Math.min(1, avail / natural);
-      z = fit * (fontScale || 1);
-    }
+    // Apply fontScale directly without auto-fit scaling
+    // This ensures documents maintain proper zoom level
+    const z = fontScale || 1;
     
     // Use CSS transform instead of zoom for smoother scaling
     el.style.setProperty('transform', `scale(${z})`);
@@ -755,7 +858,8 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
   );
 }
 
-const VIEW_BASE_WIDTH = { desktop: 720, tablet: 600, mobile: 480 };
+const VIEW_BASE_WIDTH = { desktop: 900, tablet: 700, mobile: 550 };
+const EPUB_FRAME_WIDTH = { desktop: 700, tablet: 600, mobile: 500 };
 
 export default function FaithfulReader({ book, fontScale = 1, viewMode = 'desktop', sampleMode = false }) {
   const [buffer, setBuffer] = useState(null);
@@ -823,6 +927,8 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
 
   const coverUrl = book?.cover_url || book?.coverUrl;
   const baseW = VIEW_BASE_WIDTH[viewMode] || VIEW_BASE_WIDTH.desktop;
+  // EPUB needs much larger font percentage (250% base multiplier) to display at readable size
+  const epubFontPct = Math.round((fontScale || 1) * 250);
   const fontPct = Math.round((fontScale || 1) * 100);
   const docWidth = Math.round(baseW * (fontScale || 1));
 
@@ -836,7 +942,8 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
 
   let reader;
   if (ext === 'epub') {
-    reader = <EpubReader arrayBuffer={buffer} frameWidth={baseW} fontPct={fontPct} sampleMode={activeSample} sampleStartFrac={sampleStartFrac} sampleEndFrac={sampleEndFrac} coverUrl={coverUrl} />;
+    const epubFrameW = EPUB_FRAME_WIDTH[viewMode] || EPUB_FRAME_WIDTH.desktop;
+    reader = <EpubReader arrayBuffer={buffer} frameWidth={epubFrameW} fontPct={epubFontPct} sampleMode={activeSample} sampleStartFrac={sampleStartFrac} sampleEndFrac={sampleEndFrac} coverUrl={coverUrl} />;
   } else if (ext === 'pdf') {
     reader = <PdfReader arrayBuffer={buffer} coverUrl={coverUrl} pageWidth={docWidth} sampleStart={activeSample ? sStart : 0} sampleEnd={activeSample ? sEnd : 0} />;
   } else if (ext === 'docx' || ext === 'doc') {
