@@ -9,12 +9,17 @@ import { ENDPOINTS, API_CONFIG } from '../config/api';
 const CHUNK_SIZE = 1024 * 1024; // 1MB
 
 async function downloadFileInChunks(fileUrl) {
-    // Get file size first
-    const head = await fetch(
-        `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(fileUrl, 0, 1023)}`
+    // Get file size first via the dedicated file-info endpoint
+    const infoResponse = await fetch(
+        `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_INFO(fileUrl)}`
     );
 
-    const totalSize = Number(head.headers.get("X-File-Size"));
+    if (!infoResponse.ok) {
+        throw new Error("Unable to determine file size.");
+    }
+
+    const info = await infoResponse.json();
+    const totalSize = Number(info.fileSize);
 
     if (!totalSize) {
         throw new Error("Unable to determine file size.");

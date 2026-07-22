@@ -38,24 +38,23 @@ function playPageFlipSound() {
   } catch (_) {}
 }
 
-// Helper function to get file size using the chunked API
+// Helper function to get file size using the dedicated file-info endpoint
 async function getFileSize(url) {
   try {
     const token = localStorage.getItem('adminToken');
     console.log('[FaithfulReader] Getting file size for:', url);
     
     const response = await fetch(
-      `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, 0, 1023)}`,
+      `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_INFO(url)}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Accept': 'application/octet-stream, */*'
+          'Accept': 'application/json'
         }
       }
     );
     
     console.log('[FaithfulReader] Response status:', response.status, response.statusText);
-    console.log('[FaithfulReader] All response headers:', Array.from(response.headers.entries()));
     
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
@@ -63,30 +62,16 @@ async function getFileSize(url) {
       throw new Error(`Failed to get file size: ${response.status} - ${errorText}`);
     }
     
-    // Try to get file size from X-File-Size header first
-    const fileSizeHeader = response.headers.get('X-File-Size');
-    console.log('[FaithfulReader] X-File-Size header value:', fileSizeHeader);
-    if (fileSizeHeader) {
-      const size = parseInt(fileSizeHeader, 10);
-      console.log(`[FaithfulReader] File size from X-File-Size header: ${size} bytes (${(size / 1024 / 1024).toFixed(2)} MB)`);
-      return size;
+    const data = await response.json();
+    console.log('[FaithfulReader] File info response:', data);
+    
+    if (typeof data.fileSize === 'number' && data.fileSize > 0) {
+      console.log(`[FaithfulReader] File size: ${data.fileSize} bytes (${(data.fileSize / 1024 / 1024).toFixed(2)} MB)`);
+      return data.fileSize;
     }
     
-    // Fallback: parse Content-Range header
-    const contentRange = response.headers.get('Content-Range');
-    if (contentRange) {
-      console.log('[FaithfulReader] Content-Range header:', contentRange);
-      const match = contentRange.match(/bytes \d+-\d+\/(\d+)/);
-      if (match) {
-        const size = parseInt(match[1], 10);
-        console.log(`[FaithfulReader] File size from Content-Range: ${size} bytes (${(size / 1024 / 1024).toFixed(2)} MB)`);
-        return size;
-      }
-    }
-    
-    console.error('[FaithfulReader] No file size information in response headers');
-    console.error('[FaithfulReader] Available headers:', Array.from(response.headers.entries()));
-    throw new Error('Unable to determine file size - missing X-File-Size and Content-Range headers');
+    console.error('[FaithfulReader] No fileSize present in file-info response');
+    throw new Error('Unable to determine file size - missing fileSize in file-info response');
   } catch (error) {
     console.error('[FaithfulReader] Failed to get file size:', error);
     throw error;
