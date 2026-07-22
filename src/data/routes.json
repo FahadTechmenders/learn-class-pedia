@@ -171,15 +171,6 @@
       "icon": "Users",
       "category": "management",
       "order": 18
-    },
-    {
-      "id": "publisher-category-management",
-      "path": "/admin/publisher-category-management",
-      "component": "PublisherCategoryManagement",
-      "label": "Publisher Categories",
-      "icon": "Tag",
-      "category": "management",
-      "order": 19
     }
   ],
   "roles": [

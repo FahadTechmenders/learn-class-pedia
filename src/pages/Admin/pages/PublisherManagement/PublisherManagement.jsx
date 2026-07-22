@@ -22,7 +22,6 @@ import {
   Book
 } from 'lucide-react';
 import usePublisherManagement from '../../../../hooks/api/usePublisherManagement';
-import usePublisherCategoryManagement from '../../../../hooks/api/usePublisherCategoryManagement';
 import { useToast } from '../../../../components/ToastProvider';
 
 const PublisherManagement = () => {
@@ -37,10 +36,6 @@ const PublisherManagement = () => {
     getPublisherById,
   } = usePublisherManagement();
 
-  const {
-    categories,
-    getAllCategories,
-  } = usePublisherCategoryManagement();
 
   const [filters, setFilters] = useState({
    
@@ -71,15 +66,11 @@ const PublisherManagement = () => {
         console.error('Failed to load publishers:', err);
       }
       
-      try {
-        await getAllCategories(1, 100);
-      } catch (err) {
-        console.error('Failed to load categories:', err);
-      }
+      
     };
     
     initializeData();
-  }, [getAllPublishers, getAllCategories]);
+  }, [getAllPublishers]);
 
   const loadPublishers = useCallback(async (page = 1, pageSize = 20) => {
     try {
@@ -328,25 +319,7 @@ const PublisherManagement = () => {
                   <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Category</label>
-                <div className="relative">
-                  <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
-                  <select
-                    value={filters.categoryId}
-                    onChange={(e) => handleFilterChange('categoryId', e.target.value)}
-                    className="w-full pl-9 pr-8 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white transition-all shadow-sm appearance-none cursor-pointer"
-                  >
-                    <option value="">All Categories</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.categoryName}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
+             
             </div>
           </div>
         </div>

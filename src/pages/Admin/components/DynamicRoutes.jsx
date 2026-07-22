@@ -28,7 +28,6 @@ import CourseContent from '../pages/CourseContent/CourseContent';
 import TestimonialManagement from '../pages/TestimonialManagement/TestimonialManagement';
 import Email from '../pages/Email/Email';
 import PublisherManagement from '../pages/PublisherManagement/PublisherManagement';
-import PublisherCategoryManagement from '../pages/PublisherCategoryManagement/PublisherCategoryManagement';
 import BookManagement from '../pages/BookManagement/BookManagement';
 import BookCategoryManagement from '../pages/BookCategoryManagement/BookCategoryManagement';
 import BookBadgeMapping from '../pages/BookBadgeMapping/BookBadgeMapping';
@@ -63,7 +62,6 @@ const componentMap = {
   TestimonialManagement,
   Email,
   PublisherManagement,
-  PublisherCategoryManagement,
   BookManagement,
   BookCategoryManagement,
   BookBadgeMapping,

@@ -940,7 +940,7 @@ const BookManagement = () => {
                     })}
                   </div>
                   {selectedBook.bookDescription && (
-                        <p className="text-sm font-normal text-gray-600 dark:text-gray-400 leading-relaxed mb-5">{selectedBook.bookDescription}</p>
+                        <p className="text-sm whitespace-pre-wrap font-normal text-gray-600 dark:text-gray-400 leading-relaxed mb-5">{selectedBook.bookDescription}</p>
                   )}
                       
                       {/* Price, Royalty, Language, ISBN, CP ID */}
@@ -1098,18 +1098,26 @@ const BookManagement = () => {
                           {selectedBook.manuscriptFilePath ? 'Uploaded' : 'Not uploaded'}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex flex-col gap-2 py-3 border-b border-gray-200 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Manuscript Filename</span>
-                        <span className="text-xs font-medium text-gray-900 dark:text-white truncate max-w-xs" title={selectedBook.manuscriptFilename || selectedBook.manuscriptFilePath?.split('/').pop() || 'Not found'}>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white break-words" >
                           {selectedBook.manuscriptFilename? selectedBook.manuscriptFilename : 'Not found'}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center py-3">
+                      
+                      <div className="flex justify-between border-b border-gray-200 items-center py-3">
                         <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Sample</span>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {selectedBook.samplePageStart && selectedBook.samplePageEnd ? `Pages ${selectedBook.samplePageStart}-${selectedBook.samplePageEnd}` : 'Not uploaded'}
+                          {selectedBook.sampleFilePath  ? 'Uploaded' : 'Not uploaded'}
                         </span>
                       </div>
+                      <div className="flex justify-between items-center py-3">
+                        <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">Sample Content Percentage</span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {selectedBook.sampleContentPercentage? selectedBook.sampleContentPercentage : 0}%
+                        </span>
+                      </div>
+                      
                     </div>
                   </div>
 

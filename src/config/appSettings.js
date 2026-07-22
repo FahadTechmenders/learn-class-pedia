@@ -1,6 +1,6 @@
 const appSettings = {
   // Environment: 'development' | 'production'
-  environment: 'production',
+  environment: 'development',
   
   // API Configuration
   api: {
