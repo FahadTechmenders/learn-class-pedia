@@ -38,173 +38,279 @@ function playPageFlipSound() {
   } catch (_) {}
 }
 
+// Helper function to get file size using the chunked API
+async function getFileSize(url) {
+  try {
+    const token = localStorage.getItem('adminToken');
+    console.log('[FaithfulReader] Getting file size for:', url);
+    
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, 0, 1023)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/octet-stream, */*'
+        }
+      }
+    );
+    
+    console.log('[FaithfulReader] Response status:', response.status, response.statusText);
+    console.log('[FaithfulReader] All response headers:', Array.from(response.headers.entries()));
+    
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('[FaithfulReader] Failed to get file size:', response.status, errorText);
+      throw new Error(`Failed to get file size: ${response.status} - ${errorText}`);
+    }
+    
+    // Try to get file size from X-File-Size header first
+    const fileSizeHeader = response.headers.get('X-File-Size');
+    console.log('[FaithfulReader] X-File-Size header value:', fileSizeHeader);
+    if (fileSizeHeader) {
+      const size = parseInt(fileSizeHeader, 10);
+      console.log(`[FaithfulReader] File size from X-File-Size header: ${size} bytes (${(size / 1024 / 1024).toFixed(2)} MB)`);
+      return size;
+    }
+    
+    // Fallback: parse Content-Range header
+    const contentRange = response.headers.get('Content-Range');
+    if (contentRange) {
+      console.log('[FaithfulReader] Content-Range header:', contentRange);
+      const match = contentRange.match(/bytes \d+-\d+\/(\d+)/);
+      if (match) {
+        const size = parseInt(match[1], 10);
+        console.log(`[FaithfulReader] File size from Content-Range: ${size} bytes (${(size / 1024 / 1024).toFixed(2)} MB)`);
+        return size;
+      }
+    }
+    
+    console.error('[FaithfulReader] No file size information in response headers');
+    console.error('[FaithfulReader] Available headers:', Array.from(response.headers.entries()));
+    throw new Error('Unable to determine file size - missing X-File-Size and Content-Range headers');
+  } catch (error) {
+    console.error('[FaithfulReader] Failed to get file size:', error);
+    throw error;
+  }
+}
+
+// Download PDF file in chunks (5MB limit)
+async function downloadPDFInChunks(url, onProgress = null) {
+  try {
+    const token = localStorage.getItem('adminToken');
+    const totalSize = await getFileSize(url);
+    
+    console.log(`[FaithfulReader] Downloading PDF file: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+    
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB for PDF
+    const allChunks = [];
+    let downloadedBytes = 0;
+    
+    const numChunks = Math.ceil(totalSize / CHUNK_SIZE);
+    console.log(`[FaithfulReader] Downloading in ${numChunks} chunks of ${(CHUNK_SIZE / 1024 / 1024).toFixed(2)} MB each`);
+    
+    for (let i = 0; i < numChunks; i++) {
+      const startBytes = i * CHUNK_SIZE;
+      const endBytes = Math.min(startBytes + CHUNK_SIZE - 1, totalSize - 1);
+      
+      console.log(`[FaithfulReader] Downloading chunk ${i + 1}/${numChunks}: bytes ${startBytes}-${endBytes}`);
+      
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, startBytes, endBytes)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/octet-stream, */*'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error('[FaithfulReader] Chunk download failed:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const chunkData = await response.arrayBuffer();
+      allChunks.push(new Uint8Array(chunkData));
+      downloadedBytes += chunkData.byteLength;
+      
+      const progress = Math.round((downloadedBytes / totalSize) * 100);
+      if (onProgress) {
+        onProgress(progress);
+      }
+      
+      console.log(`[FaithfulReader] Chunk ${i + 1}/${numChunks} complete: ${(chunkData.byteLength / 1024 / 1024).toFixed(2)} MB (${progress}% total)`);
+    }
+    
+    console.log(`[FaithfulReader] Combining ${numChunks} chunks...`);
+    const completeFile = new Uint8Array(downloadedBytes);
+    let offset = 0;
+    for (const chunk of allChunks) {
+      completeFile.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    if (onProgress) onProgress(100);
+    console.log(`[FaithfulReader] ✅ Successfully downloaded and combined ${(downloadedBytes / 1024 / 1024).toFixed(2)} MB`);
+    return completeFile.buffer;
+  } catch (error) {
+    console.error('[FaithfulReader] Failed to download PDF in chunks:', error);
+    throw error;
+  }
+}
+
+// Download EPUB/DOCX file in single request (backend handles it)
+async function downloadCompleteFile(url, onProgress = null) {
+  try {
+    const token = localStorage.getItem('adminToken');
+    const totalSize = await getFileSize(url);
+    
+    console.log(`[FaithfulReader] Downloading complete file: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+    
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, 0, totalSize - 1)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/octet-stream, */*'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('[FaithfulReader] Download failed:', response.status, errorText);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    console.log(`[FaithfulReader] Response status: ${response.status} ${response.statusText}`);
+    
+    const contentLength = response.headers.get('Content-Length');
+    const bytes = contentLength ? parseInt(contentLength, 10) : totalSize;
+    
+    if (response.body) {
+      const reader = response.body.getReader();
+      const chunks = [];
+      let receivedBytes = 0;
+      let lastProgressUpdate = 0;
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        chunks.push(value);
+        receivedBytes += value.length;
+        
+        const progress = Math.round((receivedBytes / bytes) * 100);
+        if (onProgress && progress - lastProgressUpdate >= 5) {
+          onProgress(progress);
+          lastProgressUpdate = progress;
+        }
+      }
+      
+      const arrayBuffer = new Uint8Array(receivedBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        arrayBuffer.set(chunk, offset);
+        offset += chunk.length;
+      }
+      
+      if (onProgress) onProgress(100);
+      console.log(`[FaithfulReader] ✅ Successfully downloaded ${receivedBytes} bytes`);
+      return arrayBuffer.buffer;
+    } else {
+      const arrayBuffer = await response.arrayBuffer();
+      if (onProgress) onProgress(100);
+      console.log(`[FaithfulReader] ✅ Successfully downloaded ${arrayBuffer.byteLength} bytes`);
+      return arrayBuffer;
+    }
+  } catch (error) {
+    console.error('[FaithfulReader] Failed to download complete file:', error);
+    throw error;
+  }
+}
+
 async function getArrayBuffer(book, onProgress = null) {
+   
   const file = book?.manuscriptFile;
   if (file && typeof file.arrayBuffer === 'function') {
     return await file.arrayBuffer();
   }
   
   const url = book?.manuscript_url || book?.manuscriptUrl;
-  if (url) {
-    // Determine file extension
-    const filename = book?.manuscript_filename || book?.manuscriptFilename || '';
-    const ext = (filename.split('.').pop() || '').toLowerCase();
-    
-    // ⚠️ Direct CDN fetch disabled due to CORS restrictions
-    // TODO: Enable CORS on cdn.classpedia.ai then set isCdnUrl = true
-    const isCdnUrl = false; // url.includes('cdn.classpedia.ai') || url.includes('cloudfront.net');
-    
-    let fetchUrl = url;
-    let cacheKey = url;
-    
-    // Only use backend proxy for non-CDN URLs (CORS handling)
-    if (!isCdnUrl) {
-      let apiEndpoint = null;
-      if (ext === 'epub') {
-        apiEndpoint = ENDPOINTS.BOOK_EPUB(url);
-      } else if (ext === 'pdf') {
-        apiEndpoint = ENDPOINTS.BOOK_PDF(url);
-      } else if (ext === 'docx' || ext === 'doc') {
-        apiEndpoint = ENDPOINTS.BOOK_DOCX(url);
+  if (!url) return null;
+  
+  // Determine file extension
+  const filename = book?.manuscript_filename || book?.manuscriptFilename || '';
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  
+  const cacheKey = `${url}_${ext}`;
+  
+  // Return existing promise if request is already in flight
+  if (requestCache.has(cacheKey)) {
+    console.log(`[FaithfulReader] Reusing in-flight request for ${ext.toUpperCase()}`);
+    return requestCache.get(cacheKey);
+  }
+  
+  // Create new request promise
+  const requestPromise = (async () => {
+    try {
+      // Check IndexedDB cache first
+      const cachedData = await getCachedFile(cacheKey);
+      if (cachedData) {
+        console.log(`[FaithfulReader] ✅ Using cached ${ext.toUpperCase()} from IndexedDB`);
+        if (onProgress) onProgress(100);
+        return cachedData;
       }
       
-      if (apiEndpoint) {
-        fetchUrl = `${API_CONFIG.BASE_URL}${apiEndpoint}`;
-        cacheKey = apiEndpoint;
+      console.log(`[FaithfulReader] 📥 Fetching ${ext.toUpperCase()} file`);
+      const startTime = performance.now();
+      
+      let arrayBuffer;
+      
+      // EPUB files - single request (backend returns complete file)
+      if (ext === 'epub') {
+        console.log('[FaithfulReader] 📚 Downloading complete EPUB file (ZIP format)');
+        arrayBuffer = await downloadCompleteFile(url, onProgress);
       }
-    }
-    
-    // Return existing promise if request is already in flight
-    if (requestCache.has(cacheKey)) {
-      console.log(`[FaithfulReader] Reusing in-flight request for ${ext.toUpperCase()}`);
-      return requestCache.get(cacheKey);
-    }
-    
-    // Create new request promise with streaming and progress
-    const requestPromise = (async () => {
-      try {
-        // Check IndexedDB cache first
-        const cachedData = await getCachedFile(cacheKey);
-        if (cachedData) {
-          console.log(`[FaithfulReader] ✅ Using cached ${ext.toUpperCase()} from IndexedDB`);
-          if (onProgress) onProgress(100);
-          return cachedData;
-        }
-        
-        // Fetch with streaming and progress tracking
-        const source = isCdnUrl ? 'CDN' : 'backend API';
-        console.log(`[FaithfulReader] 📥 Fetching ${ext.toUpperCase()} from ${source}:`, fetchUrl);
-        const startTime = performance.now();
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
-        
-        try {
-          const res = await fetch(fetchUrl, {
-            cache: 'no-store',
-            signal: controller.signal,
-            // ⚡ Request compression from server for faster transfer
-            headers: {
-              'Accept-Encoding': 'gzip, deflate, br',
-              'Accept': 'application/octet-stream, */*'
-            },
-            // ⚡ Use high priority for manuscript loading
-            priority: 'high'
-          });
-          
-          clearTimeout(timeoutId);
-          
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-          }
-          
-          // Get content length for progress tracking
-          const contentLength = res.headers.get('Content-Length');
-          const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-          
-          // Use streaming if available and size is known
-          if (res.body && totalBytes > 0) {
-            console.log(`[FaithfulReader] 📊 Streaming ${(totalBytes / 1024 / 1024).toFixed(2)} MB...`);
-            
-            const reader = res.body.getReader();
-            
-            // ⚡ Pre-allocate buffer for better performance (avoid array resizing)
-            const arrayBuffer = new Uint8Array(totalBytes);
-            let receivedBytes = 0;
-            let lastProgressUpdate = 0;
-            let lastProgressTime = performance.now();
-            
-            while (true) {
-              const { done, value } = await reader.read();
-              
-              if (done) break;
-              
-              // ⚡ Direct copy to pre-allocated buffer (faster than pushing to array)
-              arrayBuffer.set(value, receivedBytes);
-              receivedBytes += value.length;
-              
-              // ⚡ Throttle progress updates (every 10% OR 2MB OR 500ms)
-              const progress = Math.round((receivedBytes / totalBytes) * 100);
-              const timeSinceLastUpdate = performance.now() - lastProgressTime;
-              if (onProgress && (
-                progress - lastProgressUpdate >= 10 || 
-                receivedBytes - lastProgressUpdate * totalBytes / 100 >= 2097152 ||
-                timeSinceLastUpdate >= 500
-              )) {
-                onProgress(progress);
-                lastProgressUpdate = progress;
-                lastProgressTime = performance.now();
-              }
-            }
-            
-            const loadTime = ((performance.now() - startTime) / 1000).toFixed(1);
-            const sizeMB = (receivedBytes / 1024 / 1024).toFixed(2);
-            const speedMBps = (receivedBytes / 1024 / 1024 / (loadTime || 1)).toFixed(1);
-            console.log(`[FaithfulReader] ✅ ${ext.toUpperCase()} loaded: ${sizeMB} MB in ${loadTime}s (${speedMBps} MB/s)`);
-            
-            // Cache in IndexedDB asynchronously
-            setCachedFile(cacheKey, arrayBuffer.buffer).catch(err => {
-              console.warn('[FaithfulReader] ⚠️ Failed to cache file:', err);
-            });
-            
-            if (onProgress) onProgress(100);
-            return arrayBuffer.buffer;
-          } else {
-            // Fallback: no streaming support or unknown size
-            console.log(`[FaithfulReader] ⚠️ Streaming not available, using fallback...`);
-            const arrayBuffer = await res.arrayBuffer();
-            const loadTime = ((performance.now() - startTime) / 1000).toFixed(1);
-            const sizeMB = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
-            console.log(`[FaithfulReader] ✅ ${ext.toUpperCase()} loaded: ${sizeMB} MB in ${loadTime}s`);
-            
-            // Cache in IndexedDB
-            setCachedFile(cacheKey, arrayBuffer).catch(err => {
-              console.warn('[FaithfulReader] ⚠️ Failed to cache file:', err);
-            });
-            
-            if (onProgress) onProgress(100);
-            return arrayBuffer;
-          }
-        } finally {
-          clearTimeout(timeoutId);
-        }
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          console.error('[FaithfulReader] ❌ Request timeout (5 minutes)');
-          throw new Error('Request timeout - file is too large or connection is slow');
-        }
-        console.error('[FaithfulReader] ❌ Fetch failed:', error);
-        throw new Error(`Failed to load manuscript: ${error.message}`);
-      } finally {
-        // Clean up request cache after completion
-        setTimeout(() => requestCache.delete(cacheKey), 1000);
+      // PDF files - chunked download (5MB chunks due to backend limit)
+      else if (ext === 'pdf') {
+        console.log('[FaithfulReader] 📄 Downloading PDF file in chunks');
+        arrayBuffer = await downloadPDFInChunks(url, onProgress);
       }
-    })();
-    
-    requestCache.set(cacheKey, requestPromise);
-    return requestPromise;
-  }
-  return null;
+      // DOCX files - single request
+      else if (ext === 'docx' || ext === 'doc') {
+        console.log(`[FaithfulReader] 📄 Downloading complete ${ext.toUpperCase()} file`);
+        arrayBuffer = await downloadCompleteFile(url, onProgress);
+      }
+      else {
+        throw new Error(`Unsupported file type: ${ext}`);
+      }
+      
+      const loadTime = ((performance.now() - startTime) / 1000).toFixed(1);
+      const sizeMB = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
+      const speedMBps = (arrayBuffer.byteLength / 1024 / 1024 / (loadTime || 1)).toFixed(1);
+      console.log(`[FaithfulReader] ✅ ${ext.toUpperCase()} loaded: ${sizeMB} MB in ${loadTime}s (${speedMBps} MB/s)`);
+      
+      // Cache in IndexedDB asynchronously
+      setCachedFile(cacheKey, arrayBuffer).catch(err => {
+        console.warn('[FaithfulReader] ⚠️ Failed to cache file:', err);
+      });
+      
+      if (onProgress) onProgress(100);
+      return arrayBuffer;
+      
+    } catch (error) {
+      console.error('[FaithfulReader] ❌ Fetch failed:', error);
+      throw new Error(`Failed to load manuscript: ${error.message}`);
+    } finally {
+      // Clean up request cache after completion
+      setTimeout(() => requestCache.delete(cacheKey), 1000);
+    }
+  })();
+  
+  requestCache.set(cacheKey, requestPromise);
+  return requestPromise;
 }
 
 function fileExtension(book) {
@@ -323,6 +429,7 @@ async function resolveEpubImages(doc, section, book) {
 // as the very first thing in the book flow so it scrolls naturally. Zoom reflows
 // via the reader's own font-size — the original page area is never re-styled.
 function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartFrac, sampleEndFrac, coverUrl }) {
+   
   const containerRef = useRef(null);
   const viewerRef = useRef(null);
   const bookRef = useRef(null);

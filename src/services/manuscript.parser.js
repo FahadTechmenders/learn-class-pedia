@@ -4,7 +4,57 @@ import { ENDPOINTS, API_CONFIG } from '../config/api';
 /**
  * Parse EPUB file and extract structured content (optimized)
  */
+
+
+const CHUNK_SIZE = 1024 * 1024; // 1MB
+
+async function downloadFileInChunks(fileUrl) {
+    // Get file size first
+    const head = await fetch(
+        `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(fileUrl, 0, 1023)}`
+    );
+
+    const totalSize = Number(head.headers.get("X-File-Size"));
+
+    if (!totalSize) {
+        throw new Error("Unable to determine file size.");
+    }
+
+    const chunks = [];
+
+    for (let start = 0; start < totalSize; start += CHUNK_SIZE) {
+
+        const end = Math.min(start + CHUNK_SIZE - 1, totalSize - 1);
+
+        const response = await fetch(
+            `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(fileUrl, start, end)}`
+        );
+
+        if (!response.ok) {
+            throw new Error("Failed to download chunk.");
+        }
+
+        chunks.push(await response.arrayBuffer());
+    }
+
+    return concatenateBuffers(chunks, totalSize);
+}
+function concatenateBuffers(buffers, totalLength) {
+
+    const result = new Uint8Array(totalLength);
+
+    let offset = 0;
+
+    for (const buffer of buffers) {
+        result.set(new Uint8Array(buffer), offset);
+        offset += buffer.byteLength;
+    }
+
+    return result.buffer;
+}
+
 export async function parseEpub(url, options = {}) {
+  debugger;
   const { maxChapters = null, batchSize = 5 } = options;
   
   try {
@@ -30,21 +80,7 @@ export async function parseEpub(url, options = {}) {
         console.log('[parseEpub] 📥 Fetching via backend API:', fetchUrl);
       }
       
-      const response = await fetch(fetchUrl, { 
-        cache: 'no-store',
-        headers: {
-          'Accept': 'application/epub+zip, application/octet-stream, */*'
-        }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('[parseEpub] ❌ Fetch error:', response.status, errorText);
-        throw new Error(`Fetch error: ${response.status} - ${errorText}`);
-      }
-      
-      console.log('[parseEpub] 📊 Response received, converting to ArrayBuffer...');
-      arrayBuffer = await response.arrayBuffer();
+      arrayBuffer = await downloadFileInChunks(url);
       
       if (!arrayBuffer || arrayBuffer.byteLength === 0) {
         throw new Error('Received empty file');

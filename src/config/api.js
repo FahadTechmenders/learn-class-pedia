@@ -218,6 +218,8 @@ export const ENDPOINTS = {
   BOOK_EPUB: (url) => `/book/epub?url=${encodeURIComponent(url)}`,
   BOOK_PDF: (url) => `/book/epub?url=${encodeURIComponent(url)}`,
   BOOK_DOCX: (url) => `/book/epub?url=${encodeURIComponent(url)}`,
+  BOOK_FILE_CHUNK: (fileUrl, startBytes, endBytes) =>
+  `/book/file-chunk?fileUrl=${encodeURIComponent(fileUrl)}&startBytes=${startBytes}&endBytes=${endBytes}`,
 
 
   // Book Category Management endpoints
