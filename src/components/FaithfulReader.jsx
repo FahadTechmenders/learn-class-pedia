@@ -494,6 +494,27 @@ function isFixedLayoutDoc(doc) {
 
 function scaleFixedLayoutDoc(doc, userZoom) {
   if (!doc || !doc.body) return;
+
+  // Remove the fixed width/height (and display/overflow) InDesign hard-codes on
+  // its #_idContainer boxes, so the content isn't locked into a narrow left-
+  // aligned column inside the page.
+  if (!doc.getElementById('fixed-idcontainer-reset')) {
+    const reset = doc.createElement('style');
+    reset.id = 'fixed-idcontainer-reset';
+    reset.textContent = `
+      [id^="_idContainer"] {
+        width: auto !important;
+        height: auto !important;
+        max-width: 100% !important;
+        display: block !important;
+        overflow: visible !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+      }
+    `;
+    (doc.head || doc.documentElement).appendChild(reset);
+  }
+
   // Read the authored page size from the fixed-layout viewport meta.
   let nW = 0, nH = 0;
   const vp = doc.querySelector('meta[name="viewport"]');
@@ -507,9 +528,22 @@ function scaleFixedLayoutDoc(doc, userZoom) {
   if (!nW) nW = doc.body.scrollWidth || 432;
   if (!nH) nH = doc.body.scrollHeight || 648;
 
-  const availW = doc.documentElement.clientWidth || nW;
+  // Available width = the actual <iframe> element width in the parent. We must
+  // NOT use doc.documentElement.clientWidth here: a fixed-layout EPUB's viewport
+  // meta (e.g. width=432) makes clientWidth report the authored width, so on a
+  // narrow device the page wouldn't shrink and would anchor to the left.
+  let availW = 0;
+  try {
+    const frameEl = doc.defaultView && doc.defaultView.frameElement;
+    if (frameEl) availW = frameEl.clientWidth || frameEl.getBoundingClientRect().width;
+  } catch (_) {}
+  if (!availW) availW = doc.documentElement.clientWidth || nW;
+
   const scale = (availW / nW) * (userZoom || 1);
 
+  // Force the document's own width to match the frame so the fixed viewport meta
+  // can't leave the page anchored to the left.
+  doc.documentElement.style.setProperty('width', `${availW}px`, 'important');
   doc.documentElement.style.setProperty('overflow-x', 'hidden', 'important');
   doc.documentElement.style.setProperty('height', `${nH * scale}px`, 'important');
 
@@ -674,6 +708,30 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         try { rendition.themes.fontSize(`${fontPct}%`); } catch (_) {}
         await rendition.display();
         if (!destroyed) setStatus('ready');
+
+        // Inject the cover as the first element INSIDE the epub.js scroll flow so
+        // it scrolls together with the book pages (epub.js stacks its scrolled
+        // views in normal flow inside manager.container).
+        if (coverUrl && !destroyed) {
+          const injectCover = () => {
+            try {
+              const scroller = rendition.manager && rendition.manager.container;
+              if (!scroller) return;
+              if (scroller.querySelector('#faithful-injected-cover')) return;
+              const img = document.createElement('img');
+              img.id = 'faithful-injected-cover';
+              img.src = coverUrl;
+              img.alt = 'Cover';
+              img.style.cssText = 'display:block;width:100%;max-width:100%;height:auto;margin:0 auto 12px auto;box-shadow:0 10px 15px rgba(0,0,0,.1);border-radius:2px;';
+              scroller.insertBefore(img, scroller.firstChild);
+            } catch (_) {}
+          };
+          injectCover();
+          setTimeout(injectCover, 100);
+          setTimeout(injectCover, 400);
+          try { rendition.on('rendered', injectCover); } catch (_) {}
+          try { rendition.on('relocated', injectCover); } catch (_) {}
+        }
       } catch (e) {
         console.error('[EPUB] render error', e);
         if (!destroyed) setStatus('error');
@@ -834,6 +892,21 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
       const v = viewerRef.current;
       if (v && renditionRef.current) {
         try { renditionRef.current.resize(v.clientWidth, v.clientHeight); } catch (_) {}
+        // Re-fit fixed-layout (InDesign) pages to the new frame width — otherwise
+        // switching to a narrower device (mobile/tablet) keeps the old scale and
+        // the page overflows to the side.
+        try {
+          const c = renditionRef.current.manager?.container;
+          const reapply = () => {
+            c?.querySelectorAll('iframe').forEach((ifr) => {
+              const d = ifr.contentDocument || ifr.contentWindow?.document;
+              if (d && isFixedLayoutDoc(d)) scaleFixedLayoutDoc(d, (fontPctRef.current / 180) || 1);
+            });
+          };
+          reapply();
+          setTimeout(reapply, 60);
+          setTimeout(reapply, 200);
+        } catch (_) {}
       }
     });
     obs.observe(el);
@@ -845,14 +918,8 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
       {/* Cover rendered in the parent document (not inside the epub.js iframe).
           This is version-independent: it always displays for EPUB 2.0 and 3.0
           regardless of the section's XHTML namespace or embedded CSP. */}
-      {coverUrl && (
-        <img
-          src={coverUrl}
-          alt="Cover"
-          className="bg-white shadow-xl rounded-sm shrink-0"
-          style={{ width: frameWidth, maxWidth: '100%' }}
-        />
-      )}
+      {/* The cover is injected into the epub.js scroll container (see effect above)
+          so it scrolls together with the book pages instead of sitting outside. */}
       <div
         ref={containerRef}
         className="relative bg-white shadow-xl rounded-sm overflow-hidden shrink-0 w-full"
