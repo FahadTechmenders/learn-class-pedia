@@ -5,6 +5,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2, FileText, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ENDPOINTS, API_CONFIG } from '../config/api';
 import { getCachedFile, setCachedFile } from '../utils/fileCache';
+import { getCachedManuscript } from '../utils/indexedDBCache';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
@@ -222,26 +223,98 @@ async function getArrayBuffer(book, onProgress = null) {
     return await file.arrayBuffer();
   }
   
-  const url = book?.manuscript_url || book?.manuscriptUrl;
+  // Get manuscript URL - check multiple possible field names
+  let url = book?.manuscript_url || book?.manuscriptUrl;
+  
+  // If no URL but we have manuscriptFilePath, convert it to full URL
+  if (!url && book?.manuscriptFilePath) {
+    const filePath = book.manuscriptFilePath;
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      url = filePath;
+    } else {
+      url = `https://cdn.classpedia.ai/${filePath}`;
+    }
+  }
+  
   if (!url) return null;
   
   // Determine file extension
   const filename = book?.manuscript_filename || book?.manuscriptFilename || '';
-  const ext = (filename.split('.').pop() || '').toLowerCase();
+  const filePath = book?.manuscriptFilePath || '';
   
-  const cacheKey = `${url}_${ext}`;
+  // Extract extension from filename, or from filePath, or from URL
+  let ext = '';
+  if (filename) {
+    ext = (filename.split('.').pop() || '').toLowerCase();
+  } else if (filePath) {
+    ext = (filePath.split('.').pop() || '').toLowerCase();
+  } else {
+    ext = (url.split('.').pop() || '').toLowerCase();
+  }
+  
+  // Remove query parameters from extension if present
+  ext = ext.split('?')[0];
+  
+  // Get book ID - try from book object first, then extract from URL
+  let bookId = book?.id;
+  if (!bookId && url) {
+    // Extract book ID from URL pattern: /books/{id}/manuscript/
+    const match = url.match(/\/books\/(\d+)\//i);
+    if (match && match[1]) {
+      bookId = parseInt(match[1], 10);
+      console.log(`[FaithfulReader] Extracted book ID from URL: ${bookId}`);
+    }
+  }
+  
+  // Use book ID for IndexedDB cache key (same as preloader)
+  const localStorageCacheKey = `book_${bookId}_${ext}`;
+  const indexedDBCacheKey = `${url}_${ext}`;
+  
+  console.log(`[FaithfulReader] ========== CACHE LOOKUP ==========`);
+  console.log(`[FaithfulReader] Book ID: ${bookId}`);
+  console.log(`[FaithfulReader] Filename: ${filename}`);
+  console.log(`[FaithfulReader] FilePath: ${filePath}`);
+  console.log(`[FaithfulReader] URL: ${url}`);
+  console.log(`[FaithfulReader] Extension: ${ext}`);
+  console.log(`[FaithfulReader] Cache Key: ${localStorageCacheKey}`);
+  console.log(`[FaithfulReader] ===================================`);
   
   // Return existing promise if request is already in flight
-  if (requestCache.has(cacheKey)) {
+  if (requestCache.has(localStorageCacheKey)) {
     console.log(`[FaithfulReader] Reusing in-flight request for ${ext.toUpperCase()}`);
-    return requestCache.get(cacheKey);
+    return requestCache.get(localStorageCacheKey);
   }
   
   // Create new request promise
   const requestPromise = (async () => {
     try {
-      // Check IndexedDB cache first
-      const cachedData = await getCachedFile(cacheKey);
+      // Check IndexedDB cache first (from preloader)
+      console.log(`[FaithfulReader] ========== STARTING CACHE CHECK ==========`);
+      console.log(`[FaithfulReader] bookId exists: ${!!bookId}`);
+      console.log(`[FaithfulReader] Cache key to lookup: ${localStorageCacheKey}`);
+      
+      if (bookId) {
+        console.log(`[FaithfulReader] Calling getCachedManuscript(${localStorageCacheKey})...`);
+        const cachedManuscript = await getCachedManuscript(localStorageCacheKey);
+        console.log(`[FaithfulReader] getCachedManuscript returned:`, cachedManuscript ? 'DATA FOUND' : 'NULL');
+        
+        if (cachedManuscript) {
+          console.log(`[FaithfulReader] ✅ ✅ ✅ CACHE HIT! Using cached ${ext.toUpperCase()} from IndexedDB`);
+          console.log(`[FaithfulReader] ArrayBuffer size: ${cachedManuscript.arrayBuffer?.byteLength || 'N/A'} bytes`);
+          if (onProgress) onProgress(100);
+          return cachedManuscript.arrayBuffer;
+        } else {
+          console.log(`[FaithfulReader] ❌ ❌ ❌ CACHE MISS for ${localStorageCacheKey}`);
+          console.log(`[FaithfulReader] Will proceed to download from backend...`);
+        }
+      } else {
+        console.log(`[FaithfulReader] ❌ No bookId - skipping preloader cache check`);
+      }
+      console.log(`[FaithfulReader] ========== CACHE CHECK COMPLETE ==========`);
+      console.log('');
+      
+      // Check IndexedDB cache (legacy)
+      const cachedData = await getCachedFile(indexedDBCacheKey);
       if (cachedData) {
         console.log(`[FaithfulReader] ✅ Using cached ${ext.toUpperCase()} from IndexedDB`);
         if (onProgress) onProgress(100);
@@ -278,7 +351,7 @@ async function getArrayBuffer(book, onProgress = null) {
       console.log(`[FaithfulReader] ✅ ${ext.toUpperCase()} loaded: ${sizeMB} MB in ${loadTime}s (${speedMBps} MB/s)`);
       
       // Cache in IndexedDB asynchronously
-      setCachedFile(cacheKey, arrayBuffer).catch(err => {
+      setCachedFile(indexedDBCacheKey, arrayBuffer).catch(err => {
         console.warn('[FaithfulReader] ⚠️ Failed to cache file:', err);
       });
       
@@ -290,11 +363,11 @@ async function getArrayBuffer(book, onProgress = null) {
       throw new Error(`Failed to load manuscript: ${error.message}`);
     } finally {
       // Clean up request cache after completion
-      setTimeout(() => requestCache.delete(cacheKey), 1000);
+      setTimeout(() => requestCache.delete(localStorageCacheKey), 1000);
     }
   })();
   
-  requestCache.set(cacheKey, requestPromise);
+  requestCache.set(localStorageCacheKey, requestPromise);
   return requestPromise;
 }
 
