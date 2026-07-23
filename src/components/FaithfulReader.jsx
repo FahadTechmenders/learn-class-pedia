@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ePub from 'epubjs';
+import JSZip from 'jszip';
 import { renderAsync } from 'docx-preview';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2, FileText, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -568,7 +569,6 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
   const fontPctRef = useRef(fontPct);
   fontPctRef.current = fontPct;
   const [status, setStatus] = useState('loading'); // loading | ready | error
-  const [isImageBased, setIsImageBased] = useState(false);
 
   useEffect(() => {
     if (!viewerRef.current || !arrayBuffer) return;
@@ -664,50 +664,28 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
               return;
             }
 
-            // Check if this is image-based by looking for image elements
-            const images = doc.querySelectorAll('img, image');
-            const isImagePage = images.length > 0 && doc.body?.children?.length <= images.length + 1;
-            
-            if (isImagePage) {
-              setIsImageBased(true);
-              console.log('[EPUB] Detected image-based page - will use CSS transform zoom');
-            }
-            
-            // Inject a global CSS style for EPUB 2.0 compatibility (reflowable text)
+            // Reflowable / image-based EPUB (2.0 & 3.0): inject ONLY safe layout rules (line
+            // spacing, horizontal-overflow guard, responsive images). Font-size
+            // is deliberately left to epub.js's themes.fontSize so zoom reflows
+            // the real content — exactly like the Publisher Portal. Locking
+            // font-size here with !important would block themes.fontSize updates.
             const style = doc.createElement('style');
             style.id = 'epub-base-zoom';
             style.textContent = `
-              html, body { 
-                font-size: ${fontPct}% !important; 
+              html, body {
                 line-height: 1.7 !important;
                 overflow-x: hidden !important;
                 width: 100% !important;
               }
-              * { 
-                font-size: inherit !important;
-                max-width: 100% !important;
-                box-sizing: border-box !important;
-              }
-              p, div, span, li, td, th, a, em, i, b, strong {
-                font-size: inherit !important;
-              }
-              h1 { font-size: 2em !important; }
-              h2 { font-size: 1.75em !important; }
-              h3 { font-size: 1.5em !important; }
-              h4 { font-size: 1.25em !important; }
-              h5 { font-size: 1.1em !important; }
-              h6 { font-size: 1em !important; }
+              * { max-width: 100% !important; box-sizing: border-box !important; }
               img { max-width: 100% !important; height: auto !important; }
             `;
             doc.head?.appendChild(style);
-            
+
             if (doc.body) {
               doc.body.style.setProperty('overflow-anchor', 'none', 'important');
-              doc.body.style.setProperty('font-size', `${fontPct}%`, 'important');
               doc.body.style.setProperty('line-height', '1.7', 'important');
             }
-            
-            console.log('[EPUB] Styles applied to new content');
           } catch (err) {
             console.error('[EPUB] Error in content hook:', err);
           }
@@ -753,15 +731,15 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [arrayBuffer, sampleMode, sampleStartFrac, sampleEndFrac]);
 
-  // Zoom: change the reader's own font-size (content reflows, stays original).
-  // For image-based EPUBs, use CSS transform scaling on the container.
+  // Zoom (Publisher Portal approach): reflow the real EPUB via the reader's own
+  // font-size. Content stays original and reflows identically on Desktop/Tablet/
+  // Mobile for both EPUB 2.0 and 3.0. Fixed-layout EPUBs (which cannot reflow)
+  // fall back to CSS-transform page scaling below.
   useEffect(() => {
     try {
       const rendition = renditionRef.current;
       if (!rendition) return;
-      
-      console.log('[EPUB] Applying zoom:', fontPct + '%');
-      
+
       // Fixed-layout EPUBs: rescale each page in place. Do NOT call
       // themes.fontSize — that resizes the iframe and fights the transform,
       // which makes the page shake. Just re-apply the transform scale.
@@ -807,118 +785,15 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         return;
       }
       
-      // For image-based EPUBs, use CSS transform on the container
-      if (isImageBased) {
-        const container = viewerRef.current;
-        if (container) {
-          // Find the epub.js iframe container
-          const iframeContainer = container.querySelector('.epub-container') || container.querySelector('iframe')?.parentElement || container;
-          const scale = fontPct / 100;
-          iframeContainer.style.setProperty('transform', `scale(${scale})`);
-          iframeContainer.style.setProperty('transform-origin', 'top center');
-          iframeContainer.style.setProperty('transition', 'transform 0.15s ease-out');
-          
-          // Also apply to the viewer container
-          const viewerContainer = container.querySelector('.viewer') || container;
-          viewerContainer.style.setProperty('transform', `scale(${scale})`);
-          viewerContainer.style.setProperty('transform-origin', 'top center');
-          viewerContainer.style.setProperty('transition', 'transform 0.15s ease-out');
-          
-          console.log('[EPUB] Applied transform scale:', scale);
-          return;
-        }
-      }
-      
-      // Method 1: Use epub.js themes API (for text-based EPUBs)
+      // Reflowable AND image-based EPUB (2.0 & 3.0): zoom via the reader's own
+      // font-size — the Publisher Portal's exact mechanism. epub.js reflows each
+      // real spine section (each image page stays its own stacked page/card, like
+      // PDF pages) so nothing overflows the container on zoom.
       rendition.themes.fontSize(`${fontPct}%`);
-      
-      // Method 2: Direct iframe manipulation for EPUB 2.0
-      const applyZoomToIframes = () => {
-        const container = rendition.manager?.container;
-        if (!container) return;
-        
-        const iframes = container.querySelectorAll('iframe');
-        console.log('[EPUB] Found iframes:', iframes.length);
-        
-        iframes.forEach((iframe, idx) => {
-          try {
-            const doc = iframe.contentDocument || iframe.contentWindow?.document;
-            if (!doc) {
-              console.log('[EPUB] Cannot access iframe', idx);
-              return;
-            }
-            
-            // Fixed-layout EPUB: rescale the authored page to fit. Never inject
-            // font overrides here — that would break the fixed positioning.
-            if (isFixedLayoutDoc(doc)) {
-              scaleFixedLayoutDoc(doc, (fontPct / 180) || 1);
-              return;
-            }
-            
-            // Check if this is image-based
-            const images = doc.querySelectorAll('img, image');
-            const isImagePage = images.length > 0 && doc.body?.children?.length <= images.length + 1;
-            
-            if (isImagePage) {
-              // For image-based pages, apply CSS transform to the body or container
-              const body = doc.body;
-              if (body) {
-                const scale = fontPct / 100;
-                body.style.setProperty('transform', `scale(${scale})`);
-                body.style.setProperty('transform-origin', 'top center');
-                body.style.setProperty('transition', 'transform 0.15s ease-out');
-                console.log('[EPUB] Applied transform scale to iframe body:', scale);
-              }
-            } else {
-              // Remove old zoom style if exists
-              const oldStyle = doc.getElementById('epub-zoom-override');
-              if (oldStyle) oldStyle.remove();
-              
-              // Inject new zoom style for text-based pages
-              const style = doc.createElement('style');
-              style.id = 'epub-zoom-override';
-              style.textContent = `
-                html, body { 
-                  font-size: ${fontPct}% !important; 
-                  line-height: 1.7 !important;
-                }
-                * { 
-                  font-size: inherit !important;
-                  max-width: 100% !important;
-                }
-                p, div, span, li, td, th, a, em, i, b, strong {
-                  font-size: inherit !important;
-                }
-                h1 { font-size: 2em !important; }
-                h2 { font-size: 1.75em !important; }
-                h3 { font-size: 1.5em !important; }
-                h4 { font-size: 1.25em !important; }
-                h5 { font-size: 1.1em !important; }
-                h6 { font-size: 1em !important; }
-              `;
-              
-              if (doc.head) {
-                doc.head.appendChild(style);
-                console.log('[EPUB] Zoom applied to iframe', idx);
-              }
-            }
-          } catch (err) {
-            console.log('[EPUB] Error accessing iframe', idx, err.message);
-          }
-        });
-      };
-      
-      // Apply immediately
-      applyZoomToIframes();
-      
-      // Also apply after a short delay (for lazy-loaded content)
-      setTimeout(applyZoomToIframes, 100);
-      setTimeout(applyZoomToIframes, 500);
-      
     } catch (err) {
       console.error('[EPUB] Zoom error:', err);
     }
-  }, [fontPct, isImageBased]);
+  }, [fontPct]);
 
   // Keep the rendition sized to its container (view-mode width changes, resize).
   useEffect(() => {
@@ -1029,7 +904,7 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd })
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           canvas.style.width = typeof pageWidth === 'number' ? `${pageWidth}px` : pageWidth;
-          canvas.style.maxWidth = '100%';
+          canvas.style.maxWidth = 'none';
           canvas.style.height = 'auto';
           canvas.className = 'bg-white shadow-xl rounded-sm';
           container.appendChild(canvas);
@@ -1060,15 +935,15 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd })
 
   return (
     <div className="w-full h-full overflow-auto bg-slate-200">
-      <div className="flex flex-col items-center gap-5 py-6 px-3">
+      <div className="flex flex-col items-center gap-5 py-6 px-3 w-fit min-w-full mx-auto">
         {coverUrl && !(sampleStart > 1) && (
-          <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: '100%' }} />
+          <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: 'none' }} />
         )}
         {status === 'loading' && <CenterMessage icon={Loader2} spin title="Rendering PDF…" />}
         {status === 'error' && <CenterMessage icon={AlertCircle} title="Could not render this PDF" />}
         <div
           ref={pagesRef}
-          className="flex flex-col items-center gap-5 w-full"
+          className="flex flex-col items-center gap-5 w-fit min-w-full"
         />
       </div>
     </div>
@@ -1176,8 +1051,184 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
   );
 }
 
-const VIEW_BASE_WIDTH = { desktop: 900, tablet: 700, mobile: 550 };
-const EPUB_FRAME_WIDTH = { desktop: 700, tablet: 600, mobile: 500 };
+// ─── Image-based EPUB 2.0 → PDF-style page extraction ─────────────────────────
+// Legacy/fixed image EPUBs (each spine section is a full-page image) do NOT
+// paginate reliably in epub.js continuous scroll — everything collapses into one
+// scaled container. So we read the zip directly (same technique as ContentStep's
+// parseEpubToStructure), pull each page image out in spine order, and render them
+// as separate stacked pages exactly like the PDF reader. Returns an ordered array
+// of blob-URL strings, or null when the book is reflowable text (use epub.js).
+async function extractEpubImagePages(arrayBuffer) {
+  const zip = await JSZip.loadAsync(arrayBuffer.slice(0));
+  const domParser = new DOMParser();
+
+  const containerEntry = zip.file('META-INF/container.xml');
+  if (!containerEntry) return null;
+  const containerXml = await containerEntry.async('text');
+  const containerDoc = domParser.parseFromString(containerXml, 'application/xml');
+  const opfPath = containerDoc.querySelector('rootfile')?.getAttribute('full-path') || 'content.opf';
+  const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
+
+  const opfEntry = zip.file(opfPath);
+  if (!opfEntry) return null;
+  const opfXml = await opfEntry.async('text');
+  const opfDoc = domParser.parseFromString(opfXml, 'application/xml');
+
+  const manifest = {};
+  opfDoc.querySelectorAll('manifest > item').forEach((it) => {
+    const id = it.getAttribute('id');
+    const href = it.getAttribute('href');
+    const mt = it.getAttribute('media-type') || '';
+    if (id && href) manifest[id] = { path: opfDir + href, mediaType: mt };
+  });
+
+  const spineItems = Array.from(opfDoc.querySelectorAll('spine > itemref'))
+    .map((ref) => manifest[ref.getAttribute('idref')])
+    .filter(Boolean);
+
+  const resolveZipPath = (src, baseDir) => {
+    try { return new URL(src, `http://epub.local/${baseDir}`).pathname.replace(/^\//, ''); }
+    catch (_) { return src; }
+  };
+  const getImageBlobUrl = async (zipPath) => {
+    if (!zipPath) return null;
+    let entry = zip.file(zipPath);
+    if (!entry) {
+      const lc = zipPath.toLowerCase();
+      const match = Object.keys(zip.files).find((k) => k.toLowerCase() === lc && !zip.files[k].dir);
+      if (match) entry = zip.file(match);
+    }
+    if (!entry) return null;
+    try {
+      const data = await entry.async('arraybuffer');
+      const ext = (zipPath.split('.').pop() || '').toLowerCase();
+      const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp' };
+      return URL.createObjectURL(new Blob([data], { type: mimeMap[ext] || 'image/jpeg' }));
+    } catch (_) { return null; }
+  };
+
+  const pages = [];
+  let textCount = 0;
+  let imageCount = 0;
+  for (let i = 0; i < spineItems.length; i++) {
+    const { path: itemPath, mediaType } = spineItems[i];
+    const isXhtml = mediaType.includes('html') || /\.(xhtml|html|htm)$/i.test(itemPath);
+    if (!isXhtml) continue;
+    const xhtmlEntry = zip.file(itemPath);
+    if (!xhtmlEntry) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const xhtmlText = await xhtmlEntry.async('text');
+    let doc = domParser.parseFromString(xhtmlText, 'application/xhtml+xml');
+    if (doc.querySelector('parsererror')) doc = domParser.parseFromString(xhtmlText, 'text/html');
+    const itemBase = itemPath.includes('/') ? itemPath.substring(0, itemPath.lastIndexOf('/') + 1) : '';
+
+    const textEls = Array.from(doc.querySelectorAll('h1,h2,h3,h4,h5,h6,p,blockquote,li'))
+      .filter((el) => (el.textContent || '').trim());
+    textCount += textEls.length;
+
+    const imgs = Array.from(doc.querySelectorAll('img, image'));
+    for (const el of imgs) {
+      const rawSrc = el.getAttribute('src')
+        || el.getAttribute('href')
+        || el.getAttribute('xlink:href')
+        || (el.getAttributeNS ? el.getAttributeNS('http://www.w3.org/1999/xlink', 'href') : null)
+        || '';
+      if (rawSrc && !rawSrc.startsWith('data:')) {
+        const resolved = resolveZipPath(rawSrc, itemBase);
+        // eslint-disable-next-line no-await-in-loop
+        const url = await getImageBlobUrl(resolved);
+        if (url) { pages.push(url); imageCount++; }
+      }
+    }
+  }
+
+  const totalEls = textCount + imageCount;
+  const isImageBased = totalEls > 0 && imageCount / totalEls > 0.5 && pages.length > 0;
+  if (!isImageBased) {
+    pages.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} });
+    return null;
+  }
+  return pages;
+}
+
+// Renders image-based EPUB pages as separate stacked cards — identical layout to
+// the PDF reader (page width scales with zoom, gap between pages, drop shadow).
+function EpubImageReader({ pages, pageWidth, coverUrl }) {
+  return (
+    <div className="w-full h-full overflow-auto bg-slate-200">
+      <div className="flex flex-col items-center gap-5 py-6 px-3 w-fit min-w-full mx-auto">
+        {coverUrl && (
+          <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: 'none' }} />
+        )}
+        {pages.map((src, i) => (
+          <img
+            key={i}
+            src={src}
+            alt={`Page ${i + 1}`}
+            className="bg-white shadow-xl rounded-sm"
+            style={{ width: pageWidth, maxWidth: 'none', height: 'auto' }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Decides how to render an EPUB: extract image pages (PDF-style) for image-based
+// EPUB 2.0, otherwise fall back to the faithful epub.js reflow reader.
+function EpubAutoReader({ arrayBuffer, frameWidth, docWidth, fontPct, coverUrl, sampleMode, sampleStartFrac, sampleEndFrac }) {
+  const [imagePages, setImagePages] = useState(undefined); // undefined=checking | null=reflowable | string[]
+
+  useEffect(() => {
+    let cancelled = false;
+    let created = [];
+    setImagePages(undefined);
+    (async () => {
+      try {
+        const pages = await extractEpubImagePages(arrayBuffer);
+        if (cancelled) { (pages || []).forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} }); return; }
+        created = pages || [];
+        setImagePages(pages);
+      } catch (e) {
+        console.warn('[EPUB] image extraction failed, using epub.js:', e?.message);
+        if (!cancelled) setImagePages(null);
+      }
+    })();
+    return () => { cancelled = true; created.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} }); };
+  }, [arrayBuffer]);
+
+  if (imagePages === undefined) {
+    return <CenterMessage icon={Loader2} spin title="Loading book…" />;
+  }
+  if (imagePages && imagePages.length) {
+    // Sample mode → show only the pages inside the configured fraction range.
+    let visible = imagePages;
+    if (sampleMode) {
+      const n = imagePages.length;
+      const s = Math.max(0, Math.floor(n * (sampleStartFrac || 0)));
+      const e = Math.min(n, Math.max(s + 1, Math.ceil(n * (sampleEndFrac || 1))));
+      visible = imagePages.slice(s, e);
+    }
+    return <EpubImageReader pages={visible} pageWidth={docWidth} coverUrl={sampleMode ? null : coverUrl} />;
+  }
+  return (
+    <EpubReader
+      arrayBuffer={arrayBuffer}
+      frameWidth={frameWidth}
+      fontPct={fontPct}
+      sampleMode={sampleMode}
+      sampleStartFrac={sampleStartFrac}
+      sampleEndFrac={sampleEndFrac}
+      coverUrl={coverUrl}
+    />
+  );
+}
+
+// Default page width per view. Tablet/mobile values are tuned to fit inside the
+// device-frame screens at the default 90% zoom, so a zoomed-in page overflows and
+// the reader shows a scrollbar (zoom now works on every view).
+const VIEW_BASE_WIDTH = { desktop: 600, tablet: 440, mobile: 300 };
+const EPUB_FRAME_WIDTH = { desktop: 540, tablet: 440, mobile: 300 };
 
 export default function FaithfulReader({ book, fontScale = 1, viewMode = 'desktop', sampleMode = false }) {
   const [buffer, setBuffer] = useState(null);
@@ -1261,7 +1312,7 @@ export default function FaithfulReader({ book, fontScale = 1, viewMode = 'deskto
   let reader;
   if (ext === 'epub') {
     const epubFrameW = EPUB_FRAME_WIDTH[viewMode] || EPUB_FRAME_WIDTH.desktop;
-    reader = <EpubReader arrayBuffer={buffer} frameWidth={epubFrameW} fontPct={epubFontPct} sampleMode={activeSample} sampleStartFrac={sampleStartFrac} sampleEndFrac={sampleEndFrac} coverUrl={coverUrl} />;
+    reader = <EpubAutoReader arrayBuffer={buffer} frameWidth={epubFrameW} docWidth={docWidth} fontPct={epubFontPct} sampleMode={activeSample} sampleStartFrac={sampleStartFrac} sampleEndFrac={sampleEndFrac} coverUrl={coverUrl} />;
   } else if (ext === 'pdf') {
     reader = <PdfReader arrayBuffer={buffer} coverUrl={coverUrl} pageWidth={docWidth} sampleStart={activeSample ? sStart : 0} sampleEnd={activeSample ? sEnd : 0} />;
   } else if (ext === 'docx' || ext === 'doc') {
