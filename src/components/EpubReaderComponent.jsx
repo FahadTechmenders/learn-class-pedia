@@ -1006,7 +1006,7 @@ function buildManuscriptSampleSpreads(fullSpreads, book, highlightWords) {
 export default function BookPreviewer({ book, onClose, onApprove }) {
   const [viewMode, setViewMode] = useState('desktop');
   const [activeTab, setActiveTab] = useState('grammar');
-  const [fontScale, setFontScale] = useState(1.2);
+  const [fontScale, setFontScale] = useState(0.9);
   const FONT_MIN = 0.8;
   const FONT_MAX = 2;
   const FONT_STEP = 0.1;
@@ -1017,8 +1017,13 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   
   // Reset font scale when book changes
   useEffect(() => {
-    setFontScale(1.2);
+    setFontScale(0.9);
   }, [book?.id, book?.manuscript_url, book?.manuscriptUrl]);
+
+  // Reset font scale when switching devices
+  useEffect(() => {
+    setFontScale(0.9);
+  }, [viewMode]);
 
   // Escape key to close
   useEffect(() => {
@@ -1043,8 +1048,8 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
             <span className="text-sm font-semibold text-slate-800">eBook Preview</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Font-size spinner (desktop KPF reader only) */}
-            {viewMode === 'desktop' && (
+            {/* Font-size spinner (all devices) */}
+            {(viewMode === 'desktop' || viewMode === 'tablet' || viewMode === 'mobile') && (
               <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-1 py-1">
                 <button
                   onClick={decreaseFont}
