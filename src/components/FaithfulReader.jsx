@@ -631,7 +631,15 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         // scroll-anchoring vs. lazily-injected sections). Ref: epub.js #1303/#1416.
         try {
           const mgr = /** @type {any} */ (rendition).manager?.container;
-          if (mgr) mgr.style.setProperty('overflow-anchor', 'none', 'important');
+          if (mgr) {
+            mgr.style.setProperty('overflow-anchor', 'none', 'important');
+            // Override epub.js's mobile width constraints (288px + padding) for fixed-layout
+            mgr.style.setProperty('width', '100%', 'important');
+            mgr.style.setProperty('max-width', '100%', 'important');
+            mgr.style.setProperty('padding', '0', 'important');
+            mgr.style.setProperty('margin', '0', 'important');
+            mgr.style.setProperty('box-sizing', 'border-box', 'important');
+          }
         } catch (_) {}
 
         // Track if this is an image-based EPUB (EPUB 2.0 with image pages)
@@ -647,7 +655,7 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
             // frame width. Do NOT touch font-size — that breaks fixed positioning
             // and makes the text huge / overflow on first render.
             if (isFixedLayoutDoc(doc)) {
-              const applyFit = () => scaleFixedLayoutDoc(doc, (fontPctRef.current / 180) || 1);
+              const applyFit = () => scaleFixedLayoutDoc(doc, (fontPctRef.current / 100) || 1);
               applyFit();
               setTimeout(applyFit, 100);
               setTimeout(applyFit, 500);
@@ -760,14 +768,42 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
       const fxContainer = rendition.manager?.container;
       const fxDoc = fxContainer?.querySelector('iframe')?.contentDocument;
       if (fxDoc && isFixedLayoutDoc(fxDoc)) {
+        // Capture the current reading location (CFI) before zoom so we can navigate
+        // back to it after scaling. epub.js's continuous manager repositions content
+        // when iframe heights change, so preserving raw scrollTop doesn't work.
+        let savedLocation = null;
+        try {
+          savedLocation = rendition.currentLocation();
+          console.log('[ZOOM] Saved location:', savedLocation?.start?.cfi);
+        } catch (e) {
+          console.warn('[ZOOM] Could not capture location:', e.message);
+        }
+
         const applyFixed = () => {
           fxContainer.querySelectorAll('iframe').forEach((ifr) => {
             const d = ifr.contentDocument || ifr.contentWindow?.document;
-            if (d && isFixedLayoutDoc(d)) scaleFixedLayoutDoc(d, (fontPct / 180) || 1);
+            if (d && isFixedLayoutDoc(d)) scaleFixedLayoutDoc(d, (fontPct / 100) || 1);
           });
         };
+
         applyFixed();
-        setTimeout(applyFixed, 120);
+        
+        // Navigate back to the saved location after a delay to let epub.js finish
+        // repositioning. This is more reliable than fighting its scroll management.
+        if (savedLocation && savedLocation.start && savedLocation.start.cfi) {
+          setTimeout(() => {
+            try {
+              rendition.display(savedLocation.start.cfi);
+              console.log('[ZOOM] Restored to:', savedLocation.start.cfi);
+            } catch (e) {
+              console.warn('[ZOOM] Could not restore location:', e.message);
+            }
+          }, 150);
+        } else {
+          // Fallback: re-apply scaling a few times to ensure it sticks
+          setTimeout(applyFixed, 100);
+          setTimeout(applyFixed, 300);
+        }
         return;
       }
       
@@ -900,7 +936,7 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
           const reapply = () => {
             c?.querySelectorAll('iframe').forEach((ifr) => {
               const d = ifr.contentDocument || ifr.contentWindow?.document;
-              if (d && isFixedLayoutDoc(d)) scaleFixedLayoutDoc(d, (fontPctRef.current / 180) || 1);
+              if (d && isFixedLayoutDoc(d)) scaleFixedLayoutDoc(d, (fontPctRef.current / 100) || 1);
             });
           };
           reapply();
