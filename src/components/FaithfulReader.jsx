@@ -633,6 +633,14 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
           const mgr = /** @type {any} */ (rendition).manager?.container;
           if (mgr) {
             mgr.style.setProperty('overflow-anchor', 'none', 'important');
+            // Reflowable (EPUB 3.0 flowable text) zoom: make the epub.js scroll
+            // container a real vertical scroller so a scrollbar appears once the
+            // zoomed text grows taller than the frame (lets the user scroll to
+            // read/adjust). Only affects this reflowable reader — PDF and
+            // image-based EPUB 2.0 use separate components.
+            mgr.style.setProperty('overflow-y', 'auto', 'important');
+            mgr.style.setProperty('overflow-x', 'hidden', 'important');
+            mgr.style.setProperty('height', '100%', 'important');
             // Override epub.js's mobile width constraints (288px + padding) for fixed-layout
             mgr.style.setProperty('width', '100%', 'important');
             mgr.style.setProperty('max-width', '100%', 'important');
@@ -785,11 +793,19 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         return;
       }
       
-      // Reflowable AND image-based EPUB (2.0 & 3.0): zoom via the reader's own
-      // font-size — the Publisher Portal's exact mechanism. epub.js reflows each
-      // real spine section (each image page stays its own stacked page/card, like
-      // PDF pages) so nothing overflows the container on zoom.
+      // Reflowable EPUB (3.0 flowable text): zoom via the reader's own font-size.
+      // The real content reflows and grows taller; the scroll container (set to
+      // overflow-y:auto above) then shows a scrollbar so the user can scroll the
+      // enlarged text.
       rendition.themes.fontSize(`${fontPct}%`);
+      // Nudge epub.js to recompute the scrolled section heights after the font
+      // change so the container actually overflows and the scrollbar appears.
+      setTimeout(() => {
+        try {
+          const v = viewerRef.current;
+          if (v && renditionRef.current) renditionRef.current.resize(v.clientWidth, v.clientHeight);
+        } catch (_) {}
+      }, 60);
     } catch (err) {
       console.error('[EPUB] Zoom error:', err);
     }
