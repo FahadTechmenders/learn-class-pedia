@@ -5,10 +5,11 @@
  */
 
 import ApiService from './ApiService';
-import { ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS } from '../config/api';
 import { 
   setCachedManuscript, 
-  needsUpdate as checkNeedsUpdate 
+  needsUpdate as checkNeedsUpdate,
+  getAllCachedUrls
 } from '../utils/indexedDBCache';
 
 // Configuration
@@ -32,28 +33,19 @@ function getFullManuscriptUrl(filePath) {
 /**
  * Download manuscript file with progress tracking
  */
-async function downloadManuscript(book, onProgress = null) {
-  const filePath = book.manuscriptFilePath;
-  const filename = book.manuscriptFilename || '';
-  
-  if (!filePath) {
-    console.warn('[ManuscriptPreloader] No manuscript file path for book:', book.id);
-    return null;
-  }
-  
-  // Convert to full URL
-  const url = getFullManuscriptUrl(filePath);
+async function downloadManuscript(fileInfo, onProgress = null) {
+  const url = fileInfo.fileUrl;
+  const filename = fileInfo.filename || '';
+  const ext = fileInfo.ext || (filename.split('.').pop() || '').toLowerCase();
   
   if (!url) {
-    console.warn('[ManuscriptPreloader] Could not generate URL for book:', book.id);
+    console.warn('[ManuscriptPreloader] No manuscript URL for:', fileInfo.bookId || url);
     return null;
   }
-  
-  const ext = (filename.split('.').pop() || '').toLowerCase();
   
   try {
     // Download the file
-    console.log(`[ManuscriptPreloader] 📥 Downloading manuscript for book ${book.id} (${ext.toUpperCase()})`);
+    console.log(`[ManuscriptPreloader] 📥 Downloading manuscript (${ext.toUpperCase()})`);
     console.log(`[ManuscriptPreloader] URL: ${url}`);
     const startTime = performance.now();
     
@@ -70,13 +62,25 @@ async function downloadManuscript(book, onProgress = null) {
     
     const loadTime = ((performance.now() - startTime) / 1000).toFixed(1);
     const sizeMB = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
-    console.log(`[ManuscriptPreloader] ✅ Downloaded book ${book.id}: ${sizeMB} MB in ${loadTime}s`);
+    console.log(`[ManuscriptPreloader] ✅ Downloaded manuscript: ${sizeMB} MB in ${loadTime}s`);
     
     return arrayBuffer;
   } catch (error) {
-    console.error(`[ManuscriptPreloader] ❌ Failed to download book ${book.id}:`, error);
+    console.error(`[ManuscriptPreloader] ❌ Failed to download manuscript:`, error);
     return null;
   }
+}
+
+/**
+ * Extract book ID from a manuscript URL if it follows the /books/{id}/manuscript/ pattern
+ */
+function extractBookIdFromUrl(fileUrl) {
+  if (!fileUrl) return null;
+  const match = fileUrl.match(/\/books\/(\d+)\//i);
+  if (match && match[1]) {
+    return parseInt(match[1], 10);
+  }
+  return null;
 }
 
 /**
@@ -85,7 +89,7 @@ async function downloadManuscript(book, onProgress = null) {
 async function getFileSize(url, token) {
   try {
     const response = await fetch(
-      `${process.env.REACT_APP_API_URL || 'https://adminapi.classpedia.ai/api'}${ENDPOINTS.BOOK_FILE_INFO(url)}`,
+      `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_INFO(url)}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -121,7 +125,7 @@ async function downloadPDFInChunks(url, token, totalSize, onProgress = null) {
     const endBytes = Math.min(startBytes + CHUNK_SIZE - 1, totalSize - 1);
     
     const response = await fetch(
-      `${process.env.REACT_APP_API_URL || 'https://adminapi.classpedia.ai/api'}${ENDPOINTS.BOOK_FILE_CHUNK(url, startBytes, endBytes)}`,
+      `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, startBytes, endBytes)}`,
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -159,7 +163,7 @@ async function downloadPDFInChunks(url, token, totalSize, onProgress = null) {
  */
 async function downloadCompleteFile(url, token, totalSize, onProgress = null) {
   const response = await fetch(
-    `${process.env.REACT_APP_API_URL || 'https://adminapi.classpedia.ai/api'}${ENDPOINTS.BOOK_FILE_CHUNK(url, 0, totalSize - 1)}`,
+    `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, 0, totalSize - 1)}`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -214,16 +218,16 @@ async function downloadCompleteFile(url, token, totalSize, onProgress = null) {
 /**
  * Preload a single book manuscript
  */
-export async function preloadBookManuscript(book, onProgress = null) {
+export async function preloadBookManuscript(fileInfo, onProgress = null) {
   try {
-    const bookId = book.id;
-    const createdAt = book.createdAt || book.created_at;
-    const updatedAt = book.updatedAt || book.updated_at;
-    const filePath = book.manuscriptFilePath;
-    const filename = book.manuscriptFilename || '';
+    const fileUrl = fileInfo.fileUrl || (fileInfo.manuscriptFilePath ? getFullManuscriptUrl(fileInfo.manuscriptFilePath) : null);
+    const updatedAt = fileInfo.updatedAt || fileInfo.updated_at;
+    const createdAt = fileInfo.createdAt || fileInfo.created_at || updatedAt;
+    const bookId = fileInfo.bookId || fileInfo.id || extractBookIdFromUrl(fileUrl);
+    const filename = fileInfo.filename || fileInfo.manuscriptFilename || (fileUrl ? fileUrl.substring(fileUrl.lastIndexOf('/') + 1) : '');
     
-    if (!filePath) {
-      console.log(`[ManuscriptPreloader] Skipping book ${bookId} - no manuscript file path`);
+    if (!fileUrl) {
+      console.log(`[ManuscriptPreloader] Skipping - no manuscript URL`);
       return { success: false, reason: 'no_manuscript' };
     }
     
@@ -233,11 +237,11 @@ export async function preloadBookManuscript(book, onProgress = null) {
       ext = (filename.split('.').pop() || '').toLowerCase();
     } else {
       // Extract from URL if no filename
-      ext = (filePath.split('.').pop() || '').toLowerCase();
+      ext = (fileUrl.split('.').pop() || '').toLowerCase();
     }
     
     if (!ext || !['epub', 'pdf', 'docx', 'doc'].includes(ext)) {
-      console.warn(`[ManuscriptPreloader] Skipping book ${bookId} - unsupported file type: ${ext}`);
+      console.warn(`[ManuscriptPreloader] Skipping - unsupported file type: ${ext}`);
       return { success: false, reason: 'unsupported_type' };
     }
     
@@ -247,38 +251,37 @@ export async function preloadBookManuscript(book, onProgress = null) {
     const needsDownload = await checkNeedsUpdate(cacheKey, createdAt, updatedAt);
     
     if (!needsDownload) {
-      console.log(`[ManuscriptPreloader] ✅ Book ${bookId} (${filename}) - Already cached, skipping`);
+      console.log(`[ManuscriptPreloader] ✅ (${filename}) - Already cached, skipping`);
       return { success: true, reason: 'already_cached' };
     }
     
-    console.log(`[ManuscriptPreloader] 📥 Book ${bookId} (${filename}) - Downloading...`);
+    console.log(`[ManuscriptPreloader] 📥 (${filename}) - Downloading...`);
     
     // Download the manuscript
-    const arrayBuffer = await downloadManuscript(book, onProgress);
+    const arrayBuffer = await downloadManuscript({ fileUrl, filename, ext, bookId }, onProgress);
     
     if (arrayBuffer) {
-      // Save to localStorage with metadata
-      const manuscriptUrl = getFullManuscriptUrl(filePath);
+      // Save to IndexedDB with metadata
       const metadata = {
         bookId,
         createdAt,
         updatedAt,
-        manuscriptUrl,
-        manuscriptFilePath: filePath,
+        manuscriptUrl: fileUrl,
+        manuscriptFilePath: fileInfo.manuscriptFilePath || fileUrl,
         filename
       };
       
       const saved = await setCachedManuscript(cacheKey, arrayBuffer, metadata);
       
       if (saved) {
-        console.log(`[ManuscriptPreloader] ✅ Book ${bookId} - Saved to IndexedDB`);
+        console.log(`[ManuscriptPreloader] ✅ - Saved to IndexedDB`);
         return { success: true, reason: 'downloaded' };
       } else {
-        console.warn(`[ManuscriptPreloader] ⚠️ Book ${bookId} - Failed to save to IndexedDB`);
+        console.warn(`[ManuscriptPreloader] ⚠️ - Failed to save to IndexedDB`);
         return { success: false, reason: 'cache_failed' };
       }
     } else {
-      console.error(`[ManuscriptPreloader] ❌ Book ${bookId} - Download failed`);
+      console.error(`[ManuscriptPreloader] ❌ - Download failed`);
       return { success: false, reason: 'download_failed' };
     }
   } catch (error) {
@@ -288,58 +291,43 @@ export async function preloadBookManuscript(book, onProgress = null) {
 }
 
 /**
- * Fetch all books with pagination
+ * Fetch uncached file URLs from server
  */
-async function fetchAllBooks() {
-  const allBooks = [];
-  let currentPage = 1;
-  const pageSize = PRELOADER_CONFIG.PAGE_SIZE;
-  let hasMorePages = true;
+async function fetchUncachedFileUrls() {
+  console.log('[ManuscriptPreloader] 📚 Fetching uncached file URLs from server...');
   
-  console.log('[ManuscriptPreloader] 📚 Fetching all books with pagination...');
-  
-  while (hasMorePages) {
-    try {
-      const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        pageSize: pageSize.toString()
-      });
-      
-      const response = await ApiService.get(`${ENDPOINTS.BOOK_ALL}?${queryParams}`);
-      const responseData = response?.data || response;
-      const items = responseData?.items || [];
-      const totalCount = responseData?.totalCount || 0;
-      
-      console.log(`[ManuscriptPreloader] Page ${currentPage}: ${items.length} books (Total: ${totalCount})`);
-      
-      // Debug: log first book structure
-      if (items.length > 0 && currentPage === 1) {
-        console.log('[ManuscriptPreloader] Sample book structure:', {
-          id: items[0].id,
-          title: items[0].title,
-          manuscriptFilePath: items[0].manuscriptFilePath,
-          manuscriptFilename: items[0].manuscriptFilename,
-          keys: Object.keys(items[0])
-        });
-      }
-      
-      if (items.length > 0) {
-        allBooks.push(...items);
-      }
-      
-      // Check if there are more pages
-      const totalPages = Math.ceil(totalCount / pageSize);
-      hasMorePages = currentPage < totalPages;
-      currentPage++;
-      
-    } catch (error) {
-      console.error(`[ManuscriptPreloader] Error fetching page ${currentPage}:`, error);
-      hasMorePages = false;
-    }
+  try {
+    const cachedEntries = await getAllCachedUrls();
+    const fileUrls = cachedEntries.map(entry => entry.fileUrl);
+    
+    const sortedUpdatedAt = cachedEntries
+      .map(entry => entry.updatedAt)
+      .filter(Boolean)
+      .map(date => new Date(date).getTime())
+      .filter(time => !isNaN(time))
+      .sort((a, b) => b - a);
+    
+    const latestUpdatedAt = sortedUpdatedAt.length > 0
+      ? new Date(sortedUpdatedAt[0]).toISOString()
+      : new Date(0).toISOString();
+    
+    const payload = {
+      fileUrls,
+      updatedAt: latestUpdatedAt
+    };
+    
+    console.log(`[ManuscriptPreloader] Sending ${fileUrls.length} cached URLs to sync...`);
+    
+    const response = await ApiService.post(ENDPOINTS.BOOK_FILE_URLS, payload);
+    const responseData = response?.data || response || {};
+    const fileUrlItems = responseData?.fileUrls || [];
+    
+    console.log(`[ManuscriptPreloader] ✅ Server returned ${fileUrlItems.length} file URLs to download`);
+    return fileUrlItems;
+  } catch (error) {
+    console.error('[ManuscriptPreloader] Error fetching uncached file URLs:', error);
+    return [];
   }
-  
-  console.log(`[ManuscriptPreloader] ✅ Fetched ${allBooks.length} total books`);
-  return allBooks;
 }
 
 /**
@@ -356,13 +344,13 @@ export async function preloadAllManuscripts(onProgress = null, onBookComplete = 
   try {
     console.log('[ManuscriptPreloader] 🚀 Starting manuscript preload...');
     
-    // Fetch all books with pagination
-    const books = await fetchAllBooks();
+    // Fetch only uncached/changed file URLs from server
+    const fileUrlItems = await fetchUncachedFileUrls();
     
-    console.log(`[ManuscriptPreloader] Found ${books.length} books to process`);
+    console.log(`[ManuscriptPreloader] Found ${fileUrlItems.length} files to process`);
     
-    if (books.length === 0) {
-      return { success: true, total: 0, downloaded: 0, cached: 0, skipped: 0 };
+    if (fileUrlItems.length === 0) {
+      return { success: true, total: 0, downloaded: 0, cached: 0, skipped: 0, failed: 0 };
     }
     
     let downloaded = 0;
@@ -370,19 +358,30 @@ export async function preloadAllManuscripts(onProgress = null, onBookComplete = 
     let skipped = 0;
     let failed = 0;
     
-    // Process books in batches to avoid overwhelming the browser and server
-    for (let i = 0; i < books.length; i++) {
+    // Process files in batches to avoid overwhelming the browser and server
+    for (let i = 0; i < fileUrlItems.length; i++) {
       try {
-        const book = books[i];
+        const item = fileUrlItems[i];
+        const fileUrl = item.fileUrl || item;
+        const updatedAt = item.updatedAt;
+        const filename = fileUrl ? fileUrl.substring(fileUrl.lastIndexOf('/') + 1) : '';
+        const bookId = extractBookIdFromUrl(fileUrl);
         
-        console.log(`[ManuscriptPreloader] Processing book ${i + 1}/${books.length}: ${book.id}`);
+        console.log(`[ManuscriptPreloader] Processing file ${i + 1}/${fileUrlItems.length}: ${filename}`);
         
-        const bookProgress = (progress) => {
-          const overallProgress = ((i + progress / 100) / books.length) * 100;
+        const fileProgress = (progress) => {
+          const overallProgress = ((i + progress / 100) / fileUrlItems.length) * 100;
           if (onProgress) onProgress(Math.round(overallProgress));
         };
         
-        const result = await preloadBookManuscript(book, bookProgress);
+        const fileInfo = {
+          fileUrl,
+          updatedAt,
+          filename,
+          bookId
+        };
+        
+        const result = await preloadBookManuscript(fileInfo, fileProgress);
         
         if (result.success) {
           if (result.reason === 'downloaded') {
@@ -395,31 +394,31 @@ export async function preloadAllManuscripts(onProgress = null, onBookComplete = 
             skipped++;
           } else {
             failed++;
-            console.error(`[ManuscriptPreloader] Book ${book.id} failed:`, result);
+            console.error(`[ManuscriptPreloader] File ${filename} failed:`, result);
           }
         }
         
         if (onBookComplete) {
           onBookComplete({
-            bookId: book.id,
-            bookTitle: book.title,
+            bookId,
+            bookTitle: filename,
             current: i + 1,
-            total: books.length,
+            total: fileUrlItems.length,
             result
           });
         }
         
         // Add delay after every batch to prevent lag
-        if ((i + 1) % PRELOADER_CONFIG.BATCH_SIZE === 0 && (i + 1) < books.length) {
-          console.log(`[ManuscriptPreloader] ⏸️ Processed ${i + 1}/${books.length} books, pausing for ${PRELOADER_CONFIG.BATCH_DELAY}ms...`);
+        if ((i + 1) % PRELOADER_CONFIG.BATCH_SIZE === 0 && (i + 1) < fileUrlItems.length) {
+          console.log(`[ManuscriptPreloader] ⏸️ Processed ${i + 1}/${fileUrlItems.length} files, pausing for ${PRELOADER_CONFIG.BATCH_DELAY}ms...`);
           console.log(`[ManuscriptPreloader] Stats so far: ${downloaded} downloaded, ${cached} cached, ${skipped} skipped, ${failed} failed`);
           await sleep(PRELOADER_CONFIG.BATCH_DELAY);
-          console.log(`[ManuscriptPreloader] ▶️ Resuming preload... (${books.length - i - 1} books remaining)`);
+          console.log(`[ManuscriptPreloader] ▶️ Resuming preload... (${fileUrlItems.length - i - 1} files remaining)`);
         }
       } catch (error) {
-        console.error(`[ManuscriptPreloader] ❌ Critical error processing book ${i + 1}:`, error);
+        console.error(`[ManuscriptPreloader] ❌ Critical error processing file ${i + 1}:`, error);
         failed++;
-        // Continue with next book instead of stopping
+        // Continue with next file instead of stopping
       }
     }
     
@@ -427,7 +426,7 @@ export async function preloadAllManuscripts(onProgress = null, onBookComplete = 
     
     return {
       success: true,
-      total: books.length,
+      total: fileUrlItems.length,
       downloaded,
       cached,
       skipped,

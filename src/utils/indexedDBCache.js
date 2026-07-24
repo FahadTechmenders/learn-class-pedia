@@ -269,3 +269,39 @@ export async function getCacheStats() {
     };
   }
 }
+
+/**
+ * Get all cached manuscript URLs and their updatedAt values
+ */
+export async function getAllCachedUrls() {
+  try {
+    const db = await initDB();
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+
+    return new Promise((resolve) => {
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const entries = request.result || [];
+        const cachedUrls = entries
+          .filter(entry => entry.manuscriptUrl || entry.manuscriptFilePath)
+          .map(entry => ({
+            fileUrl: entry.manuscriptUrl || entry.manuscriptFilePath,
+            updatedAt: entry.updatedAt || entry.cachedAt,
+            cacheKey: entry.cacheKey
+          }));
+        console.log(`[IndexedDBCache] Retrieved ${cachedUrls.length} cached URLs`);
+        resolve(cachedUrls);
+      };
+
+      request.onerror = () => {
+        console.error('[IndexedDBCache] Error getting cached URLs:', request.error);
+        resolve([]);
+      };
+    });
+  } catch (error) {
+    console.error('[IndexedDBCache] Error accessing database:', error);
+    return [];
+  }
+}

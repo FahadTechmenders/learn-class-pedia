@@ -222,6 +222,7 @@ export const ENDPOINTS = {
   `/book/file-chunk?fileUrl=${encodeURIComponent(fileUrl)}&startBytes=${startBytes}&endBytes=${endBytes}`,
   BOOK_FILE_INFO: (fileUrl) =>
   `/book/file-info?fileUrl=${encodeURIComponent(fileUrl)}`,
+  BOOK_FILE_URLS: '/Book/file-urls',
 
 
   // Book Category Management endpoints
