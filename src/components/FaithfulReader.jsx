@@ -788,7 +788,7 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
   }, []);
 
   return (
-    <div className="w-full h-full overflow-y-auto flex flex-col items-center gap-3 p-2 sm:p-3 scrollbar-hide">
+    <div className="w-full h-full overflow-y-auto flex flex-col items-center gap-3 p-2 sm:p-3 ">
       {/* Cover rendered in the parent document (not inside the epub.js iframe).
           This is version-independent: it always displays for EPUB 2.0 and 3.0
           regardless of the section's XHTML namespace or embedded CSP. */}
@@ -799,7 +799,7 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         className="relative bg-white shadow-xl rounded-sm overflow-hidden shrink-0 w-full"
         style={{ width: frameWidth, maxWidth: '100%', height: '100%', maxHeight: '100%' }}
       >
-        <div ref={viewerRef} className="w-full h-full scrollbar-hide" />
+        <div ref={viewerRef} className="w-full h-full " />
 
         {status === 'loading' && (
           <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
@@ -897,7 +897,7 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd })
   }, [pageWidth]);
 
   return (
-    <div className="w-full h-full overflow-auto bg-slate-200 scrollbar-hide">
+    <div className="w-full h-full overflow-auto bg-slate-200">
       <div className="flex flex-col items-center gap-5 py-6 px-3 w-fit min-w-full mx-auto">
         {coverUrl && !(sampleStart > 1) && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: 'none' }} />
@@ -1001,7 +1001,7 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
   }, [applyZoom, applyCrop]);
 
   return (
-    <div ref={scrollRef} className="w-full h-full overflow-auto bg-slate-200 scrollbar-hide">
+    <div ref={scrollRef} className="w-full h-full overflow-auto bg-slate-200">
       <div className="flex flex-col items-center gap-5 py-6 px-3">
         {coverUrl && !(sampleStart > 1) && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: frameWidth, maxWidth: '100%' }} />
@@ -1118,7 +1118,7 @@ async function extractEpubImagePages(arrayBuffer) {
 // the PDF reader (page width scales with zoom, gap between pages, drop shadow).
 function EpubImageReader({ pages, pageWidth, coverUrl }) {
   return (
-    <div className="w-full h-full overflow-auto bg-slate-200 scrollbar-hide">
+    <div className="w-full h-full overflow-auto bg-slate-200">
       <div className="flex flex-col items-center gap-5 py-6 px-3 w-fit min-w-full mx-auto">
         {coverUrl && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: 'none' }} />
