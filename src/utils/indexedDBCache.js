@@ -35,7 +35,6 @@ function initDB() {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'cacheKey' });
         store.createIndex('bookId', 'bookId', { unique: false });
         store.createIndex('updatedAt', 'updatedAt', { unique: false });
-        console.log('[IndexedDBCache] Object store created');
       }
     };
   });
@@ -58,10 +57,8 @@ export async function getCachedManuscript(cacheKey) {
       request.onsuccess = () => {
         if (request.result) {
           const sizeMB = (request.result.arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
-          console.log(`[IndexedDBCache] ✅ Cache hit: ${cacheKey} (${sizeMB} MB)`);
           resolve(request.result);
         } else {
-          console.log(`[IndexedDBCache] Cache miss: ${cacheKey}`);
           resolve(null);
         }
       };
@@ -99,9 +96,6 @@ export async function setCachedManuscript(cacheKey, arrayBuffer, metadata) {
       const request = store.put(dataToStore);
       
       request.onsuccess = () => {
-        const saveTime = (performance.now() - startTime).toFixed(0);
-        const sizeMB = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
-        console.log(`[IndexedDBCache] 💾 Cached ${cacheKey}: ${sizeMB} MB in ${saveTime}ms`);
         resolve(true);
       };
       
@@ -139,7 +133,6 @@ export async function needsUpdate(cacheKey, currentCreatedAt, currentUpdatedAt) 
   const metadata = await getManuscriptMetadata(cacheKey);
   
   if (!metadata) {
-    console.log(`[IndexedDBCache] No cache found for ${cacheKey} - needs download`);
     return true; // Not cached, needs download
   }
   
@@ -152,11 +145,7 @@ export async function needsUpdate(cacheKey, currentCreatedAt, currentUpdatedAt) 
   // Update if either timestamp is different
   const timestampsDifferent = cachedCreatedAt !== newCreatedAt || cachedUpdatedAt !== newUpdatedAt;
   
-  if (timestampsDifferent) {
-    console.log(`[IndexedDBCache] Timestamps changed for ${cacheKey} - needs update`);
-  } else {
-    console.log(`[IndexedDBCache] File ${cacheKey} is up to date - skipping`);
-  }
+ 
   
   return timestampsDifferent;
 }
@@ -173,7 +162,6 @@ export async function removeCachedManuscript(cacheKey) {
     return new Promise((resolve) => {
       const request = store.delete(cacheKey);
       request.onsuccess = () => {
-        console.log('[IndexedDBCache] Removed cache:', cacheKey);
         resolve(true);
       };
       request.onerror = () => {
@@ -199,7 +187,6 @@ export async function clearAllManuscriptCache() {
     return new Promise((resolve) => {
       const request = store.clear();
       request.onsuccess = () => {
-        console.log('[IndexedDBCache] Cleared all manuscript cache');
         resolve(true);
       };
       request.onerror = () => {
@@ -291,7 +278,6 @@ export async function getAllCachedUrls() {
             updatedAt: entry.updatedAt || entry.cachedAt,
             cacheKey: entry.cacheKey
           }));
-        console.log(`[IndexedDBCache] Retrieved ${cachedUrls.length} cached URLs`);
         resolve(cachedUrls);
       };
 

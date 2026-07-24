@@ -70,7 +70,6 @@ export const useEmail = () => {
       if (selectedEmail && emailIds.includes(selectedEmail.id)) {
         setSelectedEmail(prev => ({ ...prev, read: isRead }));
       }
-      console.log('✅ markAsRead - EmailIds:', emailIds, 'isRead:', isRead, 'Updated emails state');
     } catch (err) {
       setError(err.message);
       throw err;

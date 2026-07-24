@@ -65,8 +65,6 @@ export const AuthProvider = ({ children }) => {
         currentBook: null,
         stats: result
       });
-
-      console.log('[AuthContext] Manuscript preload completed:', result);
     } catch (error) {
       console.error('[AuthContext] Manuscript preload failed:', error);
       setManuscriptPreloadStatus({

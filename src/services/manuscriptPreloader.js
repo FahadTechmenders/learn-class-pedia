@@ -44,9 +44,6 @@ async function downloadManuscript(fileInfo, onProgress = null) {
   }
   
   try {
-    // Download the file
-    console.log(`[ManuscriptPreloader] 📥 Downloading manuscript (${ext.toUpperCase()})`);
-    console.log(`[ManuscriptPreloader] URL: ${url}`);
     const startTime = performance.now();
     
     const token = localStorage.getItem('adminToken');
@@ -59,10 +56,6 @@ async function downloadManuscript(fileInfo, onProgress = null) {
     } else {
       arrayBuffer = await downloadCompleteFile(url, token, totalSize, onProgress);
     }
-    
-    const loadTime = ((performance.now() - startTime) / 1000).toFixed(1);
-    const sizeMB = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
-    console.log(`[ManuscriptPreloader] ✅ Downloaded manuscript: ${sizeMB} MB in ${loadTime}s`);
     
     return arrayBuffer;
   } catch (error) {
@@ -227,7 +220,6 @@ export async function preloadBookManuscript(fileInfo, onProgress = null) {
     const filename = fileInfo.filename || fileInfo.manuscriptFilename || (fileUrl ? fileUrl.substring(fileUrl.lastIndexOf('/') + 1) : '');
     
     if (!fileUrl) {
-      console.log(`[ManuscriptPreloader] Skipping - no manuscript URL`);
       return { success: false, reason: 'no_manuscript' };
     }
     
@@ -251,11 +243,8 @@ export async function preloadBookManuscript(fileInfo, onProgress = null) {
     const needsDownload = await checkNeedsUpdate(cacheKey, createdAt, updatedAt);
     
     if (!needsDownload) {
-      console.log(`[ManuscriptPreloader] ✅ (${filename}) - Already cached, skipping`);
       return { success: true, reason: 'already_cached' };
     }
-    
-    console.log(`[ManuscriptPreloader] 📥 (${filename}) - Downloading...`);
     
     // Download the manuscript
     const arrayBuffer = await downloadManuscript({ fileUrl, filename, ext, bookId }, onProgress);
@@ -274,7 +263,6 @@ export async function preloadBookManuscript(fileInfo, onProgress = null) {
       const saved = await setCachedManuscript(cacheKey, arrayBuffer, metadata);
       
       if (saved) {
-        console.log(`[ManuscriptPreloader] ✅ - Saved to IndexedDB`);
         return { success: true, reason: 'downloaded' };
       } else {
         console.warn(`[ManuscriptPreloader] ⚠️ - Failed to save to IndexedDB`);
@@ -294,7 +282,6 @@ export async function preloadBookManuscript(fileInfo, onProgress = null) {
  * Fetch uncached file URLs from server
  */
 async function fetchUncachedFileUrls() {
-  console.log('[ManuscriptPreloader] 📚 Fetching uncached file URLs from server...');
   
   try {
     const cachedEntries = await getAllCachedUrls();
@@ -316,13 +303,9 @@ async function fetchUncachedFileUrls() {
       updatedAt: latestUpdatedAt
     };
     
-    console.log(`[ManuscriptPreloader] Sending ${fileUrls.length} cached URLs to sync...`);
-    
     const response = await ApiService.post(ENDPOINTS.BOOK_FILE_URLS, payload);
     const responseData = response?.data || response || {};
     const fileUrlItems = responseData?.fileUrls || [];
-    
-    console.log(`[ManuscriptPreloader] ✅ Server returned ${fileUrlItems.length} file URLs to download`);
     return fileUrlItems;
   } catch (error) {
     console.error('[ManuscriptPreloader] Error fetching uncached file URLs:', error);
@@ -342,12 +325,9 @@ function sleep(ms) {
  */
 export async function preloadAllManuscripts(onProgress = null, onBookComplete = null) {
   try {
-    console.log('[ManuscriptPreloader] 🚀 Starting manuscript preload...');
     
     // Fetch only uncached/changed file URLs from server
     const fileUrlItems = await fetchUncachedFileUrls();
-    
-    console.log(`[ManuscriptPreloader] Found ${fileUrlItems.length} files to process`);
     
     if (fileUrlItems.length === 0) {
       return { success: true, total: 0, downloaded: 0, cached: 0, skipped: 0, failed: 0 };
@@ -366,8 +346,6 @@ export async function preloadAllManuscripts(onProgress = null, onBookComplete = 
         const updatedAt = item.updatedAt;
         const filename = fileUrl ? fileUrl.substring(fileUrl.lastIndexOf('/') + 1) : '';
         const bookId = extractBookIdFromUrl(fileUrl);
-        
-        console.log(`[ManuscriptPreloader] Processing file ${i + 1}/${fileUrlItems.length}: ${filename}`);
         
         const fileProgress = (progress) => {
           const overallProgress = ((i + progress / 100) / fileUrlItems.length) * 100;
@@ -410,10 +388,9 @@ export async function preloadAllManuscripts(onProgress = null, onBookComplete = 
         
         // Add delay after every batch to prevent lag
         if ((i + 1) % PRELOADER_CONFIG.BATCH_SIZE === 0 && (i + 1) < fileUrlItems.length) {
-          console.log(`[ManuscriptPreloader] ⏸️ Processed ${i + 1}/${fileUrlItems.length} files, pausing for ${PRELOADER_CONFIG.BATCH_DELAY}ms...`);
-          console.log(`[ManuscriptPreloader] Stats so far: ${downloaded} downloaded, ${cached} cached, ${skipped} skipped, ${failed} failed`);
+         
           await sleep(PRELOADER_CONFIG.BATCH_DELAY);
-          console.log(`[ManuscriptPreloader] ▶️ Resuming preload... (${fileUrlItems.length - i - 1} files remaining)`);
+         
         }
       } catch (error) {
         console.error(`[ManuscriptPreloader] ❌ Critical error processing file ${i + 1}:`, error);
@@ -421,8 +398,6 @@ export async function preloadAllManuscripts(onProgress = null, onBookComplete = 
         // Continue with next file instead of stopping
       }
     }
-    
-    console.log(`[ManuscriptPreloader] ✅ Preload complete: ${downloaded} downloaded, ${cached} cached, ${skipped} skipped, ${failed} failed`);
     
     return {
       success: true,
@@ -454,8 +429,6 @@ export function clearManuscriptCache() {
     manuscriptKeys.forEach(key => {
       localStorage.removeItem(key);
     });
-    
-    console.log(`[ManuscriptPreloader] ✅ Manuscript cache cleared (${manuscriptKeys.length} items)`);
     return true;
   } catch (error) {
     console.error('[ManuscriptPreloader] Error clearing cache:', error);

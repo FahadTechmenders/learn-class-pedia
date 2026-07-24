@@ -44,7 +44,6 @@ function playPageFlipSound() {
 async function getFileSize(url) {
   try {
     const token = localStorage.getItem('adminToken');
-    console.log('[FaithfulReader] Getting file size for:', url);
     
     const response = await fetch(
       `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_INFO(url)}`,
@@ -56,7 +55,6 @@ async function getFileSize(url) {
       }
     );
     
-    console.log('[FaithfulReader] Response status:', response.status, response.statusText);
     
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
@@ -65,10 +63,8 @@ async function getFileSize(url) {
     }
     
     const data = await response.json();
-    console.log('[FaithfulReader] File info response:', data);
     
     if (typeof data.fileSize === 'number' && data.fileSize > 0) {
-      console.log(`[FaithfulReader] File size: ${data.fileSize} bytes (${(data.fileSize / 1024 / 1024).toFixed(2)} MB)`);
       return data.fileSize;
     }
     
@@ -86,20 +82,15 @@ async function downloadPDFInChunks(url, onProgress = null) {
     const token = localStorage.getItem('adminToken');
     const totalSize = await getFileSize(url);
     
-    console.log(`[FaithfulReader] Downloading PDF file: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
-    
     const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB for PDF
     const allChunks = [];
     let downloadedBytes = 0;
     
     const numChunks = Math.ceil(totalSize / CHUNK_SIZE);
-    console.log(`[FaithfulReader] Downloading in ${numChunks} chunks of ${(CHUNK_SIZE / 1024 / 1024).toFixed(2)} MB each`);
     
     for (let i = 0; i < numChunks; i++) {
       const startBytes = i * CHUNK_SIZE;
       const endBytes = Math.min(startBytes + CHUNK_SIZE - 1, totalSize - 1);
-      
-      console.log(`[FaithfulReader] Downloading chunk ${i + 1}/${numChunks}: bytes ${startBytes}-${endBytes}`);
       
       const response = await fetch(
         `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, startBytes, endBytes)}`,
@@ -125,11 +116,7 @@ async function downloadPDFInChunks(url, onProgress = null) {
       if (onProgress) {
         onProgress(progress);
       }
-      
-      console.log(`[FaithfulReader] Chunk ${i + 1}/${numChunks} complete: ${(chunkData.byteLength / 1024 / 1024).toFixed(2)} MB (${progress}% total)`);
     }
-    
-    console.log(`[FaithfulReader] Combining ${numChunks} chunks...`);
     const completeFile = new Uint8Array(downloadedBytes);
     let offset = 0;
     for (const chunk of allChunks) {
@@ -138,7 +125,6 @@ async function downloadPDFInChunks(url, onProgress = null) {
     }
     
     if (onProgress) onProgress(100);
-    console.log(`[FaithfulReader] ✅ Successfully downloaded and combined ${(downloadedBytes / 1024 / 1024).toFixed(2)} MB`);
     return completeFile.buffer;
   } catch (error) {
     console.error('[FaithfulReader] Failed to download PDF in chunks:', error);
@@ -151,8 +137,6 @@ async function downloadCompleteFile(url, onProgress = null) {
   try {
     const token = localStorage.getItem('adminToken');
     const totalSize = await getFileSize(url);
-    
-    console.log(`[FaithfulReader] Downloading complete file: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
     
     const response = await fetch(
       `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, 0, totalSize - 1)}`,
@@ -169,8 +153,6 @@ async function downloadCompleteFile(url, onProgress = null) {
       console.error('[FaithfulReader] Download failed:', response.status, errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
-    console.log(`[FaithfulReader] Response status: ${response.status} ${response.statusText}`);
     
     const contentLength = response.headers.get('Content-Length');
     const bytes = contentLength ? parseInt(contentLength, 10) : totalSize;
@@ -203,12 +185,10 @@ async function downloadCompleteFile(url, onProgress = null) {
       }
       
       if (onProgress) onProgress(100);
-      console.log(`[FaithfulReader] ✅ Successfully downloaded ${receivedBytes} bytes`);
       return arrayBuffer.buffer;
     } else {
       const arrayBuffer = await response.arrayBuffer();
       if (onProgress) onProgress(100);
-      console.log(`[FaithfulReader] ✅ Successfully downloaded ${arrayBuffer.byteLength} bytes`);
       return arrayBuffer;
     }
   } catch (error) {
@@ -263,78 +243,50 @@ async function getArrayBuffer(book, onProgress = null) {
     const match = url.match(/\/books\/(\d+)\//i);
     if (match && match[1]) {
       bookId = parseInt(match[1], 10);
-      console.log(`[FaithfulReader] Extracted book ID from URL: ${bookId}`);
     }
   }
   
   // Use book ID for IndexedDB cache key (same as preloader)
   const localStorageCacheKey = `book_${bookId}_${ext}`;
   const indexedDBCacheKey = `${url}_${ext}`;
-  
-  console.log(`[FaithfulReader] ========== CACHE LOOKUP ==========`);
-  console.log(`[FaithfulReader] Book ID: ${bookId}`);
-  console.log(`[FaithfulReader] Filename: ${filename}`);
-  console.log(`[FaithfulReader] FilePath: ${filePath}`);
-  console.log(`[FaithfulReader] URL: ${url}`);
-  console.log(`[FaithfulReader] Extension: ${ext}`);
-  console.log(`[FaithfulReader] Cache Key: ${localStorageCacheKey}`);
-  console.log(`[FaithfulReader] ===================================`);
+
   
   // Return existing promise if request is already in flight
   if (requestCache.has(localStorageCacheKey)) {
-    console.log(`[FaithfulReader] Reusing in-flight request for ${ext.toUpperCase()}`);
     return requestCache.get(localStorageCacheKey);
   }
   
   // Create new request promise
   const requestPromise = (async () => {
     try {
-      // Check IndexedDB cache first (from preloader)
-      console.log(`[FaithfulReader] ========== STARTING CACHE CHECK ==========`);
-      console.log(`[FaithfulReader] bookId exists: ${!!bookId}`);
-      console.log(`[FaithfulReader] Cache key to lookup: ${localStorageCacheKey}`);
       
       if (bookId) {
-        console.log(`[FaithfulReader] Calling getCachedManuscript(${localStorageCacheKey})...`);
         const cachedManuscript = await getCachedManuscript(localStorageCacheKey);
-        console.log(`[FaithfulReader] getCachedManuscript returned:`, cachedManuscript ? 'DATA FOUND' : 'NULL');
         
         if (cachedManuscript) {
-          console.log(`[FaithfulReader] ✅ ✅ ✅ CACHE HIT! Using cached ${ext.toUpperCase()} from IndexedDB`);
-          console.log(`[FaithfulReader] ArrayBuffer size: ${cachedManuscript.arrayBuffer?.byteLength || 'N/A'} bytes`);
           if (onProgress) onProgress(100);
           return cachedManuscript.arrayBuffer;
         } else {
-          console.log(`[FaithfulReader] ❌ ❌ ❌ CACHE MISS for ${localStorageCacheKey}`);
-          console.log(`[FaithfulReader] Will proceed to download from backend...`);
         }
       } else {
-        console.log(`[FaithfulReader] ❌ No bookId - skipping preloader cache check`);
       }
-      console.log(`[FaithfulReader] ========== CACHE CHECK COMPLETE ==========`);
-      console.log('');
       
       // Check IndexedDB cache (legacy)
       const cachedData = await getCachedFile(indexedDBCacheKey);
       if (cachedData) {
-        console.log(`[FaithfulReader] ✅ Using cached ${ext.toUpperCase()} from IndexedDB`);
         if (onProgress) onProgress(100);
         return cachedData;
       }
-      
-      console.log(`[FaithfulReader] 📥 Fetching ${ext.toUpperCase()} file`);
       const startTime = performance.now();
       
       let arrayBuffer;
       
       // EPUB files - single request (backend returns complete file)
       if (ext === 'epub') {
-        console.log('[FaithfulReader] 📚 Downloading complete EPUB file (ZIP format)');
         arrayBuffer = await downloadCompleteFile(url, onProgress);
       }
       // PDF files - chunked download (5MB chunks due to backend limit)
       else if (ext === 'pdf') {
-        console.log('[FaithfulReader] 📄 Downloading PDF file in chunks');
         arrayBuffer = await downloadPDFInChunks(url, onProgress);
       }
       // DOCX files - single request
@@ -640,7 +592,7 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
             // image-based EPUB 2.0 use separate components.
             mgr.style.setProperty('overflow-y', 'auto', 'important');
             mgr.style.setProperty('overflow-x', 'hidden', 'important');
-            mgr.style.setProperty('height', '100%', 'important');
+                        mgr.style.setProperty('height', '100%', 'important');
             // Override epub.js's mobile width constraints (288px + padding) for fixed-layout
             mgr.style.setProperty('width', '100%', 'important');
             mgr.style.setProperty('max-width', '100%', 'important');
@@ -655,8 +607,6 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
           try {
             const doc = contents?.document;
             if (!doc) return;
-            
-            console.log('[EPUB] Content loaded, applying styles with fontPct:', fontPct + '%');
             doc.documentElement.style.setProperty('overflow-anchor', 'none', 'important');
             
             // Fixed-layout (InDesign) EPUB: scale the authored page to fit the
@@ -668,7 +618,6 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
               setTimeout(applyFit, 100);
               setTimeout(applyFit, 500);
               try { contents?.window?.addEventListener('resize', applyFit); } catch (_) {}
-              console.log('[EPUB] Fixed-layout page scaled to fit');
               return;
             }
 
@@ -760,7 +709,6 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         let savedLocation = null;
         try {
           savedLocation = rendition.currentLocation();
-          console.log('[ZOOM] Saved location:', savedLocation?.start?.cfi);
         } catch (e) {
           console.warn('[ZOOM] Could not capture location:', e.message);
         }
@@ -780,7 +728,6 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
           setTimeout(() => {
             try {
               rendition.display(savedLocation.start.cfi);
-              console.log('[ZOOM] Restored to:', savedLocation.start.cfi);
             } catch (e) {
               console.warn('[ZOOM] Could not restore location:', e.message);
             }
@@ -841,7 +788,7 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
   }, []);
 
   return (
-    <div className="w-full h-full overflow-y-auto flex flex-col items-center gap-3 p-2 sm:p-3">
+    <div className="w-full h-full overflow-y-auto flex flex-col items-center gap-3 p-2 sm:p-3 scrollbar-hide">
       {/* Cover rendered in the parent document (not inside the epub.js iframe).
           This is version-independent: it always displays for EPUB 2.0 and 3.0
           regardless of the section's XHTML namespace or embedded CSP. */}
@@ -852,7 +799,7 @@ function EpubReader({ arrayBuffer, frameWidth, fontPct, sampleMode, sampleStartF
         className="relative bg-white shadow-xl rounded-sm overflow-hidden shrink-0 w-full"
         style={{ width: frameWidth, maxWidth: '100%', height: '100%', maxHeight: '100%' }}
       >
-        <div ref={viewerRef} className="w-full h-full" />
+        <div ref={viewerRef} className="w-full h-full scrollbar-hide" />
 
         {status === 'loading' && (
           <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
@@ -950,7 +897,7 @@ function PdfReader({ arrayBuffer, coverUrl, pageWidth, sampleStart, sampleEnd })
   }, [pageWidth]);
 
   return (
-    <div className="w-full h-full overflow-auto bg-slate-200">
+    <div className="w-full h-full overflow-auto bg-slate-200 scrollbar-hide">
       <div className="flex flex-col items-center gap-5 py-6 px-3 w-fit min-w-full mx-auto">
         {coverUrl && !(sampleStart > 1) && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: 'none' }} />
@@ -1054,7 +1001,7 @@ function DocxReader({ arrayBuffer, coverUrl, fontScale = 1, frameWidth = 440, sa
   }, [applyZoom, applyCrop]);
 
   return (
-    <div ref={scrollRef} className="w-full h-full overflow-auto bg-slate-200">
+    <div ref={scrollRef} className="w-full h-full overflow-auto bg-slate-200 scrollbar-hide">
       <div className="flex flex-col items-center gap-5 py-6 px-3">
         {coverUrl && !(sampleStart > 1) && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: frameWidth, maxWidth: '100%' }} />
@@ -1171,7 +1118,7 @@ async function extractEpubImagePages(arrayBuffer) {
 // the PDF reader (page width scales with zoom, gap between pages, drop shadow).
 function EpubImageReader({ pages, pageWidth, coverUrl }) {
   return (
-    <div className="w-full h-full overflow-auto bg-slate-200">
+    <div className="w-full h-full overflow-auto bg-slate-200 scrollbar-hide">
       <div className="flex flex-col items-center gap-5 py-6 px-3 w-fit min-w-full mx-auto">
         {coverUrl && (
           <img src={coverUrl} alt="Cover" className="bg-white shadow-xl rounded-sm" style={{ width: pageWidth, maxWidth: 'none' }} />

@@ -100,16 +100,12 @@ export async function getCachedFile(url) {
           try {
             // Decompress if needed
             const arrayBuffer = await decompressData(result.data, result.compressed);
-            const loadTime = (performance.now() - startTime).toFixed(0);
-            const sizeMB = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2);
-            console.log(`[FileCache] ✅ Cache hit (${loadTime}ms, ${sizeMB} MB${result.compressed ? ', decompressed' : ''})`);
             resolve(arrayBuffer);
           } catch (error) {
             console.error('[FileCache] Decompression error:', error);
             resolve(null);
           }
         } else {
-          console.log('[FileCache] Cache miss or expired');
           resolve(null);
         }
       };
@@ -157,8 +153,6 @@ export async function setCachedFile(url, arrayBuffer) {
         const originalMB = (originalSize / 1024 / 1024).toFixed(2);
         const storedMB = (data.byteLength / 1024 / 1024).toFixed(2);
         const ratio = compressed ? ((1 - data.byteLength / originalSize) * 100).toFixed(1) : 0;
-        
-        console.log(`[FileCache] 💾 Cached (${saveTime}ms, ${originalMB} MB → ${storedMB} MB${compressed ? `, ${ratio}% smaller` : ''})`);
         resolve(true);
       };
       
@@ -197,7 +191,6 @@ export async function clearExpiredCache() {
           deletedCount++;
           cursor.continue();
         } else {
-          console.log(`[FileCache] Cleared ${deletedCount} expired entries`);
           resolve(deletedCount);
         }
       };
@@ -226,7 +219,6 @@ export async function clearAllCache() {
       const request = store.clear();
       
       request.onsuccess = () => {
-        console.log('[FileCache] All cache cleared');
         resolve(true);
       };
       

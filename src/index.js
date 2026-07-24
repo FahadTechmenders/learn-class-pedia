@@ -12,7 +12,6 @@ Promise.all([
   import('pdfjs-dist'),
   import('docx-preview')
 ]).then(() => {
-  console.log('[Preload] Document rendering libraries loaded and ready');
 }).catch((err) => {
   console.warn('[Preload] Failed to preload libraries:', err);
 });
@@ -20,7 +19,6 @@ Promise.all([
 // Clean up expired cache entries on startup
 clearExpiredCache().then(() => {
   getCacheStats().then(stats => {
-    console.log('[FileCache] Cache stats:', stats);
   });
 });
 
