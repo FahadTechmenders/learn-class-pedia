@@ -5,40 +5,80 @@
  */
 
 const DB_NAME = 'ManuscriptCache';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 const STORE_NAME = 'manuscripts';
+const REQUIRED_STORES = [STORE_NAME];
 
 let dbPromise = null;
+
+/**
+ * Create all required object stores
+ */
+function createStores(db) {
+  if (!db.objectStoreNames.contains('manuscripts')) {
+    const manuscripts = db.createObjectStore('manuscripts', { keyPath: 'cacheKey' });
+    manuscripts.createIndex('bookId', 'bookId', { unique: false });
+    manuscripts.createIndex('updatedAt', 'updatedAt', { unique: false });
+  }
+
+  if (!db.objectStoreNames.contains('files')) {
+    const files = db.createObjectStore('files', { keyPath: 'url' });
+    files.createIndex('timestamp', 'timestamp', { unique: false });
+  }
+}
+
+/**
+ * Open (or re-open) the IndexedDB connection
+ */
+function openDB(recreating = false) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => {
+      console.error('[IndexedDBCache] Error opening database:', request.error);
+      reject(request.error);
+    };
+
+    request.onupgradeneeded = (event) => {
+      createStores(event.target.result);
+    };
+
+    request.onsuccess = () => {
+      const db = request.result;
+      const missing = REQUIRED_STORES.filter((name) => !db.objectStoreNames.contains(name));
+
+      if (missing.length > 0 && !recreating) {
+        console.warn(`[IndexedDBCache] Missing stores [${missing.join(', ')}], recreating database...`);
+        db.close();
+
+        const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
+        deleteRequest.onsuccess = () => resolve(openDB(true));
+        deleteRequest.onerror = () => reject(deleteRequest.error);
+        deleteRequest.onblocked = () =>
+          console.warn('[IndexedDBCache] Delete blocked by another tab');
+      } else if (missing.length > 0 && recreating) {
+        reject(new Error(`IndexedDB stores still missing after recreate: ${missing.join(', ')}`));
+      } else {
+        resolve(db);
+      }
+    };
+
+    request.onblocked = () =>
+      console.warn('[IndexedDBCache] Database upgrade blocked by another tab');
+  });
+}
 
 /**
  * Initialize IndexedDB
  */
 function initDB() {
   if (dbPromise) return dbPromise;
-  
-  dbPromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
-    request.onerror = () => {
-      console.error('[IndexedDBCache] Error opening database:', request.error);
-      reject(request.error);
-    };
-    
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'cacheKey' });
-        store.createIndex('bookId', 'bookId', { unique: false });
-        store.createIndex('updatedAt', 'updatedAt', { unique: false });
-      }
-    };
+
+  dbPromise = openDB().catch((error) => {
+    dbPromise = null;
+    throw error;
   });
-  
+
   return dbPromise;
 }
 
@@ -262,6 +302,7 @@ export async function getCacheStats() {
  */
 export async function getAllCachedUrls() {
   try {
+    debugger
     const db = await initDB();
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);

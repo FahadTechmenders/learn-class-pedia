@@ -91,24 +91,6 @@
       "order": 9
     },
     {
-      "id": "email-templates",
-      "path": "/admin/email-templates",
-      "component": "EmailTemplateManagement",
-      "label": "Email Templates",
-      "icon": "Mail",
-      "category": "management",
-      "order": 10
-    },
-    {
-      "id": "certificate-templates",
-      "path": "/admin/certificate-templates",
-      "component": "CertificateTemplateManagement",
-      "label": "Certificate Templates",
-      "icon": "Award",
-      "category": "management",
-      "order": 11
-    },
-    {
       "id": "topics",
       "path": "/admin/topics",
       "component": "TopicManagement",

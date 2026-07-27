@@ -9,7 +9,7 @@
 
 const DB_NAME = 'ManuscriptCache';
 const STORE_NAME = 'files';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const USE_COMPRESSION = false; // Disabled for maximum speed (30-50ms cached loads)
 
@@ -32,6 +32,11 @@ function initDB() {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'url' });
         store.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('manuscripts')) {
+        const manuscripts = db.createObjectStore('manuscripts', { keyPath: 'cacheKey' });
+        manuscripts.createIndex('bookId', 'bookId', { unique: false });
+        manuscripts.createIndex('updatedAt', 'updatedAt', { unique: false });
       }
     };
   });

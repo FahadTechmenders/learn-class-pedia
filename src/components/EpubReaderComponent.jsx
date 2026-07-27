@@ -1008,7 +1008,7 @@ export default function BookPreviewer({ book, onClose, onApprove }) {
   const [activeTab, setActiveTab] = useState('grammar');
   const [fontScale, setFontScale] = useState(0.9);
   const FONT_MIN = 0.8;
-  const FONT_MAX = 2.5;
+  const FONT_MAX = 1.7;
   const FONT_STEP = 0.1;
   const decreaseFont = () => setFontScale((s) => Math.max(FONT_MIN, Math.round((s - FONT_STEP) * 10) / 10));
   const increaseFont = () => setFontScale((s) => Math.min(FONT_MAX, Math.round((s + FONT_STEP) * 10) / 10));
