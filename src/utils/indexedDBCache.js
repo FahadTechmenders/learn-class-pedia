@@ -302,7 +302,6 @@ export async function getCacheStats() {
  */
 export async function getAllCachedUrls() {
   try {
-    debugger
     const db = await initDB();
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
