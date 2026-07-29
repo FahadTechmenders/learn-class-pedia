@@ -40,12 +40,29 @@ function playPageFlipSound() {
   } catch (_) {}
 }
 
-// Helper function to get file size using the dedicated file-info endpoint
-async function getFileSize(url) {
+// Check Service Worker cache first, then fall back to backend proxy
+async function downloadManuscript(url, onProgress = null) {
   try {
+    // Try Service Worker cache first
+    if ('caches' in window) {
+      const cache = await caches.open('manuscripts-v1');
+      const cachedResponse = await cache.match(url);
+      
+      if (cachedResponse) {
+        console.log('[FaithfulReader] ✅ Loaded from Service Worker cache:', url);
+        const arrayBuffer = await cachedResponse.arrayBuffer();
+        if (onProgress) onProgress(100);
+        return arrayBuffer;
+      }
+    }
+    
+    // Cache miss - download via backend proxy (handles CORS)
+    console.log('[FaithfulReader] Cache miss, downloading via backend proxy:', url);
+    
     const token = localStorage.getItem('adminToken');
     
-    const response = await fetch(
+    // Get file size
+    const sizeResponse = await fetch(
       `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_INFO(url)}`,
       {
         headers: {
@@ -55,89 +72,18 @@ async function getFileSize(url) {
       }
     );
     
-    
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      console.error('[FaithfulReader] Failed to get file size:', response.status, errorText);
-      throw new Error(`Failed to get file size: ${response.status} - ${errorText}`);
+    if (!sizeResponse.ok) {
+      throw new Error(`Failed to get file size: ${sizeResponse.status}`);
     }
     
-    const data = await response.json();
+    const sizeData = await sizeResponse.json();
+    const totalSize = sizeData.fileSize || 0;
     
-    if (typeof data.fileSize === 'number' && data.fileSize > 0) {
-      return data.fileSize;
+    if (!totalSize) {
+      throw new Error('Unable to determine file size');
     }
     
-    console.error('[FaithfulReader] No fileSize present in file-info response');
-    throw new Error('Unable to determine file size - missing fileSize in file-info response');
-  } catch (error) {
-    console.error('[FaithfulReader] Failed to get file size:', error);
-    throw error;
-  }
-}
-
-// Download PDF file in chunks (5MB limit)
-async function downloadPDFInChunks(url, onProgress = null) {
-  try {
-    const token = localStorage.getItem('adminToken');
-    const totalSize = await getFileSize(url);
-    
-    const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB for PDF
-    const allChunks = [];
-    let downloadedBytes = 0;
-    
-    const numChunks = Math.ceil(totalSize / CHUNK_SIZE);
-    
-    for (let i = 0; i < numChunks; i++) {
-      const startBytes = i * CHUNK_SIZE;
-      const endBytes = Math.min(startBytes + CHUNK_SIZE - 1, totalSize - 1);
-      
-      const response = await fetch(
-        `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, startBytes, endBytes)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/octet-stream, */*'
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('[FaithfulReader] Chunk download failed:', response.status, errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const chunkData = await response.arrayBuffer();
-      allChunks.push(new Uint8Array(chunkData));
-      downloadedBytes += chunkData.byteLength;
-      
-      const progress = Math.round((downloadedBytes / totalSize) * 100);
-      if (onProgress) {
-        onProgress(progress);
-      }
-    }
-    const completeFile = new Uint8Array(downloadedBytes);
-    let offset = 0;
-    for (const chunk of allChunks) {
-      completeFile.set(chunk, offset);
-      offset += chunk.length;
-    }
-    
-    if (onProgress) onProgress(100);
-    return completeFile.buffer;
-  } catch (error) {
-    console.error('[FaithfulReader] Failed to download PDF in chunks:', error);
-    throw error;
-  }
-}
-
-// Download EPUB/DOCX file in single request (backend handles it)
-async function downloadCompleteFile(url, onProgress = null) {
-  try {
-    const token = localStorage.getItem('adminToken');
-    const totalSize = await getFileSize(url);
-    
+    // Download via backend proxy
     const response = await fetch(
       `${API_CONFIG.BASE_URL}${ENDPOINTS.BOOK_FILE_CHUNK(url, 0, totalSize - 1)}`,
       {
@@ -149,15 +95,13 @@ async function downloadCompleteFile(url, onProgress = null) {
     );
     
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      console.error('[FaithfulReader] Download failed:', response.status, errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
     const contentLength = response.headers.get('Content-Length');
     const bytes = contentLength ? parseInt(contentLength, 10) : totalSize;
     
-    if (response.body) {
+    if (response.body && bytes > 0) {
       const reader = response.body.getReader();
       const chunks = [];
       let receivedBytes = 0;
@@ -192,7 +136,7 @@ async function downloadCompleteFile(url, onProgress = null) {
       return arrayBuffer;
     }
   } catch (error) {
-    console.error('[FaithfulReader] Failed to download complete file:', error);
+    console.error('[FaithfulReader] Failed to download manuscript:', error);
     throw error;
   }
 }
@@ -281,17 +225,9 @@ async function getArrayBuffer(book, onProgress = null) {
       
       let arrayBuffer;
       
-      // EPUB files - single request (backend returns complete file)
-      if (ext === 'epub') {
-        arrayBuffer = await downloadCompleteFile(url, onProgress);
-      }
-      // PDF files - chunked download (5MB chunks due to backend limit)
-      else if (ext === 'pdf') {
-        arrayBuffer = await downloadPDFInChunks(url, onProgress);
-      }
-      // DOCX files - single request
-      else if (ext === 'docx' || ext === 'doc') {
-        arrayBuffer = await downloadCompleteFile(url, onProgress);
+      // Check cache first, then download via backend proxy if needed
+      if (ext === 'epub' || ext === 'pdf' || ext === 'docx' || ext === 'doc') {
+        arrayBuffer = await downloadManuscript(url, onProgress);
       }
       else {
         throw new Error(`Unsupported file type: ${ext}`);
