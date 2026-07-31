@@ -164,6 +164,7 @@ const BookManagement = () => {
       const updatedBook = await getBookById(selectedBook.id);
       setSelectedBook(updatedBook);
       setSelectedStatusId(updatedBook.bookStatusId);
+       setShowBookModal(false);
     } catch (err) {
       console.error('Failed to update book status:', err);
       showError('Failed to update book status');
