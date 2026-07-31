@@ -204,11 +204,16 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
             icon: Users,
             path: 'publisher-management',
             children: [
-              
+              {
+                id: 'publisher-badge-management',
+                label: 'Publisher Badge Management',
+                icon: Award,
+                path: 'publisher-badge-management'
+              },
               {
                 id: 'publisher-badge-mapping',
                 label: 'Publisher Badge Mapping',
-                icon: Award,
+                icon: Tag,
                 path: 'publisher-badge-mapping'
               }
             ]
@@ -277,11 +282,16 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
             icon: Users,
             path: 'publisher-management',
             children: [
-             
+              {
+                id: 'publisher-badge-management',
+                label: 'Publisher Badge Management',
+                icon: Award,
+                path: 'publisher-badge-management'
+              },
               {
                 id: 'publisher-badge-mapping',
                 label: 'Publisher Badge Mapping',
-                icon: Award,
+                icon: Tag,
                 path: 'publisher-badge-mapping'
               }
             ]

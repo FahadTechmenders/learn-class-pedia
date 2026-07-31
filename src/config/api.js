@@ -252,8 +252,16 @@ export const ENDPOINTS = {
   PUBLISHER_BOOK_SALE_BY_ID: (id) => `/PublisherBookSale/${id}`,
   PUBLISHER_BOOK_SALE_PAYMENT_INFO: (publisherId) => `/PublisherBookSale/payment-info/${publisherId}`,
   
-  //Publisher badges
-  PUBLISHER_BADGES:'/PublisherBadges',
+  // Publisher Badge Management endpoints
+  PUBLISHER_BADGE_ALL: '/PublisherBadges',
+  PUBLISHER_BADGE_BY_ID: (id) => `/PublisherBadges/${id}`,
+  PUBLISHER_BADGE_CREATE: '/PublisherBadges',
+  PUBLISHER_BADGE_UPDATE: (id) => `/PublisherBadges/${id}`,
+  PUBLISHER_BADGE_DELETE: (id) => `/PublisherBadges/${id}`,
+  
+  // Publisher badges (legacy - for mapping)
+  PUBLISHER_BADGES: '/PublisherBadges',
+  
   // Publisher Payout endpoints
   PUBLISHER_PAYOUT: '/PublisherPayout',
 };

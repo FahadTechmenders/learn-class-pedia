@@ -2281,6 +2281,45 @@ async uploadCsvFileByName(formData) {
     });
   }
 
+  // ==================== PUBLISHER BADGE MANAGEMENT ====================
+
+  // GET all publisher badges with pagination and optional badgeName filter
+  async getAllPublisherBadgesManagement(page = 1, pageSize = 10, badgeName = '') {
+    let url = `${ENDPOINTS.PUBLISHER_BADGE_ALL}?page=${page}&pageSize=${pageSize}`;
+    if (badgeName && badgeName.trim() !== '') {
+      url += `&BadgeName=${encodeURIComponent(badgeName.trim())}`;
+    }
+    return this.request(url);
+  }
+
+  // GET publisher badge by ID
+  async getPublisherBadgeById(badgeId) {
+    return this.request(ENDPOINTS.PUBLISHER_BADGE_BY_ID(badgeId));
+  }
+
+  // POST create new publisher badge
+  async createPublisherBadge(badgeData) {
+    return this.request(ENDPOINTS.PUBLISHER_BADGE_CREATE, {
+      method: 'POST',
+      body: JSON.stringify(badgeData),
+    });
+  }
+
+  // PUT update publisher badge
+  async updatePublisherBadge(badgeId, badgeData) {
+    return this.request(ENDPOINTS.PUBLISHER_BADGE_UPDATE(badgeId), {
+      method: 'PUT',
+      body: JSON.stringify(badgeData),
+    });
+  }
+
+  // DELETE publisher badge
+  async deletePublisherBadge(badgeId) {
+    return this.request(ENDPOINTS.PUBLISHER_BADGE_DELETE(badgeId), {
+      method: 'DELETE',
+    });
+  }
+
   // ==================== BOOK CATEGORY MANAGEMENT ====================
 
   // GET all book categories with pagination and title filter
