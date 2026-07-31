@@ -252,6 +252,8 @@ export const ENDPOINTS = {
   PUBLISHER_BOOK_SALE_BY_ID: (id) => `/PublisherBookSale/${id}`,
   PUBLISHER_BOOK_SALE_PAYMENT_INFO: (publisherId) => `/PublisherBookSale/payment-info/${publisherId}`,
   
+  //Publisher badges
+  PUBLISHER_BADGES:'/PublisherBadges',
   // Publisher Payout endpoints
   PUBLISHER_PAYOUT: '/PublisherPayout',
 };

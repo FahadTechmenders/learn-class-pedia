@@ -52,14 +52,27 @@ export const usePublisherBadgeMapping = () => {
   }, []);
 
   const getAllBadges = useCallback(async (page = 1, pageSize = 100, badgeName = '') => {
+    setLoading(true);
+    setError(null);
+
     try {
-      const response = await ApiService.getAllBookBadges(page, pageSize, badgeName);
+      const response = await ApiService.getAllPublisherBadges(page, pageSize, badgeName);
       
       if (response && (response.items || response.data?.items || Array.isArray(response))) {
         const responseData = response.data || response;
         const badgesList = responseData.items || responseData || [];
         setBadges(badgesList);
-        return badgesList;
+        
+        // Update pagination state if pagination info is available
+        if (responseData.page !== undefined) {
+          setPagination({
+            page: responseData.page || page,
+            pageSize: responseData.pageSize || pageSize,
+            totalCount: responseData.totalCount || badgesList.length,
+          });
+        }
+        
+        return responseData;
       }
       throw new Error('Invalid response format');
     } catch (err) {
@@ -67,6 +80,8 @@ export const usePublisherBadgeMapping = () => {
       setError(errorMessage);
       console.error('getAllBadges error:', err);
       throw err;
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -95,21 +110,23 @@ export const usePublisherBadgeMapping = () => {
     }
   }, []);
 
-  const assignPublisherBadgeMapping = useCallback(async (publisherId, badgeIds) => {
+  const assignPublisherBadgeMapping = useCallback(async (publisherIds, badgeId) => {
     setLoading(true);
     setError(null);
 
     try {
       const mappingData = {
-        publisherId: parseInt(publisherId),
-        badgeIds: badgeIds.map(id => parseInt(id))
+        PublisherIds: Array.isArray(publisherIds) 
+          ? publisherIds.map(id => parseInt(id))
+          : [parseInt(publisherIds)],
+        BadgeId: badgeId ? parseInt(badgeId) : null
       };
 
       const response = await ApiService.assignPublisherBadgeMapping(mappingData);
       
       return response.data || response;
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to assign badges to publisher';
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to assign badge to publishers';
       setError(errorMessage);
       console.error('assignPublisherBadgeMapping error:', err);
       throw err;

@@ -2245,6 +2245,13 @@ async uploadCsvFileByName(formData) {
     }
     return this.request(url);
   }
+    async getAllPublisherBadges(page = 1, pageSize = 10, badgeName = '') {
+    let url = `${ENDPOINTS.PUBLISHER_BADGES}?page=${page}&pageSize=${pageSize}`;
+    if (badgeName && badgeName.trim() !== '') {
+      url += `&BadgeName=${encodeURIComponent(badgeName.trim())}`;
+    }
+    return this.request(url);
+  }
 
   // GET book badge by ID
   async getBookBadgeById(badgeId) {

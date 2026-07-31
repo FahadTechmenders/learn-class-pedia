@@ -32,7 +32,7 @@ const PublisherBadgeMapping = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTerm, setFilterTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(100);
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState(null);
   const [selectedPublishers, setSelectedPublishers] = useState([]);
@@ -45,7 +45,7 @@ const PublisherBadgeMapping = () => {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        await getAllBadges(1, 100, '');
+        await getAllBadges(currentPage, pageSize, filterTerm);
         await getAllPublishers(1, 100);
       } catch (err) {
         console.error('Failed to load initial data:', err);
@@ -53,18 +53,18 @@ const PublisherBadgeMapping = () => {
     };
     
     loadInitialData();
-  }, [getAllPublishers, getAllBadges]);
+  }, [getAllPublishers, getAllBadges, currentPage, pageSize, filterTerm]);
 
   const handleFilter = useCallback(() => {
     setFilterTerm(searchTerm);
-    getAllBadges(1, 100, searchTerm);
-  }, [searchTerm, getAllBadges]);
+    setCurrentPage(1); // Reset to first page when filtering
+  }, [searchTerm]);
 
   const handleClearFilter = useCallback(() => {
     setSearchTerm('');
     setFilterTerm('');
-    getAllBadges(1, 100, '');
-  }, [getAllBadges]);
+    setCurrentPage(1); // Reset to first page when clearing filter
+  }, []);
 
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -121,17 +121,9 @@ const PublisherBadgeMapping = () => {
 
     setLoadingMapping(true);
     try {
-      // Assign badge to newly selected publishers
-      for (const publisherId of selectedPublishers) {
-        await assignPublisherBadgeMapping(publisherId, [selectedBadge.id]);
-      }
-      
-      // Remove badge from publishers that were unchecked
-      const removedPublishers = assignedPublishers.filter(id => !selectedPublishers.includes(id));
-      for (const publisherId of removedPublishers) {
-        // Remove the badge by calling assign with empty array
-        await assignPublisherBadgeMapping(publisherId, []);
-      }
+      // Assign badge to all selected publishers
+      // Backend should handle replacing existing assignments
+      await assignPublisherBadgeMapping(selectedPublishers, selectedBadge.id);
       
       const badgeName = selectedBadge.name || selectedBadge.title || selectedBadge.badgeName || 'Badge';
       setSuccessMessage(`Successfully updated publisher assignments for "${badgeName}"`);
@@ -147,7 +139,7 @@ const PublisherBadgeMapping = () => {
     } finally {
       setLoadingMapping(false);
     }
-  }, [selectedBadge, selectedPublishers, assignedPublishers, assignPublisherBadgeMapping, closeMappingModal]);
+  }, [selectedBadge, selectedPublishers, assignPublisherBadgeMapping, closeMappingModal]);
 
   const handlePageChange = useCallback((newPage) => {
     setCurrentPage(newPage);
