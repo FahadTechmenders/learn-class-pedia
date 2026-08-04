@@ -373,12 +373,35 @@ const BookReviewManagement = () => {
   };
 
   const handleEditReview = (review) => {
+
+    // Resolve customer ID from various possible field names
+    const resolvedCustomerId =
+      review.customerId ?? review.customerID ?? review.userId ?? review.customer?.id ?? '';
+
     setEditingReview(review);
     setFormData({
       rating: review.rating,
       review: review.review,
-      customerId: review.customerId || ''
+      customerId: resolvedCustomerId
     });
+
+    // Ensure the review's customer is present in the dropdown list so it displays correctly
+    if (resolvedCustomerId) {
+      const reviewCustomer = {
+        id: resolvedCustomerId,
+        fullName: review.customerName || review.customer?.fullName || 'Unknown Customer',
+        email: review.customerEmail || review.customer?.email || '',
+        description: review.customerEmail || review.customer?.email || ''
+      };
+
+      setCustomers((prev) => {
+        const exists = prev.some((c) => String(c.id) === String(resolvedCustomerId));
+        return exists ? prev : [reviewCustomer, ...prev];
+      });
+      // Clear any stale search results so the base customers list (with the injected customer) is used
+      setCustomerSearchResults([]);
+    }
+
     setShowEditModal(true);
   };
 
