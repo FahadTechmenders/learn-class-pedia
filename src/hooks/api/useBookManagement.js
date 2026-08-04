@@ -11,7 +11,7 @@ export const useBookManagement = () => {
   const [bookStatuses, setBookStatuses] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
-    pageSize: 20,
+    pageSize: 100,
     totalCount: 0,
     unpublishRequestCount: 0,
   });
@@ -48,7 +48,7 @@ export const useBookManagement = () => {
       }
       throw new Error('Invalid response format');
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch books';
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to Fetch books Network error';
       setError(errorMessage);
       console.error('getAllBooks error:', err);
       throw err;
@@ -71,7 +71,7 @@ export const useBookManagement = () => {
       }
       throw new Error('Invalid response format');
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to fetch book';
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to Fetch books Network error';
       setError(errorMessage);
       throw err;
     } finally {
