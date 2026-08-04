@@ -264,6 +264,15 @@ export const ENDPOINTS = {
   
   // Publisher Payout endpoints
   PUBLISHER_PAYOUT: '/PublisherPayout',
+
+  // Book Review endpoints
+  BOOK_REVIEW_BY_BOOK: (bookId) => `/BookReview/book/${bookId}`,
+  BOOK_REVIEW_BY_ID: (id) => `/BookReview/${id}`,
+  BOOK_REVIEW_DETAILS: (id) => `/BookReview/${id}/details`,
+  BOOK_REVIEW_CREATE: '/BookReview',
+  BOOK_REVIEW_UPDATE: (id) => `/BookReview/${id}`,
+  BOOK_REVIEW_DELETE: (id) => `/BookReview/${id}`,
+  BOOK_REVIEW_CUSTOMERS: '/BookReview/customers',
 };
 
 // HTTP Status Codes

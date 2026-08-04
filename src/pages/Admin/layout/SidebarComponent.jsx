@@ -194,6 +194,12 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 label: 'Publisher Book Sales',
                 icon: ShoppingCart,
                 path: 'publisher-book-sale'
+              },
+              {
+                id: 'book-review-management',
+                label: 'Book Reviews',
+                icon: Star,
+                path: 'book-review-management'
               }
             ]
           },
@@ -273,6 +279,12 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 label: 'Publisher Book Sales',
                 icon: ShoppingCart,
                 path: 'publisher-book-sale'
+              },
+              {
+                id: 'book-review-management',
+                label: 'Book Reviews',
+                icon: Star,
+                path: 'book-review-management'
               }
             ]
           },

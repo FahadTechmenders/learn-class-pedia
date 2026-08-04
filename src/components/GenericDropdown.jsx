@@ -28,7 +28,9 @@ const GenericDropdown = ({
     const lowerSearchTerm = searchTerm.toLowerCase();
     return items.filter(item => 
       item[displayField]?.toLowerCase().includes(lowerSearchTerm) ||
-      item.description?.toLowerCase().includes(lowerSearchTerm)
+      item.description?.toLowerCase().includes(lowerSearchTerm) ||
+      item.email?.toLowerCase().includes(lowerSearchTerm) ||
+      item.title?.toLowerCase().includes(lowerSearchTerm)
     );
   }, [items, searchTerm, searchable, displayField, onSearch]);
 
@@ -106,24 +108,28 @@ const GenericDropdown = ({
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
+        setSearchTerm('');
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, dropdownRef]);
+  }, [isOpen]);
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       {/* Trigger Button */}
       <div
-        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white flex items-center justify-between cursor-pointer ${
-          disabled ? 'bg-gray-100 cursor-not-allowed' : 'hover:border-gray-400'
+        className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 flex items-center justify-between cursor-pointer ${
+          disabled ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : 'hover:border-gray-400 dark:hover:border-gray-500'
         }`}
         onClick={() => !disabled && setIsOpen(!isOpen)}
       >
         <span className={`flex-1 px-4 truncate ${
-          (multiple && (!value || value.length === 0)) || (!multiple && (value === null || value === '')) ? 'text-gray-400' : 'text-gray-900'
+          (multiple && (!value || value.length === 0)) || (!multiple && (value === null || value === '')) ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'
         }`}>
           {getSelectedDisplayName()}
         </span>
@@ -150,13 +156,17 @@ const GenericDropdown = ({
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute z-[9999] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-hidden">
+        <div className="absolute z-[9999] w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-80 overflow-hidden">
           {/* Search Input */}
           {searchable && (
-            <div className="p-3 border-b border-gray-200">
+            <div 
+              className="p-3 border-b border-gray-200 dark:border-gray-700"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="relative">
                 <Search 
-                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 ${loading ? 'animate-spin' : ''}`}
+                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 ${loading ? 'animate-spin' : ''}`}
                   size={16} 
                 />
                 <input
@@ -164,8 +174,9 @@ const GenericDropdown = ({
                   placeholder={`Search ${placeholder.toLowerCase()}...`}
                   value={searchTerm}
                   onChange={handleSearchChange}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  onClick={(e) => e.stopPropagation()}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-600 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                  autoComplete="off"
+                  autoFocus
                 />
                 {loading && (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -178,7 +189,7 @@ const GenericDropdown = ({
 
           {/* Select All */}
           {multiple && showSelectAll && items.length > 0 && (
-            <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+            <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
               <button
                 className="flex items-center w-full text-left cursor-pointer hover:bg-gray-100 rounded px-1 py-1 transition-colors"
                 onClick={handleSelectAll}
@@ -218,8 +229,8 @@ const GenericDropdown = ({
                 return (
                   <div
                     key={itemValue || index}
-                    className={`flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer ${
-                      isSelected ? 'bg-blue-50 text-blue-600' : ''
+                    className={`flex items-center px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer ${
+                      isSelected ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'
                     }`}
                     onClick={() => {
                      
@@ -231,24 +242,24 @@ const GenericDropdown = ({
                         type="checkbox"
                         readOnly
                         checked={isSelected}
-                        className="w-4 h-4 mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        className="w-4 h-4 mr-2 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
                     ) : (
                       <span className={`w-2 h-2 rounded-full mr-2 ${
-                        isSelected ? 'bg-blue-500' : 'bg-gray-400'
+                        isSelected ? 'bg-blue-500' : 'bg-gray-400 dark:bg-gray-600'
                       }`} />
                     )}
                     <div className="flex-1">
                       <div className="font-medium text-sm">{item[displayField]}</div>
                       {item?.description ? (
-                        <div className="text-xs text-gray-500">{item.description}</div>
-                      ) :  <div className="text-xs text-gray-500">{item.title}</div>}
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{item.description}</div>
+                      ) :  <div className="text-xs text-gray-500 dark:text-gray-400">{item.title}</div>}
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="px-3 py-8 text-center text-gray-500 text-sm">
+              <div className="px-3 py-8 text-center text-gray-500 dark:text-gray-400 text-sm">
                 {searchTerm ? 'No items found' : 'No items available'}
               </div>
             )}
