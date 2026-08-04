@@ -200,6 +200,12 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 label: 'Book Reviews',
                 icon: Star,
                 path: 'book-review-management'
+              },
+              {
+                id: 'book-category-mapping',
+                label: 'Book Category Mapping',
+                icon: Tag,
+                path: 'book-category-mapping'
               }
             ]
           },
@@ -221,6 +227,12 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 label: 'Publisher Badge Mapping',
                 icon: Tag,
                 path: 'publisher-badge-mapping'
+              },
+              {
+                id: 'publisher-category-mapping',
+                label: 'Publisher Category Mapping',
+                icon: Tag,
+                path: 'publisher-category-mapping'
               }
             ]
           },
@@ -285,6 +297,12 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 label: 'Book Reviews',
                 icon: Star,
                 path: 'book-review-management'
+              },
+              {
+                id: 'book-category-mapping',
+                label: 'Book Category Mapping',
+                icon: Tag,
+                path: 'book-category-mapping'
               }
             ]
           },
@@ -305,6 +323,12 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
                 label: 'Publisher Badge Mapping',
                 icon: Tag,
                 path: 'publisher-badge-mapping'
+              },
+              {
+                id: 'publisher-category-mapping',
+                label: 'Publisher Category Mapping',
+                icon: Tag,
+                path: 'publisher-category-mapping'
               }
             ]
           }

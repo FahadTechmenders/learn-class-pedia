@@ -273,6 +273,14 @@ export const ENDPOINTS = {
   BOOK_REVIEW_UPDATE: (id) => `/BookReview/${id}`,
   BOOK_REVIEW_DELETE: (id) => `/BookReview/${id}`,
   BOOK_REVIEW_CUSTOMERS: '/BookReview/customers',
+
+  // Publisher Category Mapping endpoints
+  PUBLISHER_CATEGORY_MAPPING_ASSIGN: '/PublisherCategoryMapping/assign',
+  PUBLISHER_CATEGORY_MAPPING_GET: (categoryId) => `/PublisherCategoryMapping/${categoryId}`,
+
+  // Book Category Mapping endpoints
+  BOOK_CATEGORY_MAPPING_ASSIGN: '/BookCategoryMapping/assign',
+  BOOK_CATEGORY_MAPPING_GET: (categoryId) => `/BookCategoryMapping/${categoryId}`,
 };
 
 // HTTP Status Codes

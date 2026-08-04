@@ -36,6 +36,8 @@ import PublisherBadgeMapping from '../pages/PublisherBadgeMapping/PublisherBadge
 import PublisherBadgeManagement from '../pages/PublisherBadgeManagement/PublisherBadgeManagement';
 import PublisherBookSale from '../pages/PublisherBookSale/PublisherBookSale';
 import BookReviewManagement from '../pages/BookReviewManagement/BookReviewManagement';
+import PublisherCategoryMapping from '../pages/PublisherCategoryMapping/PublisherCategoryMapping';
+import BookCategoryMapping from '../pages/BookCategoryMapping/BookCategoryMapping';
 
 const componentMap = {
   Dashboard,
@@ -72,6 +74,8 @@ const componentMap = {
   PublisherBadgeManagement,
   PublisherBookSale,
   BookReviewManagement,
+  PublisherCategoryMapping,
+  BookCategoryMapping,
 };
 
 export const ProtectedRoute = ({ children }) => {
@@ -261,6 +265,16 @@ const DynamicRoutes = () => {
       <Route path="book-review-management" element={
         <ProtectedRoute>
           <BookReviewManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="publisher-category-mapping" element={
+        <ProtectedRoute>
+          <PublisherCategoryMapping />
+        </ProtectedRoute>
+      } />
+      <Route path="book-category-mapping" element={
+        <ProtectedRoute>
+          <BookCategoryMapping />
         </ProtectedRoute>
       } />
 
