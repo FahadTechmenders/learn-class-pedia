@@ -26,11 +26,13 @@ import {
   MessageSquare,
   Percent
 } from 'lucide-react';
-import useStudentManagement from '../../../../hooks/api/useStudentManagement';
+import useStudentManagement, { DEFAULT_STUDENT_PAGE_SIZE } from '../../../../hooks/api/useStudentManagement';
 import { useAdmin } from '../../../../hooks/api/useAdmin';
 import GenericDropdown from '../../../../components/GenericDropdown';
 import { useToast } from '../../../../components/ToastProvider';
 import './StudentManagement.css';
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
 const StudentManagement = () => {
   const { showSuccess, showError } = useToast();
@@ -62,6 +64,7 @@ const StudentManagement = () => {
   } = useAdmin();
 
   // Component state
+  const [pageSize, setPageSize] = useState(DEFAULT_STUDENT_PAGE_SIZE);
   const [filters, setFilters] = useState({
     fullName: '',
     email: '',
@@ -148,47 +151,60 @@ const StudentManagement = () => {
 
 
   // Load students function
-  const loadStudents = useCallback(async (page = 1, pageSize = 100) => {
+  const loadStudents = useCallback(async (page = 1, size = pageSize) => {
     try {
-      await getAllStudents(page, pageSize, filters);
+      await getAllStudents(page, size, filters);
     } catch (err) {
       console.error('Failed to load students:', err);
     }
-  }, [getAllStudents, filters]);
+  }, [getAllStudents, filters, pageSize]);
 
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await loadStudents(pagination.currentPage, pagination.pageSize);
+      await loadStudents(pagination.currentPage, pageSize);
     } catch (err) {
       console.error('Failed to refresh students:', err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [loadStudents, pagination.currentPage, pagination.pageSize]);
+  }, [loadStudents, pagination.currentPage, pageSize]);
 
   // Load initial data on mount
   useEffect(() => {
-    getAllStudents(1, 100, {});
+    getAllStudents(1, DEFAULT_STUDENT_PAGE_SIZE, {});
   }, [getAllStudents]);
 
   const handleFilter = useCallback(async () => {
     try {
-      await filterStudents(filters, 1, pagination.pageSize);
+      await filterStudents(filters, 1, pageSize);
     } catch (err) {
       console.error('Failed to filter students:', err);
     }
-  }, [filterStudents, filters, pagination.pageSize]);
+  }, [filterStudents, filters, pageSize]);
 
   const handlePageChange = useCallback(async (newPage) => {
+    const target = Math.max(1, Math.min(newPage, pagination.totalPages || newPage));
+    if (target === pagination.currentPage) return;
     try {
-      await getAllStudents(newPage, pagination.pageSize, filters);
+      await getAllStudents(target, pageSize, filters);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error('Failed to change page:', err);
     }
-  }, [getAllStudents, pagination.pageSize, filters]);
+  }, [getAllStudents, pageSize, filters, pagination.totalPages, pagination.currentPage]);
+
+  const handlePageSizeChange = useCallback(async (size) => {
+    const next = Number(size) || DEFAULT_STUDENT_PAGE_SIZE;
+    setPageSize(next);
+    try {
+      await getAllStudents(1, next, filters);
+    } catch (err) {
+      console.error('Failed to change page size:', err);
+    }
+  }, [getAllStudents, filters]);
 
   const handleViewStudent = useCallback(async (studentId) => {
     try {
@@ -340,11 +356,11 @@ const StudentManagement = () => {
   const clearFilters = useCallback(async () => {
     try {
       setFilters(emptyFiltersRef);
-      await getAllStudents(1, pagination.pageSize, emptyFiltersRef);
+      await getAllStudents(1, pageSize, emptyFiltersRef);
     } catch (err) {
       console.error('Failed to clear filters:', err);
     }
-  }, [getAllStudents, pagination.pageSize, emptyFiltersRef]);
+  }, [getAllStudents, pageSize, emptyFiltersRef]);
 
   // Reset a single filter and re-fetch
   const removeFilter = useCallback(async (key) => {
@@ -356,11 +372,11 @@ const StudentManagement = () => {
     const next = { ...filters, [key]: resetValue };
     setFilters(next);
     try {
-      await getAllStudents(1, pagination.pageSize, next);
+      await getAllStudents(1, pageSize, next);
     } catch (err) {
       console.error('Failed to remove filter:', err);
     }
-  }, [filters, getAllStudents, pagination.pageSize]);
+  }, [filters, getAllStudents, pageSize]);
 
   // Build active-filter metadata (count + chips)
   const { activeFilterCount, activeFilterChips } = useMemo(() => {
@@ -1850,13 +1866,28 @@ const StudentManagement = () => {
         </div>
 
         {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-gray-700 dark:text-gray-300 font-medium">
-                Showing <span className="font-semibold text-gray-900 dark:text-white">{((pagination.currentPage - 1) * pagination.pageSize) + 1}</span> to{' '}
-                <span className="font-semibold text-gray-900 dark:text-white">{Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount)}</span> of{' '}
-                <span className="font-semibold text-gray-900 dark:text-white">{pagination.totalCount}</span> results
+        {!loading && pagination.totalCount > 0 && (
+          <div className="px-4 sm:px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                <span>
+                  Showing <span className="font-semibold text-gray-900 dark:text-white">{((pagination.currentPage - 1) * pagination.pageSize) + 1}</span> to{' '}
+                  <span className="font-semibold text-gray-900 dark:text-white">{Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount)}</span> of{' '}
+                  <span className="font-semibold text-gray-900 dark:text-white">{pagination.totalCount.toLocaleString()}</span> students
+                </span>
+                <label className="inline-flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  Per page
+                  <select
+                    value={pageSize}
+                    onChange={(e) => handlePageSizeChange(e.target.value)}
+                    className="h-9 rounded-lg border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-600 px-2 text-sm font-medium text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    aria-label="Students per page"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </label>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -1868,7 +1899,7 @@ const StudentManagement = () => {
                   <span>Previous</span>
                 </button>
 
-                <div className="flex items-center gap-1">
+                <div className="hidden sm:flex items-center gap-1">
                   {/* Page numbers */}
                   {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                     let pageNum;
@@ -1896,6 +1927,9 @@ const StudentManagement = () => {
                     );
                   })}
                 </div>
+                <span className="sm:hidden text-sm font-medium text-gray-700 dark:text-gray-300 px-2 whitespace-nowrap">
+                  Page {pagination.currentPage} of {pagination.totalPages}
+                </span>
 
                 <button
                   onClick={() => handlePageChange(pagination.currentPage + 1)}

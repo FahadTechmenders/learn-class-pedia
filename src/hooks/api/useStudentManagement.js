@@ -1,6 +1,33 @@
 import { useState, useCallback, useEffect } from 'react';
 import ApiService from '../../services/ApiService';
 import { ENDPOINTS } from '../../config/api';
+import appSettings from '../../config/appSettings';
+
+export const DEFAULT_STUDENT_PAGE_SIZE = appSettings?.pagination?.defaultPageSize || 100;
+
+const firstNumber = (...values) => {
+  for (const v of values) {
+    const n = Number(v);
+    if (v !== undefined && v !== null && v !== '' && Number.isFinite(n)) return n;
+  }
+  return undefined;
+};
+
+const normalizePagination = (data, requestedPage, requestedPageSize, itemCount) => {
+  const p = data?.pagination || {};
+  const pageSize = firstNumber(data.pageSize, p.pageSize, requestedPageSize) || DEFAULT_STUDENT_PAGE_SIZE;
+  const currentPage = firstNumber(data.currentPage, data.pageNumber, data.page, p.currentPage, p.pageNumber, p.page, requestedPage) || 1;
+  const totalCount = firstNumber(data.totalCount, data.totalRecords, data.totalItems, data.total, p.totalCount, p.totalRecords, p.totalItems, p.total);
+  const resolvedTotal = totalCount !== undefined ? totalCount : (currentPage - 1) * pageSize + itemCount;
+  const totalPages = firstNumber(data.totalPages, p.totalPages) ?? (pageSize > 0 ? Math.max(1, Math.ceil(resolvedTotal / pageSize)) : 1);
+  const hasNextPage = typeof data.hasNextPage === 'boolean' ? data.hasNextPage
+    : typeof p.hasNextPage === 'boolean' ? p.hasNextPage
+      : currentPage < totalPages;
+  const hasPreviousPage = typeof data.hasPreviousPage === 'boolean' ? data.hasPreviousPage
+    : typeof p.hasPreviousPage === 'boolean' ? p.hasPreviousPage
+      : currentPage > 1;
+  return { currentPage, pageSize, totalCount: resolvedTotal, totalPages, hasNextPage, hasPreviousPage };
+};
 
 export const useStudentManagement = () => {
   // Global state
@@ -21,7 +48,7 @@ export const useStudentManagement = () => {
   // Pagination state
   const [pagination, setPagination] = useState({
     currentPage: 1,
-    pageSize: 100,
+    pageSize: DEFAULT_STUDENT_PAGE_SIZE,
     totalCount: 0,
     totalPages: 0,
     hasNextPage: false,
@@ -34,7 +61,7 @@ export const useStudentManagement = () => {
   }, []);
 
   // Get all students with pagination and filters
-  const getAllStudents = useCallback(async (pageNumber = 1, pageSize = 100, filters = {}) => {
+  const getAllStudents = useCallback(async (pageNumber = 1, pageSize = DEFAULT_STUDENT_PAGE_SIZE, filters = {}) => {
     setLoading(true);
     setError(null);
     
@@ -76,16 +103,10 @@ export const useStudentManagement = () => {
       // Handle the response format - data is directly in response, not nested under response.data
       if (response && (response.students || response.data?.students)) {
         const responseData = response.data || response;
-        setStudents(responseData.students || []);
+        const list = responseData.students || [];
+        setStudents(list);
         setSummary(responseData.summary || null);
-        setPagination({
-          currentPage: responseData.currentPage || 1,
-          pageSize: responseData.pageSize || pageSize,
-          totalCount: responseData.totalCount || 0,
-          totalPages: responseData.totalPages || 0,
-          hasNextPage: responseData.hasNextPage || false,
-          hasPreviousPage: responseData.hasPreviousPage || false
-        });
+        setPagination(normalizePagination(responseData, pageNumber, pageSize, list.length));
         return responseData;
       }
       throw new Error('Invalid response format');
@@ -123,7 +144,7 @@ export const useStudentManagement = () => {
   }, []);
 
   // Search students (wrapper for getAllStudents with search filters)
-  const searchStudents = useCallback(async (searchTerm, pageNumber = 1, pageSize = 100) => {
+  const searchStudents = useCallback(async (searchTerm, pageNumber = 1, pageSize = DEFAULT_STUDENT_PAGE_SIZE) => {
     const filters = {};
     
     // Try to determine search type based on input pattern
@@ -141,7 +162,7 @@ export const useStudentManagement = () => {
   }, [getAllStudents]);
 
   // Filter students
-  const filterStudents = useCallback(async (filters, pageNumber = 1, pageSize = 100) => {
+  const filterStudents = useCallback(async (filters, pageNumber = 1, pageSize = DEFAULT_STUDENT_PAGE_SIZE) => {
     return getAllStudents(pageNumber, pageSize, filters);
   }, [getAllStudents]);
 
@@ -152,7 +173,7 @@ export const useStudentManagement = () => {
     setSummary(null);
     setPagination({
       currentPage: 1,
-      pageSize: 100,
+      pageSize: DEFAULT_STUDENT_PAGE_SIZE,
       totalCount: 0,
       totalPages: 0,
       hasNextPage: false,
