@@ -1,0 +1,168 @@
+export const hasValue = (value) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+};
+
+export const getFullName = (lead) => {
+  if (!lead) return '';
+  if (hasValue(lead.customerName)) return lead.customerName.trim();
+  return `${lead.firstName ?? ''} ${lead.lastName ?? ''}`.trim();
+};
+
+export const getInitials = (lead) => {
+  if (!lead) return '';
+  const first = lead.firstName?.trim()?.[0];
+  const last = lead.lastName?.trim()?.[0];
+  if (first || last) return `${first ?? ''}${last ?? ''}`.toUpperCase();
+  const name = getFullName(lead);
+  if (!name) return '?';
+  const parts = name.split(/\s+/).filter(Boolean);
+  return parts.slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+};
+
+const parseDate = (value) => {
+  if (!hasValue(value)) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+export const formatDate = (value) => {
+  const date = parseDate(value);
+  if (!date) return null;
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+export const formatTime = (value) => {
+  const date = parseDate(value);
+  if (!date) return null;
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+};
+
+export const formatDateTime = (value) => {
+  const date = formatDate(value);
+  const time = formatTime(value);
+  if (!date) return null;
+  return `${date}, ${time}`;
+};
+
+export const formatUrlLabel = (url) => {
+  if (!hasValue(url)) return null;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const path = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '';
+    return `${host}${path}`;
+  } catch {
+    return url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+  }
+};
+
+export const getVerificationStatus = (isVerified) => ({
+  verified: Boolean(isVerified),
+  label: isVerified ? 'Verified' : 'Pending verification',
+});
+
+export const getAccountStatus = (isActive) => ({
+  active: Boolean(isActive),
+  label: isActive ? 'Active' : 'Inactive',
+});
+
+export const QUESTION_TYPE = {
+  SINGLE_CHOICE: 1,
+  MULTIPLE_CHOICE: 2,
+  TEXT: 3,
+};
+
+export const sortAnswers = (answers) => {
+  if (!Array.isArray(answers)) return [];
+  return [...answers].sort((a, b) => (a.questionOrder ?? 0) - (b.questionOrder ?? 0));
+};
+
+export const getAnswerContent = (answer) => {
+  if (!answer) return { type: 'empty', values: [] };
+  const choices = Array.isArray(answer.answers) ? answer.answers.filter(hasValue) : [];
+  const text = hasValue(answer.answerText) ? answer.answerText.trim() : null;
+
+  switch (answer.questionTypeId) {
+    case QUESTION_TYPE.SINGLE_CHOICE:
+      return { type: 'single', values: choices.slice(0, 1), text };
+    case QUESTION_TYPE.MULTIPLE_CHOICE:
+      return { type: 'multiple', values: choices, text };
+    case QUESTION_TYPE.TEXT:
+      return { type: 'text', values: [], text };
+    default:
+      if (choices.length > 1) return { type: 'multiple', values: choices, text };
+      if (choices.length === 1) return { type: 'single', values: choices, text };
+      return { type: 'text', values: [], text };
+  }
+};
+
+export const getInitialsFromName = (name) => {
+  if (!hasValue(name)) return '?';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+};
+
+export const mapLead = (lead) => ({
+  id: lead.customerId,
+  name: hasValue(lead.customerName) ? lead.customerName.trim() : 'Unnamed lead',
+  initials: getInitialsFromName(lead.customerName),
+  email: hasValue(lead.email) ? lead.email : null,
+  phone: hasValue(lead.phone) ? lead.phone : null,
+  institute: hasValue(lead.institute) ? lead.institute : null,
+  customerTypeId: lead.customerTypeId ?? null,
+  customerType: hasValue(lead.customerType) ? lead.customerType : null,
+  customerTypeDescription: hasValue(lead.customerTypeDescription) ? lead.customerTypeDescription : null,
+  country: hasValue(lead.country) ? lead.country : null,
+  signupType: hasValue(lead.signupType) ? lead.signupType : null,
+  emailVerified: Boolean(lead.isEmailVerified),
+  phoneVerified: Boolean(lead.isPhoneVerified),
+  active: Boolean(lead.isActive),
+  signupDate: formatDate(lead.signupDate),
+  signupTime: formatTime(lead.signupDate),
+});
+
+export const getPageRange = (page, pageSize, totalRecords) => {
+  if (!totalRecords) return { start: 0, end: 0 };
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalRecords);
+  return { start, end };
+};
+
+export const buildLeadJourney = (lead) => {
+  if (!lead) return [];
+  const steps = [];
+
+  const referral = formatUrlLabel(lead.referralUrl);
+  if (referral) steps.push({ key: 'referral', label: referral, caption: 'Referral' });
+
+  const landing = formatUrlLabel(lead.landingPageUrl);
+  if (landing) steps.push({ key: 'landing', label: landing, caption: 'Landing page' });
+
+  steps.push({
+    key: 'signup',
+    label: hasValue(lead.signupType) ? `${lead.signupType} Signup` : 'Signup',
+    caption: formatDate(lead.signupDate) || 'Registered',
+    highlight: true,
+  });
+
+  const verified = Boolean(lead.isEmailVerified || lead.isPhoneVerified);
+  steps.push({
+    key: 'verification',
+    label: verified ? 'Verified' : 'Verification Pending',
+    caption: 'Account verification',
+    muted: !verified,
+  });
+
+  steps.push({
+    key: 'account',
+    label: lead.isActive ? 'Active Account' : 'Inactive Account',
+    caption: 'ClassPedia LMS',
+    muted: !lead.isActive,
+  });
+
+  return steps;
+};
