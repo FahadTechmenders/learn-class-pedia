@@ -281,6 +281,11 @@ export const ENDPOINTS = {
   // Book Category Mapping endpoints
   BOOK_CATEGORY_MAPPING_ASSIGN: '/BookCategoryMapping/assign',
   BOOK_CATEGORY_MAPPING_GET: (categoryId) => `/BookCategoryMapping/${categoryId}`,
+
+  // LMS Leads Management endpoints (new API)
+  LEADS_MANAGEMENT_LIST: '/LeadsManagement',
+  LEADS_MANAGEMENT_DETAILS: (customerId) => `/LeadsManagement/${customerId}`,
+  LEADS_MANAGEMENT_CUSTOMER_TYPES: '/LeadsManagement/customer-types',
 };
 
 // HTTP Status Codes

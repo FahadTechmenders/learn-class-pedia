@@ -38,6 +38,9 @@ import PublisherBookSale from '../pages/PublisherBookSale/PublisherBookSale';
 import BookReviewManagement from '../pages/BookReviewManagement/BookReviewManagement';
 import PublisherCategoryMapping from '../pages/PublisherCategoryMapping/PublisherCategoryMapping';
 import BookCategoryMapping from '../pages/BookCategoryMapping/BookCategoryMapping';
+import LmsLeads from '../pages/LmsLeads/LmsLeads';
+import LmsLeadsManagement from '../pages/LmsLeadsManagement/LmsLeadsManagement';
+import LmsLeadDetails from '../pages/LmsLeadsManagement/LmsLeadDetails';
 
 const componentMap = {
   Dashboard,
@@ -76,6 +79,9 @@ const componentMap = {
   BookReviewManagement,
   PublisherCategoryMapping,
   BookCategoryMapping,
+  LmsLeads,
+  LmsLeadsManagement,
+  LmsLeadDetails,
 };
 
 export const ProtectedRoute = ({ children }) => {
@@ -275,6 +281,16 @@ const DynamicRoutes = () => {
       <Route path="book-category-mapping" element={
         <ProtectedRoute>
           <BookCategoryMapping />
+        </ProtectedRoute>
+      } />
+      <Route path="lms-leads" element={
+        <ProtectedRoute>
+          <LmsLeadsManagement />
+        </ProtectedRoute>
+      } />
+      <Route path="lms-leads/:customerId" element={
+        <ProtectedRoute>
+          <LmsLeadDetails />
         </ProtectedRoute>
       } />
 

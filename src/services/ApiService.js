@@ -2412,6 +2412,58 @@ async uploadCsvFileByName(formData) {
     });
   }
 
+  // LMS Leads Management methods
+  
+  /**
+   * GET LMS Leads list with pagination, search, and filters
+   * @param {Object} params - Query parameters
+   * @param {number} params.page - Page number (1-based)
+   * @param {number} params.pageSize - Items per page (1-100)
+   * @param {string} params.search - Search term (matches name, email, phone, institute)
+   * @param {number} params.customerTypeId - Filter by customer type
+   * @param {string} params.sortBy - Sort field (signupDate, customerName, email, institute, customerType, country)
+   * @param {string} params.sortDirection - Sort direction (asc|desc)
+   * @returns {Promise<Object>} API response with items, pagination, etc.
+   */
+  async getLmsLeads(params = {}) {
+    const queryParams = new URLSearchParams();
+    
+    // Add pagination params (defaults handled by backend)
+    if (params.page) queryParams.append('page', params.page);
+    if (params.pageSize) queryParams.append('pageSize', params.pageSize);
+    
+    // Add search param
+    if (params.search) queryParams.append('search', params.search);
+    
+    // Add filter params
+    if (params.customerTypeId) queryParams.append('customerTypeId', params.customerTypeId);
+    
+    // Add sorting params
+    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params.sortDirection) queryParams.append('sortDirection', params.sortDirection);
+    
+    const queryString = queryParams.toString();
+    const url = queryString ? `${ENDPOINTS.LEADS_MANAGEMENT_LIST}?${queryString}` : ENDPOINTS.LEADS_MANAGEMENT_LIST;
+    
+    return this.request(url);
+  }
+
+  /**
+   * GET LMS Lead details by customer ID
+   * @param {number} customerId - Customer ID
+   * @returns {Promise<Object>} API response with lead details and signup answers
+   */
+  async getLmsLeadDetails(customerId) {
+    return this.request(ENDPOINTS.LEADS_MANAGEMENT_DETAILS(customerId));
+  }
+
+  /**
+   * GET LMS Customer Types for filter dropdown
+   * @returns {Promise<Object>} API response with customer types array
+   */
+  async getLmsCustomerTypes() {
+    return this.request(ENDPOINTS.LEADS_MANAGEMENT_CUSTOMER_TYPES);
+  }
 }
 
 export default new ApiService();

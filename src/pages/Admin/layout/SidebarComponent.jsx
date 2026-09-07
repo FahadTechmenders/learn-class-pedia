@@ -1,4 +1,4 @@
-import { X, ChevronLeft, ChevronRight, User, LogOut, Star, ChevronDown, Brain, Percent, Award, Mail, Users, ShoppingCart, CreditCard, Book, BookOpen, Tag } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, User, LogOut, Star, ChevronDown, Brain, Percent, Award, Mail, Users, ShoppingCart, CreditCard, Book, BookOpen, Tag, UserPlus } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useDynamicRoutes } from '../../../hooks/api/useDynamicRoutes';
@@ -482,19 +482,29 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
     return item;
   }).filter(Boolean); // Remove null items
 
-  // Reorder items to place Publisher Management right after Book Management
+  // Reorder Management items: Lead Management first, then Publisher Management after Book Management
   const reorderedItems = (function() {
-    const bookMgmtIndex = allManagementItems.findIndex(item => item.id === 'book-management-parent');
-    const publisherMgmtIndex = allManagementItems.findIndex(item => item.id === 'publisher-management-parent');
+    let items = [...allManagementItems];
+    
+    // Add Lead Management as first item
+    const leadManagementItem = {
+      id: 'lms-leads',
+      label: 'Lead Management',
+      icon: UserPlus,
+      path: 'lms-leads'
+    };
+    items.unshift(leadManagementItem);
+    
+    // Place Publisher Management right after Book Management
+    const bookMgmtIndex = items.findIndex(item => item.id === 'book-management-parent');
+    const publisherMgmtIndex = items.findIndex(item => item.id === 'publisher-management-parent');
 
     if (bookMgmtIndex !== -1 && publisherMgmtIndex !== -1 && publisherMgmtIndex > bookMgmtIndex + 1) {
-      // Publisher Management exists but is not right after Book Management
-      const items = [...allManagementItems];
       const publisherItem = items.splice(publisherMgmtIndex, 1)[0];
       items.splice(bookMgmtIndex + 1, 0, publisherItem);
-      return items;
     }
-    return allManagementItems;
+    
+    return items;
   })();
   
   // Handle loading state
