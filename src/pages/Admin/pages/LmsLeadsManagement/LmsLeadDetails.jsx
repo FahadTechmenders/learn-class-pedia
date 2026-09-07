@@ -3,7 +3,6 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, AlertCircle, SearchX } from 'lucide-react';
 import useLmsLeadsManagement from '../../../../hooks/api/useLmsLeadsManagement';
 import LeadProfileHeader from './components/LeadProfileHeader';
-import LeadSummaryCards from './components/LeadSummaryCards';
 import {
   ContactInformationCard,
   VerificationCard,
@@ -163,8 +162,6 @@ const LmsLeadDetails = () => {
 
       <div className="space-y-6">
         <LeadProfileHeader lead={lead} />
-
-        <LeadSummaryCards lead={lead} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ContactInformationCard lead={lead} />

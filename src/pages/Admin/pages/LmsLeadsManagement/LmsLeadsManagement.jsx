@@ -162,8 +162,7 @@ const LmsLeadsManagement = () => {
 
         <LeadsSummaryCards
           totalRecords={pagination.totalRecords}
-          page={pagination.page || currentPage}
-          totalPages={pagination.totalPages}
+          customerTypesCount={customerTypes.length || null}
           leads={uiLeads}
         />
 

@@ -482,14 +482,14 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
     return item;
   }).filter(Boolean); // Remove null items
 
-  // Reorder Management items: Lead Management first, then Publisher Management after Book Management
+  // Reorder Management items: LMS Leads first, then Publisher Management after Book Management
   const reorderedItems = (function() {
     let items = [...allManagementItems];
     
-    // Add Lead Management as first item
+    // Add LMS Leads as first item
     const leadManagementItem = {
       id: 'lms-leads',
-      label: 'Lead Management',
+      label: 'LMS Leads',
       icon: UserPlus,
       path: 'lms-leads'
     };

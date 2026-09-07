@@ -62,6 +62,28 @@ export const VerificationBadges = ({ emailVerified, phoneVerified, compact = fal
   </div>
 );
 
+const VerificationIcon = ({ icon: Icon, verified, label }) => (
+  <span
+    title={`${label}: ${verified ? 'Verified' : 'Pending verification'}`}
+    aria-label={`${label} ${verified ? 'verified' : 'pending'}`}
+    className={`relative inline-flex items-center justify-center w-7 h-7 rounded-lg border ${
+      verified
+        ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-300'
+        : 'bg-gray-50 border-gray-200 text-gray-400 dark:bg-gray-900/40 dark:border-gray-700 dark:text-gray-500'
+    }`}
+  >
+    <Icon className="w-3.5 h-3.5" />
+    {verified && <CheckCircle className="absolute -top-1 -right-1 w-3 h-3 text-emerald-600 bg-white dark:bg-gray-800 rounded-full" />}
+  </span>
+);
+
+export const VerificationIcons = ({ emailVerified, phoneVerified }) => (
+  <div className="inline-flex items-center gap-1.5">
+    <VerificationIcon icon={Mail} verified={emailVerified} label="Email" />
+    <VerificationIcon icon={Phone} verified={phoneVerified} label="Phone" />
+  </div>
+);
+
 export const ActiveBadge = ({ active }) => (
   <StatusBadge tone={active ? 'success' : 'neutral'} icon={Activity}>
     {active ? 'Active' : 'Inactive'}
@@ -111,17 +133,17 @@ const SummaryCard = ({ icon: Icon, label, value, hint, accent }) => (
   </div>
 );
 
-export const LeadsSummaryCards = ({ totalRecords, page, totalPages, leads }) => {
+export const LeadsSummaryCards = ({ totalRecords, customerTypesCount, leads }) => {
   const verifiedEmails = leads.filter((l) => l.emailVerified).length;
   const activeLeads = leads.filter((l) => l.active).length;
-  const pageHint = leads.length ? `of ${leads.length} on this page` : 'on this page';
+  const pageValue = (count) => (leads.length ? `${count} / ${leads.length}` : '—');
 
   return (
     <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-4">
-      <SummaryCard icon={Users} label="Total Leads" value={totalRecords.toLocaleString()} hint="all records" accent="bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300" />
-      <SummaryCard icon={Layers} label="Current Page" value={totalPages ? `${page} / ${totalPages}` : page} hint="pages" accent="bg-violet-50 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300" />
-      <SummaryCard icon={Mail} label="Verified Emails" value={verifiedEmails} hint={pageHint} accent="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300" />
-      <SummaryCard icon={Activity} label="Active Leads" value={activeLeads} hint={pageHint} accent="bg-amber-50 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300" />
+      <SummaryCard icon={Users} label="Total Leads" value={totalRecords.toLocaleString()} hint="All LMS leads" accent="bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300" />
+      <SummaryCard icon={Layers} label="Customer Types" value={customerTypesCount ?? '—'} hint="Available lead types" accent="bg-violet-50 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300" />
+      <SummaryCard icon={Mail} label="Verified Emails · Current Page" value={pageValue(verifiedEmails)} hint="Loaded records only" accent="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300" />
+      <SummaryCard icon={Activity} label="Active Leads · Current Page" value={pageValue(activeLeads)} hint="Loaded records only" accent="bg-amber-50 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300" />
     </div>
   );
 };

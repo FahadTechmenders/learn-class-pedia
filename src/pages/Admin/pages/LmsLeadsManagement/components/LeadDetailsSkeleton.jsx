@@ -42,21 +42,6 @@ const LeadDetailsSkeleton = () => (
       </div>
     </CardShell>
 
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <CardShell key={i} className="p-4">
-          <div className="flex justify-between gap-3">
-            <div className="flex-1 space-y-2">
-              <Bone className="h-3 w-20" />
-              <Bone className="h-5 w-32" />
-              <Bone className="h-3 w-full" />
-            </div>
-            <Bone className="w-10 h-10 rounded-xl" />
-          </div>
-        </CardShell>
-      ))}
-    </div>
-
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <InfoCardSkeleton />
       <InfoCardSkeleton rows={3} />

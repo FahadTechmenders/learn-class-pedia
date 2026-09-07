@@ -132,37 +132,96 @@ export const getPageRange = (page, pageSize, totalRecords) => {
   return { start, end };
 };
 
+export const JOURNEY_STATUS = {
+  COMPLETED: 'completed',
+  CURRENT: 'current',
+  PENDING: 'pending',
+  MUTED: 'muted',
+};
+
+/**
+ * Builds the 5-step journey purely from API fields:
+ * referralUrl, landingPageUrl, signupType, signupDate, isEmailVerified, isPhoneVerified, isActive.
+ */
 export const buildLeadJourney = (lead) => {
   if (!lead) return [];
-  const steps = [];
 
   const referral = formatUrlLabel(lead.referralUrl);
-  if (referral) steps.push({ key: 'referral', label: referral, caption: 'Referral' });
-
   const landing = formatUrlLabel(lead.landingPageUrl);
-  if (landing) steps.push({ key: 'landing', label: landing, caption: 'Landing page' });
+  const signupDate = formatDate(lead.signupDate);
+  const signupDateTime = formatDateTime(lead.signupDate);
+  const emailVerified = Boolean(lead.isEmailVerified);
+  const phoneVerified = Boolean(lead.isPhoneVerified);
+  const verified = emailVerified || phoneVerified;
+  const fullyVerified = emailVerified && phoneVerified;
+  const active = Boolean(lead.isActive);
 
-  steps.push({
-    key: 'signup',
-    label: hasValue(lead.signupType) ? `${lead.signupType} Signup` : 'Signup',
-    caption: formatDate(lead.signupDate) || 'Registered',
-    highlight: true,
-  });
+  const steps = [
+    {
+      key: 'referral',
+      stage: 'Referral',
+      title: referral || 'Direct',
+      value: referral ? 'Referral source' : 'No referral recorded',
+      status: referral ? JOURNEY_STATUS.COMPLETED : JOURNEY_STATUS.MUTED,
+      href: referral ? lead.referralUrl : null,
+      details: [
+        { label: 'Source', value: referral || 'Not recorded' },
+        referral ? { label: 'URL', value: lead.referralUrl, href: lead.referralUrl } : null,
+      ].filter(Boolean),
+    },
+    {
+      key: 'landing',
+      stage: 'Landing Page',
+      title: landing || 'Unknown page',
+      value: landing ? 'First page visited' : 'No landing page recorded',
+      status: landing ? JOURNEY_STATUS.COMPLETED : JOURNEY_STATUS.MUTED,
+      href: landing ? lead.landingPageUrl : null,
+      details: [
+        { label: 'Page', value: landing || 'Not recorded' },
+        landing ? { label: 'URL', value: lead.landingPageUrl, href: lead.landingPageUrl } : null,
+      ].filter(Boolean),
+    },
+    {
+      key: 'signup',
+      stage: 'Signup',
+      title: hasValue(lead.signupType) ? `${lead.signupType} Signup` : 'Signup',
+      value: signupDate || 'Registered',
+      status: JOURNEY_STATUS.COMPLETED,
+      details: [
+        { label: 'Signed up', value: signupDateTime || 'Unknown' },
+        { label: 'Signup method', value: hasValue(lead.signupType) ? lead.signupType : 'Not specified' },
+      ],
+    },
+    {
+      key: 'verification',
+      stage: 'Verification',
+      title: fullyVerified ? 'Verified' : verified ? 'Partially Verified' : 'Verification Pending',
+      value: fullyVerified ? 'Email & phone verified' : verified ? (emailVerified ? 'Email verified' : 'Phone verified') : 'Awaiting verification',
+      status: fullyVerified ? JOURNEY_STATUS.COMPLETED : JOURNEY_STATUS.PENDING,
+      details: [
+        { label: 'Email', value: emailVerified ? 'Verified' : 'Pending' },
+        { label: 'Phone', value: phoneVerified ? 'Verified' : 'Pending' },
+      ],
+    },
+    {
+      key: 'account',
+      stage: 'Account',
+      title: active ? 'Active Account' : 'Inactive Account',
+      value: 'ClassPedia LMS',
+      status: active ? JOURNEY_STATUS.COMPLETED : JOURNEY_STATUS.MUTED,
+      details: [
+        { label: 'Status', value: active ? 'Active' : 'Inactive' },
+        { label: 'Customer ID', value: `#${lead.customerId}` },
+      ],
+    },
+  ];
 
-  const verified = Boolean(lead.isEmailVerified || lead.isPhoneVerified);
-  steps.push({
-    key: 'verification',
-    label: verified ? 'Verified' : 'Verification Pending',
-    caption: 'Account verification',
-    muted: !verified,
-  });
-
-  steps.push({
-    key: 'account',
-    label: lead.isActive ? 'Active Account' : 'Inactive Account',
-    caption: 'ClassPedia LMS',
-    muted: !lead.isActive,
-  });
-
-  return steps;
+  // Current step: the first unresolved stage after signup, otherwise the account stage.
+  const currentKey = !fullyVerified ? 'verification' : 'account';
+  return steps.map((step, index) => ({
+    ...step,
+    index,
+    number: String(index + 1).padStart(2, '0'),
+    isCurrent: step.key === currentKey,
+  }));
 };

@@ -11,6 +11,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Lead Journey traveling pulse */
+@keyframes journey-pulse-x {
+  0% { transform: translateX(-100%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(400%); opacity: 0; }
+}
+@keyframes journey-pulse-y {
+  0% { transform: translateY(-100%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(400%); opacity: 0; }
+}
+.journey-pulse-x { animation: journey-pulse-x 2.4s ease-in-out infinite; }
+.journey-pulse-y { animation: journey-pulse-y 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .journey-pulse-x, .journey-pulse-y { animation: none; display: none; }
+}
+
 /* Invisible scrollbar for better UX */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* Internet Explorer 10+ */

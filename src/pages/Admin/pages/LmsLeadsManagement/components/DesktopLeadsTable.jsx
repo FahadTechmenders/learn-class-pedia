@@ -1,11 +1,11 @@
 import React from 'react';
 import { ArrowUp, ArrowDown, ArrowUpDown, ArrowRight, Building2, MapPin } from 'lucide-react';
-import { LeadAvatar, LeadTypeBadge, VerificationBadges, ActiveBadge } from './LeadsListParts';
+import { LeadAvatar, LeadTypeBadge, VerificationIcons, ActiveBadge } from './LeadsListParts';
 
 const COLUMNS = [
-  { key: 'lead', label: 'Lead', sortKey: 'customerName', className: 'min-w-[260px]' },
+  { key: 'lead', label: 'Lead', sortKey: 'customerName', className: 'min-w-[240px]' },
   { key: 'institute', label: 'Institute', sortKey: 'institute' },
-  { key: 'type', label: 'Customer Type', sortKey: 'customerType', className: 'min-w-[200px]' },
+  { key: 'type', label: 'Customer Type', sortKey: 'customerType' },
   { key: 'country', label: 'Country', sortKey: 'country' },
   { key: 'verification', label: 'Verification' },
   { key: 'status', label: 'Status' },
@@ -52,25 +52,20 @@ const DesktopLeadsTable = ({ leads, sortBy, sortDirection, onSort, onView }) => 
             onClick={() => onView(lead.id)}
             className="group cursor-pointer transition-colors hover:bg-blue-50/40 dark:hover:bg-gray-700/40"
           >
-            <td className="px-4 py-3.5">
+            <td className="px-4 py-3">
               <div className="flex items-center gap-3 min-w-0">
-                <LeadAvatar initials={lead.initials} />
+                <LeadAvatar initials={lead.initials} size="sm" />
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{lead.name}</div>
                   {lead.email && (
-                    <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} className="block text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 truncate max-w-[220px]">
+                    <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} title={lead.phone || undefined} className="block text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 truncate max-w-[220px]">
                       {lead.email}
-                    </a>
-                  )}
-                  {lead.phone && (
-                    <a href={`tel:${lead.phone}`} onClick={(e) => e.stopPropagation()} className="block text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 truncate">
-                      {lead.phone}
                     </a>
                   )}
                 </div>
               </div>
             </td>
-            <td className="px-4 py-3.5 text-sm">
+            <td className="px-4 py-3 text-sm">
               {lead.institute ? (
                 <span className="inline-flex items-center gap-1.5 text-gray-800 dark:text-gray-100">
                   <Building2 className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
@@ -80,10 +75,10 @@ const DesktopLeadsTable = ({ leads, sortBy, sortDirection, onSort, onView }) => 
                 <span className="text-xs text-gray-400 dark:text-gray-500 italic">Not provided</span>
               )}
             </td>
-            <td className="px-4 py-3.5">
-              <LeadTypeBadge type={lead.customerType} description={lead.customerTypeDescription} showDescription clamp={1} />
+            <td className="px-4 py-3">
+              <LeadTypeBadge type={lead.customerType} description={lead.customerTypeDescription} />
             </td>
-            <td className="px-4 py-3.5 text-sm text-gray-800 dark:text-gray-100">
+            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-100">
               {lead.country ? (
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-gray-400" />
@@ -93,13 +88,13 @@ const DesktopLeadsTable = ({ leads, sortBy, sortDirection, onSort, onView }) => 
                 <span className="text-xs text-gray-400 dark:text-gray-500 italic">Not provided</span>
               )}
             </td>
-            <td className="px-4 py-3.5">
-              <VerificationBadges emailVerified={lead.emailVerified} phoneVerified={lead.phoneVerified} compact />
+            <td className="px-4 py-3">
+              <VerificationIcons emailVerified={lead.emailVerified} phoneVerified={lead.phoneVerified} />
             </td>
-            <td className="px-4 py-3.5">
+            <td className="px-4 py-3">
               <ActiveBadge active={lead.active} />
             </td>
-            <td className="px-4 py-3.5 whitespace-nowrap">
+            <td className="px-4 py-3 whitespace-nowrap">
               {lead.signupDate ? (
                 <>
                   <div className="text-sm text-gray-900 dark:text-white">{lead.signupDate}</div>
@@ -109,12 +104,12 @@ const DesktopLeadsTable = ({ leads, sortBy, sortDirection, onSort, onView }) => 
                 <span className="text-xs text-gray-400 dark:text-gray-500 italic">Unknown</span>
               )}
             </td>
-            <td className="px-4 py-3.5 text-right">
+            <td className="px-4 py-3 text-right">
               <button
                 onClick={(e) => { e.stopPropagation(); onView(lead.id); }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 group-hover:border-blue-300 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors whitespace-nowrap"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors whitespace-nowrap"
               >
-                View Details
+                View
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </td>
