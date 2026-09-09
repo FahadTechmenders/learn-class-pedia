@@ -39,9 +39,9 @@ const AnswerBody = ({ content, childAnswers }) => {
       )}
       {childAnswers && childAnswers.length > 0 && (
         <div className="pl-4 border-l-2 border-blue-200 dark:border-blue-800">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5">
+          {/* <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-1.5">
             Related Topics
-          </div>
+          </div> */}
           <div className="flex flex-wrap gap-1.5">
             {childAnswers.map((child, idx) => (
               <span
